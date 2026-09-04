@@ -1,6 +1,6 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.5 20260905)
+## Requirements & Planning Document (v1.6)
 
 **Status:** Draft for implementation\
 **Phase 1 scope:** Offline, single device, Human vs AI bots\
@@ -58,7 +58,8 @@ Detailed design and implementation decisions belong in dedicated subsystem docum
 | Document | Module | Main responsibility |
 |---|---|---|
 | `requirements.md` | Overall Product | Main source of truth for scope, rules, features, constraints, and high-level architecture |
-| `engine.md` | Game Engine | Authoritative game rules, validation, state transitions, scoring, and engine-owned game state |
+| `domain-model.md` | Shared Domain Model | Shared, implementation-independent TypeScript concepts used across modules, such as cards, ranks, suits, combinations, moves, player IDs, and game modes |
+| `engine.md` | Game Engine | Authoritative game rules, validation, state transitions, scoring, engine-owned state, information-safe views, and engine event contracts |
 | `orchestrator.md` | Game Orchestrator | Coordinates game flow, player controllers, engine execution, events, and round/session progression |
 | `ai.md` | AI System | Bot move selection, strategies, personalities, difficulty behavior, and permitted game information |
 | `ui-ux.md` | UI Layer | Screens, interactions, presentation, feedback, accessibility, responsive behavior, and quality-of-life features |
@@ -66,31 +67,33 @@ Detailed design and implementation decisions belong in dedicated subsystem docum
 | `events-logging.md` | Event & Logging System | Structured gameplay events, game history, debug logging, formatting, and event consumers |
 | `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic simulation, regression testing, and AI balancing support |
 
-Future online multiplayer may introduce a separate `networking.md` when that work enters scope. Player-controller contracts should initially be documented with the orchestrator, while engine configuration and ruleset configuration should initially be documented with the engine.
+Future online multiplayer may introduce a separate `networking.md` when that work enters scope. Shared domain concepts should be defined once in `domain-model.md` rather than duplicated inside subsystem documents. Player-controller contracts should initially be documented with the orchestrator, while engine configuration, authoritative state, ruleset configuration, player/public views, and engine event contracts should initially be documented with the engine.
 
 ### 1.3.1 Documentation authority
 
 The documents follow this authority model:
 
-1. **`requirements.md` defines product truth.** A subsystem document must not silently change a confirmed rule, scoring rule, product behavior, or architectural boundary defined here.
-2. **Subsystem documents define implementation contracts.** They may add internal types, APIs, algorithms, state models, workflows, and design decisions needed to satisfy this document.
-3. If implementation work reveals that a confirmed product requirement must change, **update `requirements.md` first**, then update the affected subsystem documents.
-4. Details should live in the most relevant subsystem document rather than being duplicated across every document. This main document may summarize a subsystem boundary without specifying its full implementation.
+1. **`requirements.md` defines product truth.** A lower-level document must not silently change a confirmed rule, scoring rule, product behavior, or architectural boundary defined here.
+2. **`domain-model.md` defines shared implementation-independent domain contracts.** It translates stable cross-module concepts from the requirements into shared TypeScript-oriented data types without owning authoritative rule algorithms.
+3. **Subsystem documents define subsystem-owned implementation contracts.** They may add internal types, APIs, algorithms, state models, workflows, and public contracts needed to satisfy this document and the shared domain model.
+4. If implementation work reveals that a confirmed product requirement must change, **update `requirements.md` first**, then update `domain-model.md` when shared types are affected, then update the affected subsystem documents.
+5. Details should live in their owning document rather than being duplicated. A public subsystem contract does not automatically become a shared domain model merely because another module consumes it.
 
 ### 1.3.2 High-level module boundaries
 
 The v1 architecture is organized around the following major responsibilities:
 
-- **Game Engine:** owns authoritative game truth, rule validation, state transitions, and scoring. It does not drive players, render UI, persist data, or choose AI moves.
-- **Game Orchestrator:** drives the game forward by coordinating player controllers and submitting their proposed actions to the engine. It does not reimplement game rules.
+- **Shared Domain Model:** defines the common application-wide vocabulary and simple shared data concepts, such as `Card`, `Rank`, `Suit`, `PlayerId`, `GameMode`, `Combination`, and `Move`. It contains no authoritative game algorithms and depends on no application subsystem.
+- **Game Engine:** owns authoritative game truth, internal runtime state, rule validation, state transitions, scoring, legal-move generation, information-safe state views, and factual engine event contracts. It does not drive players, render UI, persist data, or choose AI moves.
+- **Game Orchestrator:** drives game execution by coordinating player controllers and submitting their proposed actions to the engine. It does not reimplement game rules.
 - **Player Controllers:** provide player intent from a human, AI, or future network source. Controllers cannot mutate authoritative game state directly.
-- **AI System:** chooses among permitted actions using the information available to that bot. It does not determine authoritative legality.
-- **UI Layer:** renders player-facing state and gathers human input. It does not own authoritative game rules or scoring.
-- **Game Persistence:** stores and restores durable data. The engine must not depend on `localStorage` or another persistence implementation.
-- **Event & Logging System:** records structured gameplay events for UI history, debugging, testing, and simulation without changing game state.
+- **AI System:** chooses among permitted actions using only the information available to that bot. It does not determine authoritative legality.
+- **UI / Application Layer:** owns application navigation and screens, renders player-facing state, gathers human input, and presents results/settings/statistics. It does not own authoritative game rules or scoring.
+- **Game Persistence:** stores and restores durable data such as resumable games, settings, and statistics. The engine must not depend on `localStorage` or another persistence implementation.
+- **Event & Logging System:** retains, formats, and exposes structured gameplay events for UI history, debugging, testing, and simulation without changing game state. The authoritative factual event contracts themselves are produced by the engine.
 - **Testing & Simulation:** exercises the same production engine and orchestrator headlessly. Four AI-controlled players must be able to complete games and sessions without React or another UI being present.
 
-A central architectural requirement is that the **Game Engine remains independently executable and testable**. A headless setup consisting of the engine, orchestrator, four AI controllers, and event/logging components must be capable of running a complete game/session without UI or persistence dependencies.
+A central architectural requirement is that the **Game Engine remains independently executable and testable**. A headless setup consisting of the shared domain model, engine, orchestrator, four AI controllers, and event/logging consumers must be capable of running a complete game/session without UI or persistence dependencies.
 
 ## 1.4 Domain Terminology
 
@@ -920,22 +923,36 @@ without changing the core rules engine.
 
 # 5.1 Architecture
 
-Recommended source structure:
+Recommended high-level source organization:
 
 ``` text
 /src
+  /domain
+    cards
+    players
+    combinations
+    moves
+    game
+
   /engine
-    deck
+    state
     cards
     combinations
-    rules
-    comparison
-    turn-state
-    scoring
+    moves
+    turn
     round
     session
+    modes
+    scoring
+    config
+    events
+    views
+    rng
+    results
+    validation
 
-  /players
+  /orchestrator
+    GameRunner
     PlayerController
     HumanController
     AIController
@@ -943,25 +960,44 @@ Recommended source structure:
 
   /ai
     strategies
-    OptimizerBot
+    personalities
     difficulty
     rng
 
-  /state
-    session state
-    UI/game state wiring
-    persistence
-
   /ui
-    Table
-    Hand
-    Card
-    Trick
-    TurnIndicator
-    RoundResult
-    SessionSummary
-    Stats
+    pages
+    components
+    navigation
+    game
+    stats
+    settings
+
+  /persistence
+    snapshots
+    statistics
+    settings
+    migrations
+
+  /events-logging
+
+  /simulation
 ```
+
+The source tree is illustrative rather than a requirement to create every folder immediately.
+
+The main dependency rule is:
+
+``` text
+requirements.md
+      ↓
+domain-model.md
+      ↓
+domain types
+      ↓
+engine / orchestrator / AI / UI / persistence / logging
+```
+
+`/domain` contains shared game concepts only and must not import subsystem implementations. Engine-internal state and algorithms remain under `/engine`; public contracts remain with the subsystem that owns them unless they are genuinely implementation-independent domain concepts.
 
 ### Game mode and setup-modifier extensibility
 
@@ -1023,91 +1059,44 @@ an extension point only.
 
 ### Architectural boundary
 
-**`/engine` must never import from `/ui`.**
+Core dependency boundaries:
 
-The engine should know nothing about:
+- `/domain` must not import from any application subsystem.
+- `/engine` may depend on `/domain`, but must not depend on `/ui`, `/ai`, `/persistence`, `/simulation`, React, DOM APIs, browser events, animations, or visual presentation.
+- `/orchestrator` coordinates controllers and engine operations but must not duplicate engine legality, turn, or scoring rules.
+- UI and AI should consume engine-provided public contracts rather than inspect or mutate engine-internal state.
+- Persistence should store explicit persistence/snapshot contracts rather than force the engine's internal state representation to become a storage schema.
 
--   React
--   DOM elements
--   browser events
--   animations
--   visual presentation
-
-The UI should call engine functions and render the resulting state.
+The UI may use engine-provided legal-move information for responsiveness, but the engine remains authoritative.
 
 ------------------------------------------------------------------------
 
-# 5.2 Move / PlayerController Contract
+# 5.2 Move and PlayerController Boundary
 
-A controller proposes what a player wants to do.
+`Move` is a shared domain concept defined in `domain-model.md`. It represents player intent and does not prove legality.
 
-Conceptually:
-
-``` ts
-type Move =
-  | {
-      kind: 'play';
-      playerId: string;
-      cards: Card[];
-    }
-  | {
-      kind: 'pass';
-      playerId: string;
-    };
-```
-
-The controller does **not** get to decide whether a move is legal.
-
-### Engine responsibility
-
-The engine must:
-
-1.  Receive the proposed move.
-2.  Determine the combination represented by the selected cards.
-3.  Validate the combination.
-4.  Validate that the player owns the selected cards.
-5.  Validate that the play is legal against the current trick.
-6.  Validate opening 3♣ requirements.
-7.  Apply the move only if valid.
-8.  Return a clear validation result/error if invalid.
-
-The UI should use engine-provided legal-move information to prevent
-invalid submissions, but the engine remains authoritative.
-
-The engine should expose comparison/legal-move behavior equivalent to:
-
-``` ts
-canBeat(candidate: Combo, current: Combo): boolean
-```
-
-Required semantics:
-
--   Singles, Pairs, and Triples require matching combination type.
--   Five-card combinations compare first by five-card type hierarchy, then
-    by the same-type comparison rule when both types are equal.
--   Legal-move generation must enumerate all legal five-card responses, not
-    only combinations matching the current five-card type.
--   Human UI validation and AI move generation must use the same engine
-    legality rules.
-
-
-### Controller examples
+The architectural flow is:
 
 ``` text
-HumanController
-  receives input from the UI
-  proposes a Move
-
-AIController
-  receives game state and legal moves
-  selects a Move
-
-NetworkController (future)
-  receives remote input
-  proposes a Move
+Human / AI / Future Network Controller
+                ↓
+              Move
+                ↓
+        Game Orchestrator
+                ↓
+          Game Engine
+                ↓
+     result + factual events
 ```
 
-This allows the same engine to support local and future network players.
+Requirements:
+
+- Controllers propose Moves; they do not mutate authoritative state.
+- The Game Orchestrator coordinates when a controller is asked to act and forwards its proposed Move to the engine.
+- The Game Engine authoritatively validates the Move, applies accepted state transitions, determines resulting turn/trick state, and returns structured results.
+- Human UI and AI may consume legal-move information from the engine, but neither may independently redefine legality.
+- Player-controller lifecycle, asynchronous behavior, and runner flow belong to `orchestrator.md`.
+- Detailed validation, legal-move generation, state transitions, views, and engine result/error contracts belong to `engine.md`.
 
 ------------------------------------------------------------------------
 
@@ -1247,222 +1236,57 @@ counting is reserved for future Personality F.
 
 ------------------------------------------------------------------------
 
-# 7. Data Model
+# 7. Data and Model Ownership
 
-The following is a starting model and may be refined during
-implementation without changing the external rules.
+Detailed TypeScript model definitions are intentionally kept out of this requirements document.
 
-``` ts
-type Suit =
-  | 'clubs'
-  | 'spades'
-  | 'hearts'
-  | 'diamonds';
+The model ownership rules are:
 
-type Rank =
-  | '3' | '4' | '5' | '6' | '7' | '8' | '9'
-  | '10' | 'J' | 'Q' | 'K' | 'A' | '2';
+- **`domain-model.md`** defines stable shared domain concepts such as `Card`, `Rank`, `Suit`, `PlayerId`, `GameMode`, `CombinationType`, `Combination`, and `Move`.
+- **`engine.md`** defines authoritative/internal runtime state and engine public contracts such as Round/Session/Trick state, internal player state, validation results, scoring breakdowns, Player/Public Views, and engine event contracts.
+- **`orchestrator.md`** defines PlayerController and game-runner/orchestration contracts.
+- **`ai.md`** defines bot personalities, difficulty behavior, evaluation data, and AI-specific state.
+- **`ui-ux.md`** defines UI view state, navigation, card-selection/manual-ordering state, presentation models, and screen behavior.
+- **`persistence.md`** defines saved-game snapshots, statistics records, settings persistence, storage versions, and migrations.
+- **`events-logging.md`** defines event retention, formatting, debug/history records, filtering, and consumers.
+- **`testing-simulation.md`** defines simulation scenarios, aggregate metrics, fixtures, and test-run configuration.
 
-interface Card {
-  rank: Rank;
-  suit: Suit;
-}
+A type should not be placed in the shared domain model simply because multiple modules consume it. Public subsystem contracts remain owned by their subsystem unless they describe an implementation-independent game concept.
 
-type ComboType =
-  | 'single'
-  | 'pair'
-  | 'triple'
-  | 'straight'
-  | 'flush'
-  | 'fullhouse'
-  | 'fourkind'
-  | 'straightflush';
-
-interface Combo {
-  type: ComboType;
-  cards: Card[];
-
-  /**
-   * Effective comparison value.
-   * For straights and straight flushes this is
-   * the effective highest rank, including special
-   * low straights (5 and 6).
-   */
-  compareValue: number;
-}
-
-type BotPersonality =
-  | 'optimizer'
-  | 'chaotic'
-  | 'minimizer'
-  | 'greedy'
-  | 'spoiler'
-  | 'counter';
-
-type BotDifficulty =
-  | 'easy'
-  | 'normal'
-  | 'hard';
-
-type GameMode =
-  | 'basic'
-  | 'competitive';
-
-interface RulesetConfig {
-  suitOrder: Suit[];
-  fiveCardOrder: ComboType[];
-
-  allowLowWrapStraights: boolean;
-
-  /**
-   * Special low straights:
-   * A-2-3-4-5
-   * 2-3-4-5-6
-   */
-}
-
-interface PlayerState {
-  id: string;
-  hand: Card[];
-  isBot: boolean;
-  botPersonality?: BotPersonality;
-  botDifficulty?: BotDifficulty;
-
-  /**
-   * Official placement.
-   * Basic Mode: 1-4.
-   * Competitive Mode: winner only.
-   */
-  placement?: number;
-}
-
-interface RoundState {
-  roundNumber: number;
-  players: PlayerState[];
-
-  /**
-   * Current active player index.
-   * Turn advancement skips eliminated players.
-   */
-  currentTurn: number;
-
-  lastPlayedCombo: Combo | null;
-  lastPlayerToPlay: string | null;
-
-  passCount: number;
-
-  status:
-    | 'dealing'
-    | 'in_progress'
-    | 'finished';
-
-  /**
-   * Players in order of officially emptying
-   * their hands.
-   *
-   * Basic Mode: up to 3 players, with the
-   * final remaining player appended as 4th.
-   *
-   * Competitive Mode: contains the winner only.
-   */
-  finishOrder: string[];
-}
-
-interface RoundResult {
-  roundNumber: number;
-
-  finishOrder: string[];
-
-  pointsByPlayer: Record<string, number>;
-
-  /**
-   * Hand-type counts for the round.
-   */
-  handTypeCountsThisRound:
-    Record<string, Record<ComboType, number>>;
-}
-
-interface SessionState {
-  mode: GameMode;
-
-  ruleset: RulesetConfig;
-
-  players: {
-    id: string;
-    isBot: boolean;
-    botPersonality?: BotPersonality;
-    botDifficulty?: BotDifficulty;
-  }[];
-
-  roundsCompleted: RoundResult[];
-
-  currentRound: RoundState | null;
-
-  sessionTotals: Record<string, number>;
-
-  status:
-    | 'in_progress'
-    | 'finished';
-}
-
-interface HandTypeStats {
-  single: number;
-  pair: number;
-  triple: number;
-  straight: number;
-  flush: number;
-  fullhouse: number;
-  fourkind: number;
-  straightflush: number;
-}
-
-interface BasicModeStats {
-  sessionsPlayed: number;
-  sessionWins: number;
-  averageSessionScore: number;
-  bestSessionScore: number;
-  averagePlacement: number;
-  bestRoundScore: number;
-}
-
-interface CompetitiveModeStats {
-  sessionsPlayed: number;
-  sessionWins: number;
-  totalRunningScore: number;
-  averageSessionScore: number;
-  bestSessionScore: number;
-  bestRoundScore: number;
-}
-
-interface PlayerStats {
-  playerId: string;
-
-  basic: BasicModeStats;
-  competitive: CompetitiveModeStats;
-
-  cumulativeHandTypeCounts: HandTypeStats;
-}
-```
+This separation is intended to prevent duplicate models, hidden-information leakage, and accidental coupling between UI/AI/persistence code and engine-internal authoritative state.
 
 ------------------------------------------------------------------------
 
 # 8. UI / UX Screens
 
-## 8.1 Home / New Session
+## 8.1 Home / Main Menu
+
+The Home screen is the application's default landing page and primary navigation hub.
+
+Required primary actions:
+
+- **Play** — opens Game Setup for a new Session.
+- **Stats** — opens the persistent statistics screen.
+- **Settings** — opens application/gameplay settings.
+- **Resume** — shown when a resumable unfinished Session exists and allows the player to return to that Session.
+
+The Home/Main Menu belongs to the UI/application layer. It must not create a separate game-rules or orchestration subsystem.
+
+## 8.2 Game Setup
 
 Required:
 
--   Game mode selection:
-    -   Basic
-    -   Competitive
--   Per-bot difficulty configuration:
-    -   Bot 1: Easy / Normal / Hard
-    -   Bot 2: Easy / Normal / Hard
-    -   Bot 3: Easy / Normal / Hard
--   Start Session button.
--   Resume unfinished session if one exists.
+- Game mode selection:
+  - Basic
+  - Competitive
+- Per-bot difficulty configuration:
+  - Bot 1: Easy / Normal / Hard
+  - Bot 2: Easy / Normal / Hard
+  - Bot 3: Easy / Normal / Hard
+- Start Session button.
+- Starting a Session transitions from UI setup into Game Orchestrator execution, which creates/starts authoritative game state through the Game Engine.
 
-## 8.2 Game Table
+## 8.3 Game Table
 
 Display:
 
@@ -1509,7 +1333,7 @@ Normal and Hard AI may make use of publicly played-card information as part of t
 
 The UI should never rely solely on visual validation. The engine remains authoritative.
 
-## 8.3 Round Result
+## 8.4 Round Result
 
 Display:
 
@@ -1537,7 +1361,7 @@ In Competitive Mode, the three losing players may have their remaining card coun
 
 Round-result presentation should be skippable/accelerated when the corresponding pacing preference is enabled.
 
-## 8.4 Session Summary
+## 8.5 Session Summary
 
 Display:
 
@@ -1552,7 +1376,7 @@ Display:
 
 A Rematch preserves the selected mode and all three bot difficulty settings. A New Session returns the player to setup.
 
-## 8.5 Stats
+## 8.6 Stats
 
 Display persistent statistics.
 
@@ -1583,6 +1407,21 @@ At minimum:
 -   Cumulative hand-type usage.
 
 Basic and Competitive statistics must remain separate because their scoring and result models are different. The Stats screen should prioritize a concise set of meaningful headline statistics and avoid presenting every tracked metric with equal prominence.
+
+## 8.7 Settings
+
+The Settings screen provides application/gameplay preferences that do not change authoritative Pusoy Dos rules.
+
+Initial settings include:
+
+- Human auto-pass when zero legal plays exist.
+- Presentation pacing:
+  - Relaxed
+  - Fast
+
+Settings should use strong defaults and remain intentionally small. Avoid exposing unnecessary granular controls.
+
+Settings persistence belongs to `persistence.md`; presentation and interaction behavior belongs to `ui-ux.md`.
 
 ------------------------------------------------------------------------
 
@@ -2032,10 +1871,11 @@ implementation.
 
 # 15. Milestone Plan
 
-## M1 --- Engine Core
+## M1 --- Shared Domain + Engine Core
 
 Build:
 
+-   shared domain model foundation;
 -   card model;
 -   rank/suit ordering;
 -   deck;
@@ -2056,6 +1896,8 @@ No React UI required.
 Build:
 
 -   React/Vite application;
+-   Home / Main Menu;
+-   Game Setup screen;
 -   game table;
 -   human hand;
 -   Bot A;
