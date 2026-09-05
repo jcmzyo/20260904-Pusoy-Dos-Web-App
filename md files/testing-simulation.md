@@ -1,6 +1,6 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.1)
+## Testing & Simulation Document (v1.2)
 
 **Status:** Draft for implementation  
 **Last Modified:** September 5, 2026  
@@ -1933,3 +1933,49 @@ Headless Simulator
 The POC should optimize for **being demonstrably correct before being clever or fast**.
 
 Performance and memory are designed as observable, replaceable implementation concerns. Rule correctness, information safety, deterministic reproducibility, authoritative state integrity, and reliable Session completion are non-negotiable.
+
+---
+
+# 46. AI-Assisted Development Verification
+
+During development with coding assistants that have file read/write access but no terminal or shell access:
+
+- the coding assistant is responsible for implementing production code;
+- the coding assistant is responsible for writing the required automated tests;
+- the coding assistant must provide the exact verification commands for the developer to run locally;
+- the developer executes those commands in the real local project environment;
+- a newly implemented task is **READY FOR USER VERIFICATION**, not fully complete, until the developer confirms the required tests, type-checks, and builds succeed;
+- test or compilation failures should be returned to the coding assistant for focused diagnosis and correction;
+- the coding assistant must never claim that an unexecuted test, type-check, or build passed;
+- after a failure is corrected, the assistant must provide the exact commands that should be rerun;
+- unrelated refactoring or specification changes must not be introduced merely to make verification pass.
+
+The normal verification loop is:
+
+```text
+Coding assistant
+  → inspect relevant documentation and source
+  → implement production code
+  → write focused automated tests
+  → provide exact verification commands
+  → READY FOR USER VERIFICATION
+      ↓
+Developer
+  → run focused tests
+  → run required regression tests
+  → run type-check/build when applicable
+      ↓
+If verification fails
+  → return relevant failure output to coding assistant
+  → focused correction
+  → rerun required verification
+      ↓
+If verification succeeds
+  → task is COMPLETE
+  → review diff / commit
+```
+
+This workflow does **not** weaken or change the project's testing requirements, QA gates, Definition of Done, or headless-simulation requirements. It only separates implementation/test authorship from physical command execution when the coding assistant's environment has no shell.
+
+For M1 specifically, the detailed task-level handoff statuses and commands are owned by `m1-task-breakdown.md`. This document remains authoritative for the overall testing and simulation strategy.
+
