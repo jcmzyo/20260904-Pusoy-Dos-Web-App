@@ -5,8 +5,7 @@
   "description": "Offline web-based Pusoy Dos (Filipino Big Two) implementation. Shared domain model and Game Engine (M1).",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
