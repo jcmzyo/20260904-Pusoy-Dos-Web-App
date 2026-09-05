@@ -1,9 +1,10 @@
 # Pusoy Dos --- Shared Domain Model
 
-## Domain Model Document (v1.0)
+## Domain Model Document (v1.1)
 
 **Status:** Draft for implementation\
-**Parent document:** `requirements.md` v1.5\
+**Last Modified:** September 5, 2026\
+**Parent document:** `requirements.md` v1.8\
 **Scope:** Shared, implementation-independent game vocabulary and data
 contracts\
 **Language:** TypeScript
@@ -579,6 +580,15 @@ domain concepts.
 
 A domain type may have harmless value-level utilities where appropriate,
 but authoritative gameplay behavior must remain in the Game Engine.
+
+------------------------------------------------------------------------
+
+
+# 16.1 Internal Representation Boundary
+
+Subsystems may convert shared `Card` collections into bitmasks, bitsets, rank-frequency tables, suit-frequency tables, memoization keys, or other optimized internal representations. Those representations are **not** shared domain types and must not leak into `/domain` merely because multiple algorithms find them convenient. Public/shared contracts continue to use the domain concepts defined here unless a future requirements change explicitly promotes a representation.
+
+The POC optimization priority is correctness/reliability first, then speed, then memory. This priority does not change the shared model and leaves subsystem caches/representations free to evolve after profiling.
 
 ------------------------------------------------------------------------
 

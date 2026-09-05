@@ -1,8 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.6)
+## Requirements & Planning Document (v1.8)
 
 **Status:** Draft for implementation\
+**Last Modified:** September 5, 2026\
 **Phase 1 scope:** Offline, single device, Human vs AI bots\
 **Future scope:** Online cross-play (multiplayer over network)
 
@@ -604,37 +605,26 @@ Therefore:
 
 ## 2.6.3 Session Winner and Tiebreakers
 
-The session winner is the player with the **highest session total**
-after all 5 rounds.
+The session winner is the player with the **highest session total** after all 5 rounds. Tiebreak behavior is mode-specific because Basic Mode has official 1st--4th placements while Competitive Mode deliberately does not assign official loser placements.
 
-If players are tied, resolve ties in this order:
+### Basic Mode tiebreak order
 
-1.  **Most round wins** --- number of 1st-place finishes.
-2.  **Best average placement** across the 5 rounds.
-    -   Lower average is better.
-    -   In Competitive Mode, only the winner has an official placement;
-        therefore Competitive Mode does not use an official loser
-        placement for this tiebreaker.
-3.  **Highest single best-round score**.
-4.  If still tied, declare a **genuine tie**.
+If Basic Mode players are tied on Session total, resolve ties in this order:
 
-### Basic Mode placement
+1. **Most Round wins** --- number of official 1st-place finishes.
+2. **Best average placement** across the 5 Rounds; lower average is better.
+3. **Highest single best-Round score**.
+4. If still tied, declare a **genuine tie**.
 
-Basic Mode always produces official placements 1st through 4th, so
-average placement is directly calculated from the 5 rounds.
+### Competitive Mode tiebreak order
 
-### Competitive Mode placement
+If Competitive Mode players are tied on Session total, resolve ties in this order:
 
-Competitive Mode officially records only:
+1. **Most Round wins** --- number of Rounds won.
+2. **Highest single best-Round score**.
+3. If still tied, declare a **genuine tie**.
 
--   1st = round winner.
-
-The other three players are losers for scoring purposes and are not
-assigned official placements.
-
-If a future feature requires loser ordering, remaining card count may be
-displayed as informational data but must not silently become an official
-placement.
+Competitive Mode **skips average placement entirely**. Only the Round winner has an official placement; the other three players are losers for scoring purposes and are not assigned official 2nd/3rd/4th placements. Remaining-card counts may be displayed as informational data but must not silently become official placements or a placement-based tiebreak.
 
 ------------------------------------------------------------------------
 
@@ -649,11 +639,13 @@ placement.
     -   deal 13 cards to each player;
     -   identify the player holding 3♣;
     -   that player opens with a valid combination containing 3♣.
-6.  Show the round result.
-7.  Continue to the next round.
-8.  After round 5, show the session summary.
-9.  Apply the session tiebreakers if necessary.
-10. Update persistent local statistics.
+6.  After each Round, calculate the official Round result and update cumulative Session totals.
+7.  Enter the **Round Result** checkpoint and show the official Round result/scores plus updated cumulative Session totals.
+8.  In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**.
+9.  Headless simulation may pass through the same checkpoint and continue immediately without an artificial wait.
+10. After Round 5, show the Session summary.
+11. Apply the mode-specific Session tiebreakers if necessary.
+12. Update persistent local statistics.
 
 ------------------------------------------------------------------------
 
@@ -712,7 +704,7 @@ Track:
 -   [ ] Show a pass hint when the human has zero legal plays against the current trick when auto-pass is disabled.
 -   [ ] Do not provide a "suggest a move" feature.
 -   [ ] Run AI turns automatically.
--   [ ] Add a short simulated AI thinking delay.
+-   [ ] Add a short simulated AI thinking delay that is separate from actual AI computation.
 -   [ ] Display the current trick and recent play history.
 -   [ ] Provide a toggleable played-card history/window containing cards that have already been publicly played.
 -   [ ] Display whose turn it is.
@@ -737,7 +729,7 @@ Track:
 -   [ ] Resume the last unfinished session.
 -   [ ] Persistent player statistics.
 -   [ ] Mode-separated persistent statistics.
--   [ ] Seeded/reproducible AI randomness for testing.
+-   [ ] Keep initial AI decisions deterministic; if controlled AI variation is introduced later, make it seeded/reproducible for testing.
 -   [ ] Additional bot personalities after Bot A.
 
 ### Persistent statistics
@@ -841,14 +833,24 @@ have been cached.
 
 No gameplay operation should require a network request.
 
-## 4.2 Performance
+## 4.2 Performance and POC Optimization Priority
 
--   Card selection should feel immediate.
--   Game-state transitions should be responsive.
--   AI should simulate thinking rather than intentionally performing
-    slow computation.
--   Target AI presentation delay: approximately 0.3--1.5 seconds.
--   The AI delay must not be part of the engine's game rules.
+For the initial POC, engineering tradeoffs follow this order:
+
+1. **Accuracy and reliability** --- authoritative rules, legal-Move generation, scoring, state transitions, and AI analysis must be correct and reproducible.
+2. **Speed** --- optimize computation after correctness is established and measured. A slower device may legitimately take longer, especially for Hard search, provided computation remains bounded and the application stays responsive.
+3. **Memory usage** --- memoization/caching may use additional memory in the POC when it materially improves correctness, simplicity, or speed. Memory reduction and cache policies may be optimized later.
+
+Additional requirements:
+
+- Card selection should feel immediate.
+- Game-state transitions should remain responsive.
+- AI must not intentionally perform slow computation merely to simulate thinking.
+- Actual AI computation time and simulated presentation delay are separate concerns.
+- Target AI presentation delay is approximately 0.3--1.5 seconds and may be tuned independently from computation.
+- Headless simulation uses no artificial thinking delay.
+- AI/search implementations must provide room for future profiling, cache optimization, pruning improvements, and faster algorithms without changing public game contracts.
+- The AI delay must not be part of the engine's game rules.
 
 ## 4.3 Portability
 
@@ -1100,141 +1102,121 @@ Requirements:
 
 ------------------------------------------------------------------------
 
-# 5.3 Deterministic Randomness
+# 5.3 Determinism and Randomness
 
-AI randomness must be testable.
+The initial AI is **deterministic**: given the same permitted game state, legal Moves, mode, personality, and difficulty, it should choose the same Move. Initial difficulty differences must come from reasoning capability rather than random mistakes.
 
-The implementation should use an injectable random-number generator or
-seeded RNG rather than relying directly on uncontrolled global
-randomness.
+If controlled AI variation is introduced later, it must use an injectable/seeded RNG and should normally vary only among strategically defensible candidates rather than force irrational play.
 
-Given the same:
+Determinism/reproducibility is particularly important for AI unit tests, simulations, bug reproduction, debugging, and balancing.
 
--   game state,
--   each bot's AI difficulty,
--   each bot's personality,
--   random seed,
-
-the AI should make reproducible decisions.
-
-This is particularly important for:
-
--   AI unit tests;
--   simulations;
--   bug reproduction;
--   debugging;
--   balancing.
-
-Deck shuffling should also support deterministic randomness when running
-engine tests.
+Authoritative engine randomness such as deck shuffling must also be injectable/seedable for deterministic tests.
 
 ------------------------------------------------------------------------
 
 # 6. AI Opponent Design
 
-Six personalities are planned.
+The AI architecture uses one shared decision framework for both **Basic** and **Competitive** modes. The Game Engine remains authoritative for legality; AI ranks only Engine-generated legal Moves.
 
-  ----------------------------------------------------------------------------
-  ID                Personality       Intended behavior      v1
-  ----------------- ----------------- ---------------------- -----------------
-  A                 Optimizer         Attempts to maximize   **Build first**
-                                      long-term game outcome 
-                                      using legal-move       
-                                      evaluation             
+Six personalities are planned. Personality controls strategic preference, while difficulty controls how competently that preference is executed.
 
-  B                 Chaotic           Random/unpredictable   Deferred
-                                      legal choices          
-
-  C                 Risk-Averse /     Minimizes potential    Deferred
-                    Minimizer         penalty and avoids     
-                                      dangerous remaining    
-                                      cards                  
-
-  D                 Greedy            Prefers immediately    Deferred
-                                      strong/high-card or    
-                                      high-impact plays      
-
-  E                 Spoiler           Prioritizes preventing Deferred
-                                      a specific opponent    
-                                      from winning           
-
-  F                 Card Counter      Tracks played cards    Deferred
-                                      and infers opponents'  
-                                      remaining cards        
-  ----------------------------------------------------------------------------
+| ID | Personality | Intended behavior | v1 |
+|---|---|---|---|
+| A | Optimizer | Attempts to maximize final Session outcome using legal-Move evaluation, mode-specific consequences, public information, and bounded planning. | **Build first** |
+| B | Chaotic | Prefers unconventional but strategically defensible choices; future seeded variation may select among similarly valued candidates. | Deferred |
+| C | Risk-Averse / Minimizer | Prioritizes avoiding severe loss/penalty and dangerous remaining-hand states. | Deferred |
+| D | Greedy | Strongly prefers immediate shedding/impact while still respecting rational strategic constraints. | Deferred |
+| E | Spoiler | Strongly values blocking strategically relevant opponents when doing so can improve its own Session outcome. | Deferred |
+| F | Card Counter | Uses advanced deduction/inference from legitimately public information; never receives hidden hands directly. | Deferred |
 
 ## 6.1 Bot A --- Optimizer
 
-Bot A is the only AI personality required for v1.
+Bot A is the only AI personality required for v1. It should not be described as mathematically or game-theoretically optimal. "Best" means best according to the documented evaluation/search strategy.
 
-The phrase "objectively best move" must **not** be treated as a vague
-assumption.
+The Optimizer uses shared factors such as:
 
-Before final implementation, Bot A's evaluation strategy should be
-researched and documented.
+- cards shed;
+- resulting-hand structure and estimated minimum future plays;
+- preservation/breaking of useful combinations;
+- control-card/resource cost;
+- free-lead potential;
+- opponent remaining-card counts and turn position;
+- publicly played cards;
+- mode-specific scoring/risk;
+- current Session standings, score gaps, Round number, and Rounds remaining;
+- bounded endgame/tactical lookahead where enabled by difficulty.
 
-The implementation should establish an explicit evaluation function
-rather than claiming perfect game-theoretic optimality.
+The bot's objective is the **final five-Round Session outcome**, not simply winning the current Round. It may rationally block the most relevant Session rival or accept a slightly worse immediate Round line when that improves expected Session outcome.
 
-Candidate factors include:
+### Basic Mode policy
 
--   cards shed by the move;
--   preservation of useful combinations;
--   preservation of high-impact cards;
--   preservation of bombs;
--   ability to respond to future tricks;
--   opponent hand sizes;
--   endgame risk;
--   likelihood of being forced to retain high-penalty cards;
--   current trick control.
+Approximate the best expected Session outcome through strong Round placement. Because the Round continues after first place is established, the bot must keep optimizing for 2nd/3rd placement and continued control.
 
-The exact weighting should be treated as an AI design decision and
-validated through simulations.
+### Competitive Mode policy
 
-### Important distinction
-
-"Best" means **best according to the implemented Bot A evaluation
-strategy**, not mathematically proven optimal play.
-
-------------------------------------------------------------------------
+Win the Round when practical while reducing expected penalty exposure if another player finishes first. Evaluation must understand the 10-card threshold, unused-bomb exposure, winner-final-play multipliers, and potentially large Session score swings.
 
 ## 6.2 Difficulty
 
-Difficulty and personality are separate concepts.
+All difficulties:
 
--   **Personality** determines *how the bot prefers to play*.
--   **Difficulty** determines *how effectively it executes that
-    personality*.
+- try to improve their own final Session outcome;
+- receive the same fair information-access boundary;
+- never receive unrevealed opponent hands;
+- do not know opponents' configured difficulty or personality;
+- initially model opponents as rational players trying to improve their own outcome;
+- are deterministic in the initial implementation;
+- do not intentionally choose bad Moves or unjustified Passes merely to appear weaker.
 
-For v1, all three bots use the Optimizer personality.
+Expected performance over large balanced simulations should trend **Hard > Normal > Easy**, without guaranteeing the result of any individual deal or Session.
 
 ### Easy
 
--   Considers a limited set of reasonable legal moves.
--   Introduces controlled randomness.
--   Uses shallow evaluation.
--   Makes weaker endgame decisions.
--   Does not strongly react to opponents nearing victory.
+- Evaluates a reduced set of reasonable candidate Moves.
+- Uses basic resulting-hand structure and immediate card shedding.
+- Uses limited/minimally weighted minimum-play analysis.
+- Recognizes obvious opponent threats.
+- Uses coarse Session context such as ahead / close / behind.
+- Makes minimal use of public-card history.
+- Uses little or no tactical lookahead and simple endgame reasoning.
 
 ### Normal
 
--   Uses the full Bot A evaluation strategy.
--   Makes deterministic best-scored choices under the selected seed.
--   Uses current trick and its own hand as primary information.
--   Uses limited opponent-state information.
+- Evaluates all or nearly all meaningful legal candidates.
+- Uses full resulting-hand and minimum-play analysis.
+- Evaluates opportunity cost and control preservation.
+- Uses opponent card counts/turn position and publicly played cards.
+- Uses actual Session score gaps and Rounds remaining.
+- Identifies strategically important Session rivals.
+- Uses selective shallow lookahead and a limited endgame planner.
 
 ### Hard
 
--   Uses the Normal strategy plus stronger opponent-aware decisions.
--   Considers opponents with 1--2 cards remaining.
--   More carefully preserves defensive responses.
--   Avoids wasting critical cards when doing so creates substantial
-    endgame risk.
+- Uses the same fair information but analyzes it more thoroughly.
+- Evaluates the full candidate set and richer opportunity costs.
+- Uses public played-card knowledge systematically.
+- Performs stronger opponent-threat and Session-outcome reasoning.
+- Uses adaptive, bounded deeper tactical/endgame search.
+- Does **not** infer that an opponent lacks a response merely because that opponent passed; passing is voluntary under the house rules. Rich pass-behavior belief modeling is deferred.
 
-Hard is **not** intended to be a perfect card-counting AI. Full card
-counting is reserved for future Personality F.
+Hard is not intended to be a perfect Card Counter. Dedicated inference-heavy behavior remains future Personality F.
 
-------------------------------------------------------------------------
+## 6.3 Algorithm Adaptation and House-Rule Authority
+
+External card-game algorithms may be used as implementation references for efficient representation, hand decomposition, search, or pruning, but they are **never authoritative for Pusoy Dos legality or strength**. Every borrowed technique must be adapted to the confirmed house rules in this document and validated by Engine tests.
+
+In particular, generic poker/Big-Two logic must not override this project's:
+
+- configured Rank and Suit order;
+- special Straight order including `A-2-3-4-5`, `2-3-4-5-6`, and `J-Q-K-A-2`;
+- invalid wrap patterns such as `K-A-2-3-4` and `Q-K-A-2-3`;
+- five-card cross-type hierarchy;
+- Flush comparison rules;
+- Full House/Four-of-a-Kind/other same-type comparison rules;
+- normal permitted use of 2s;
+- Basic/Competitive scoring and Round-ending behavior.
+
+Useful POC techniques include compact internal bitmasks, rank/suit frequency tables, memoized exact minimum-play decomposition, conservative candidate pruning, and bounded endgame search. These remain internal implementation choices rather than shared domain contracts.
 
 # 7. Data and Model Ownership
 
@@ -1329,7 +1311,7 @@ When the auto-pass setting is enabled and the human has zero legal plays:
 
 The played-card window contains only information that has already become public through normal gameplay. It should help the human review prior plays without revealing hidden cards.
 
-Normal and Hard AI may make use of publicly played-card information as part of their decision logic. Hard AI may use it more systematically, while full inference-focused behavior remains reserved for the future Card Counter personality.
+All AI difficulties receive the same permitted public-information boundary. Easy may make only minimal use of played-card history, Normal uses it meaningfully, and Hard may analyze it more systematically. Full inference-focused behavior remains reserved for the future Card Counter personality. A public Pass does not prove the player lacked a legal response because voluntary passing is allowed.
 
 The UI should never rely solely on visual validation. The engine remains authoritative.
 
@@ -1343,6 +1325,8 @@ Display:
 -   Running session totals.
 -   Human hand-type usage for the round.
 -   Next Round button.
+
+In normal human gameplay, the application remains at this Round Result checkpoint until the user explicitly selects **Next Round**. The next Round must not auto-start. Headless simulation may continue immediately through the same logical checkpoint.
 
 ### Competitive Mode scoring presentation
 
@@ -1731,8 +1715,8 @@ Verify:
 -   Turn rotation remains valid after players go out.
 -   Scores remain internally consistent.
 -   Different seeds can produce different valid games.
--   The same seed reproduces the same deterministic AI decisions where
-    randomness is used.
+-   With identical deterministic configuration and the same Engine RNG seed/state, the same headless execution is reproducible.
+-   Initial AI move selection is deterministic and does not require a separate AI RNG seed. If future controlled AI variation is introduced, its AI RNG seed/state becomes part of replay metadata.
 
 Simulation should eventually be used to evaluate and tune Bot A's
 strategy.
@@ -1880,56 +1864,75 @@ Build:
 -   rank/suit ordering;
 -   deck;
 -   shuffle/deal;
--   combination detection;
--   five-card comparison;
+-   combination detection and comparison under the confirmed house rules;
+-   legal-move generation and move validation;
 -   straight special cases;
--   move validation;
--   turn state machine;
+-   turn/trick state machine;
 -   Basic Mode round flow;
--   Competitive Mode scoring;
--   unit tests.
+-   Competitive Mode round-end/scoring;
+-   focused Engine and algorithm unit tests.
 
 No React UI required.
 
-## M2 --- Basic Playable UI
+## M2 --- Headless Orchestrator + AI POC
+
+Build:
+
+-   GameRunner / Orchestrator around the real Engine;
+-   four interchangeable AI Controllers;
+-   Bot A (Optimizer) with Easy / Normal / Hard capability profiles;
+-   Basic and Competitive evaluators;
+-   minimum-play analysis and other approved AI analysis helpers;
+-   deterministic tie-breaking;
+-   full Round execution without UI;
+-   full five-Round Session execution without UI;
+-   module integration tests across Engine + Orchestrator + AI;
+-   explicit invariant checking and reproducible seeded execution.
+
+This milestone proves that the production-oriented gameplay modules work together before UI development begins.
+
+## M3 --- Headless Simulator + Reliability Baseline
+
+Build:
+
+-   reusable headless simulation runner using the same Engine, Orchestrator, and AI modules;
+-   single-Session and batch simulation modes;
+-   automatic continuation through Round Result checkpoints;
+-   reproducible failure capture by seed/configuration;
+-   regression fixtures for discovered failures;
+-   AI outcome/decision-time metrics;
+-   Easy / Normal / Hard comparison across balanced simulations;
+-   correctness and termination stress runs;
+-   profiling hooks for future speed and memory optimization.
+
+POC priority remains **accuracy/reliability first, then speed, then memory usage**. Performance and cache size are measured during this milestone, but correctness is the release gate. Detailed strategy belongs to `testing-simulation.md`.
+
+## M4 --- Playable UI + Offline Product Flow
 
 Build:
 
 -   React/Vite application;
--   Home / Main Menu;
--   Game Setup screen;
--   game table;
--   human hand;
--   Bot A;
+-   Home / Main Menu and Game Setup;
+-   game table and human hand;
 -   per-bot difficulty configuration;
--   Easy difficulty;
--   one complete Basic Mode round;
--   Play/Pass flow;
+-   Play/Pass and validation feedback;
+-   pass hint and optional human auto-pass;
 -   turn indicator;
--   selected-hand type/strength feedback;
--   bot-play type/strength feedback;
--   current round and per-player score display;
--   manual card rearrangement with explicit Sort behavior.
-
-## M3 --- Complete Session
-
-Build:
-
--   5-round sessions;
--   Competitive Mode;
--   Normal difficulty;
--   Hard difficulty;
--   pass hint;
--   optional human auto-pass;
--   played-card history window;
--   Relaxed / Fast pacing;
--   round results with explicit Competitive scoring breakdown;
--   session summary;
+-   selected-hand and bot-play type/strength feedback;
+-   played-card history;
+-   Relaxed / Fast presentation pacing;
+-   Round Result with explicit Competitive scoring breakdown;
+-   explicit Next Round flow;
+-   Session Summary;
+-   current Round and Session score display;
+-   manual card rearrangement with explicit Sort behavior;
 -   hand-type tracking;
 -   persistent statistics;
--   localStorage persistence.
+-   localStorage persistence / resume flow.
 
-## M4 --- Polish
+UI must consume the already-tested production gameplay modules rather than create a separate rules/game loop.
+
+## M5 --- Polish
 
 Build:
 
@@ -1937,13 +1940,12 @@ Build:
 -   optional animations and event polish;
 -   contextual rules/help;
 -   potential legal-card dimming/highlighting;
--   resume support;
 -   PWA/offline install;
 -   tutorial/rules reference;
 -   sound effects if desired;
 -   statistics visualizations.
 
-## M5 --- Future Online / Advanced AI
+## M6 --- Future Online / Advanced AI
 
 Separate future effort:
 

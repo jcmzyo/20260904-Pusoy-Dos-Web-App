@@ -1,10 +1,11 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.1)
+## Game Engine Document (v1.2)
 
 **Status:** Draft for implementation\
-**Parent document:** `requirements.md` v1.5\
-**Shared model:** `domain-model.md` v1.0\
+**Last Modified:** September 5, 2026\
+**Parent document:** `requirements.md` v1.8\
+**Shared model:** `domain-model.md` v1.1\
 **Module:** Game Engine\
 **Language:** TypeScript
 
@@ -722,15 +723,26 @@ The UI decides how this information is presented.
 
 # 24. Session Winner and Tiebreaks
 
-The engine applies the Session winner and tiebreak rules from
-`requirements.md`.
+The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.7.
 
-It should expose structured outcome/tiebreak facts so consumers can
-explain the result without implementing the calculation themselves.
+First compare final Session totals. If still tied:
 
-Any unresolved product-rule ambiguity discovered during implementation
-must be resolved in `requirements.md` before being silently decided in
-engine code.
+### Basic Mode
+
+1. most Round wins;
+2. best/lower average official placement across all five Rounds;
+3. highest single best-Round score;
+4. genuine tie.
+
+### Competitive Mode
+
+1. most Round wins;
+2. highest single best-Round score;
+3. genuine tie.
+
+Competitive Mode must **not** manufacture 2nd/3rd/4th placements from remaining-card counts for tiebreaking. Remaining-card counts may remain factual result data only.
+
+The engine should expose structured outcome/tiebreak facts so consumers can explain which rule resolved a tie without reimplementing the calculation.
 
 ------------------------------------------------------------------------
 
@@ -1237,6 +1249,29 @@ consumers do not require them.
 
 ------------------------------------------------------------------------
 
+# 40.1 Algorithm Adaptation, Correctness, and Optimization Priority
+
+The Engine may borrow implementation techniques from poker/Big-Two/card-game evaluators, but **this Engine's confirmed house rules are authoritative**. External algorithms are references for representation or search efficiency only and must be adapted before use.
+
+Combination detection/comparison and legal-Move generation must be validated against the configured `RulesetConfig`, including the project's special Straight ordering, Suit ordering, five-card hierarchy, same-type comparison behavior, and permitted use of 2s. A generic poker evaluator or Big-Two library must never be treated as a source of rule truth.
+
+For the POC, prefer:
+
+1. **accuracy and reliability**;
+2. **speed after profiling**;
+3. **memory reduction after correctness/performance needs are understood**.
+
+Recommended internal techniques include:
+
+- small Rank/Suit frequency tables or masks for combination classification;
+- direct structure-aware generation for Singles/Pairs/Triples/five-card candidates where it improves clarity or measured performance;
+- memoization/caching where deterministic results repeat;
+- compact internal card masks where useful.
+
+These are private implementation details. The Engine's public contracts remain domain-oriented and must not expose a particular bitmask/cache representation. POC caches may be comparatively generous; later profiling may introduce cache limits, precomputation changes, or more specialized generators without changing public contracts.
+
+------------------------------------------------------------------------
+
 # 41. Recommended Implementation Order
 
 1.  Implement shared types from `domain-model.md`.
@@ -1278,8 +1313,7 @@ requirements:
 -   legal-Move enumeration optimizations;
 -   exact internal file granularity.
 
-These decisions should favor correctness, testability, readability, and
-clear ownership.
+These decisions should favor correctness, testability, readability, and clear ownership. For the POC, correctness/reliability outranks speed, and speed outranks memory optimization. Legal-Move enumeration optimization should be driven by profiling rather than by changing rule semantics.
 
 ------------------------------------------------------------------------
 
