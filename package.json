@@ -4,6 +4,9 @@
   "private": true,
   "description": "Offline web-based Pusoy Dos (Filipino Big Two) implementation. Shared domain model and Game Engine (M1).",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
