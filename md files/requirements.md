@@ -1,13 +1,16 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.8)
+## Requirements & Planning Document (v1.9)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026\
-**Phase 1 scope:** Offline, single device, Human vs AI bots\
-**Future scope:** Online cross-play (multiplayer over network)
+**Last Modified:** September 5, 2026
+**Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
+**Committed roadmap:** Phase 1 only\
+**Future scope:** Deferred or possible directions only; no committed timeline
 
 ------------------------------------------------------------------------
+
+> **Committed delivery scope — Phase 1 only.** Phase 1 ends with a human-playable Basic Mode web game. Competitive Mode, persistence, advanced AI, personalities, statistics/settings, online play, and other expansions are preserved only as deferred or possible future work unless explicitly stated otherwise. Detailed future designs are **not implementation commitments**.
 
 ## 1. Overview
 
@@ -16,13 +19,10 @@ Version 1 is fully offline: one human player competes against 3
 AI-controlled bots on a fixed 4-player table, with no server, account,
 or internet requirement.
 
-Each session uses one of two game modes: **Basic** or **Competitive**.
+Phase 1 sessions use **Basic Mode**. **Competitive Mode** remains an approved deferred design and is not part of Phase 1 implementation.
 Canonical gameplay terms such as **session**, **round**, and **trick** are defined in §1.4.
 
-The codebase must be structured so that a future networked multiplayer
-mode can reuse the same game rules engine and UI. The intended future
-change is primarily the addition of a transport/session layer and
-network-controlled players.
+The codebase should preserve clean boundaries that do not unnecessarily block future extensions. Online multiplayer is only a possible future direction; no networking architecture, transport, server, or delivery timeline is committed by this document.
 
 ### 1.1 Goals
 
@@ -130,6 +130,34 @@ This section is the **canonical glossary for shared game/domain terms** used acr
 When a later section needs to specify the detailed behavior of one of these terms, it should define the **rule or algorithm**, not introduce a competing definition.
 
 ------------------------------------------------------------------------
+
+# 1.5 Committed Phase 1 Roadmap
+
+A **milestone** must produce a concrete, testable technical output. A **phase** must end with an integrated working version of the product. Only Phase 1 is committed.
+
+## M1 — Basic Engine Core
+
+**Technical output:** a tested authoritative Basic Mode engine covering cards, combinations, legal moves, turn/trick flow, finished-player continuation, Basic scoring, five-Round Sessions, safe views, events, and invariants.
+
+## M2 — Baseline AI + Headless Game
+
+**Technical output:** the production Engine and Orchestrator can complete a five-Round Basic Session autonomously with four deterministic Baseline controllers. The Baseline bot must be legal and reasonably rational, including conserving powerful cards/hands where practical, but does not require deep search, difficulty profiles, personalities, or sophisticated opponent modeling.
+
+## M3 — Headless Simulator + Reliability
+
+**Technical output:** deterministic batch simulation of real production Sessions with reproducible seeds, invariant checking, failure reproduction, termination checks, regression coverage, and measured performance.
+
+## M4 — Minimal Playable UI
+
+**Technical output:** a React/Vite UI integrated with the same Engine/Orchestrator used headlessly. A human can complete a five-Round Basic Session against three Baseline bots.
+
+### Phase 1 working product
+
+At Phase 1 completion, a human can play a complete five-Round Basic Pusoy Dos Session in the browser against three Baseline bots. The initial version does not persist an unfinished Session across refresh/close. Leaving an active Session must warn that progress will not be saved where browser capabilities allow; in-app leave actions must provide an explicit confirmation.
+
+### Post-Phase-1 planning rule
+
+After the working UI exists, the product must be played and evaluated before a new committed phase or milestone roadmap is defined. Existing deferred designs may inform that decision, but they do not create a delivery promise.
 
 # 2. Game Rules Specification
 
@@ -486,7 +514,7 @@ Minimum possible score:
 
 ------------------------------------------------------------------------
 
-## 2.6.2 Competitive Mode
+## 2.6.2 Competitive Mode — Deferred Approved Design
 
 ### Round ending
 
@@ -616,7 +644,7 @@ If Basic Mode players are tied on Session total, resolve ties in this order:
 3. **Highest single best-Round score**.
 4. If still tied, declare a **genuine tie**.
 
-### Competitive Mode tiebreak order
+### Competitive Mode tiebreak order — Deferred
 
 If Competitive Mode players are tied on Session total, resolve ties in this order:
 
@@ -676,152 +704,59 @@ Track:
 
 # 3. Functional Requirements
 
-## 3.1 Phase 1 --- MUST HAVE
+## 3.1 Phase 1 — Committed MUST HAVE
 
--   [ ] Start a new session.
--   [ ] Select Basic or Competitive mode.
--   [ ] Configure Easy, Normal, or Hard difficulty independently for each bot.
--   [ ] Deal 13 cards to each of 4 players.
--   [ ] Freshly shuffle and deal before every round.
--   [ ] Display the human player's hand.
--   [ ] Default-sort the human hand by rank, then suit.
--   [ ] Allow manual card reordering.
--   [ ] Allow a Sort action to restore the default rank-then-suit order.
--   [ ] Select cards to form a proposed combination.
--   [ ] Display the detected/selected combination type and effective rank/strength before the human plays it.
--   [ ] Display the combination type and effective rank/strength whenever a bot plays cards.
--   [ ] Prevent the UI from submitting an invalid play.
--   [ ] Have the engine independently validate every submitted move.
--   [ ] Correctly enforce opening 3♣ requirements.
--   [ ] Correctly validate all combination types.
--   [ ] Correctly compare Singles, Pairs, and Triples.
--   [ ] Correctly allow strictly stronger cross-type five-card responses.
--   [ ] Correctly implement special straight rules.
--   [ ] Support passing.
--   [ ] Support an optional human auto-pass setting that triggers only when the human has zero legal plays.
--   [ ] When auto-pass triggers, record a human-facing log message such as "Auto pass — no valid play."
--   [ ] Auto-pass reason information must not be exposed to bots as public game information; bots should observe only that the human passed.
--   [ ] Show a pass hint when the human has zero legal plays against the current trick when auto-pass is disabled.
--   [ ] Do not provide a "suggest a move" feature.
--   [ ] Run AI turns automatically.
--   [ ] Add a short simulated AI thinking delay that is separate from actual AI computation.
--   [ ] Display the current trick and recent play history.
--   [ ] Provide a toggleable played-card history/window containing cards that have already been publicly played.
--   [ ] Display whose turn it is.
--   [ ] Handle Basic Mode player elimination and continued trick flow.
--   [ ] Handle Competitive Mode immediate round termination.
--   [ ] Display clear game-state feedback for passes, trick wins, round wins, and session wins.
--   [ ] Display the round result.
--   [ ] In Competitive Mode, explicitly explain the score calculation from remaining cards through all applicable multipliers to the final score.
--   [ ] Display the full 5-round session summary.
--   [ ] Display human hand-type usage.
--   [ ] Support New Session and Rematch flows.
--   [ ] Work offline after the application has been loaded/cached.
+- [ ] One human and three deterministic Baseline bots on a fixed four-player table.
+- [ ] Basic Mode only, using the canonical rules in §2.
+- [ ] Exactly five Rounds per Session with +5/+3/+2/+0 Round scoring and Basic Session tiebreaks.
+- [ ] Pure TypeScript authoritative Engine with no React dependency.
+- [ ] Deterministic injected Engine randomness for shuffle/deal and reproducible headless execution.
+- [ ] Engine-generated legal Moves and authoritative Move validation.
+- [ ] Baseline bot that always chooses from legal Moves, behaves reasonably, and attempts to conserve powerful cards/hands; no deep search/difficulty/personality requirement.
+- [ ] Headless execution through the production Orchestrator/controllers.
+- [ ] Reusable deterministic batch simulator with invariants and failure reproduction.
+- [ ] Minimal React/Vite playable UI described by `ui-ux.md`.
+- [ ] Human card selection, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists.
+- [ ] Current trick, turn, opponent card counts, PASS/DONE state, public played-card history/Event Log, and current running Session scores visible through the UI.
+- [ ] Round Result checkpoint after every Round showing official placement, Round points, and updated cumulative Session score; explicit Next Round.
+- [ ] Session Summary after Round 5 with final result and tiebreak information when applicable.
+- [ ] Four-color suits by default: Hearts red, Diamonds orange, Clubs blue, Spades black; no Phase 1 toggle.
+- [ ] Basic responsive usability on common phone and desktop widths.
+- [ ] No save/Resume in Phase 1. In-app leaving an unfinished Session warns that progress will be lost; browser close/refresh warning is used where supported.
 
-------------------------------------------------------------------------
+## 3.2 Phase 1 — SHOULD HAVE
 
-## 3.2 Phase 1 --- SHOULD HAVE
+- [ ] Clear validation explanations for invalid/non-beating selections.
+- [ ] Simple green Modern Casino Table visual foundation using reusable design tokens/components.
+- [ ] Information overlays pause game progression while open.
+- [ ] Deterministic diagnostics sufficient to reproduce simulation failures.
 
--   [ ] Relaxed / Fast pacing setting for AI presentation delay and transition speed.
--   [ ] Auto-sort and manual hand reordering.
--   [ ] Preserve manual card order until the player explicitly presses Sort.
--   [ ] Toggleable quick/skip behavior for round-result transitions.
--   [ ] Resume the last unfinished session.
--   [ ] Persistent player statistics.
--   [ ] Mode-separated persistent statistics.
--   [ ] Keep initial AI decisions deterministic; if controlled AI variation is introduced later, make it seeded/reproducible for testing.
--   [ ] Additional bot personalities after Bot A.
+A SHOULD item may be deferred within Phase 1 only if the Phase 1 working-product acceptance criteria remain satisfied and the deferral is explicitly recorded; it must not be silently dropped.
 
-### Persistent statistics
+## 3.3 Explicitly Deferred — Approved Design, No Timeline
 
-Statistics are stored locally using **`localStorage`**.
+The following are intentionally not required for Phase 1 even where detailed design exists elsewhere:
 
-Cookies are not used for game-state/stat persistence.
+- Competitive Mode.
+- persistence/Resume and persistent statistics.
+- Settings and auto-pass.
+- Easy/Normal/Hard difficulty system and deeper Optimizer/search behavior.
+- AI personalities, Mystery Bots, and Surprise Me.
+- manual arbitrary hand rearrangement.
+- two-color/four-color suit preference toggle.
+- richer animations, sounds, branding, progression, achievements, and other polish.
 
-Persistent statistics are separated by game mode.
+## 3.4 Possible Future Directions — Not Committed
 
-#### Basic Mode statistics
+Online multiplayer, backend/server infrastructure, additional modes/modifiers, PWA/product packaging, and other expansions are possibilities only. They have no committed phase, milestone, or timeline.
 
--   Sessions played
--   Session wins
--   Win rate
--   Average session score
--   Best session score
--   Average placement
--   Best round score
+## 3.5 Explicitly Rejected / Guardrails
 
-#### Competitive Mode statistics
-
--   Sessions played
--   Session wins
--   Win rate
--   Total running score across sessions
--   Average session score
--   Best session score
--   Best round score
-
-#### Shared statistics
-
--   Cumulative hand-type counts across all sessions and both modes
-
-### Definition of a session win
-
-A session win means the player is the **final session winner after all
-session tiebreakers have been applied**.
-
-If the result is a genuine tie, no player receives a session win for
-that session.
-
-------------------------------------------------------------------------
-
-## 3.3 Explicitly Rejected
-
-### No "Suggest a Move" button
-
-The application must not provide a button that tells the human which
-move to play.
-
-The pass hint only informs the player that they have **zero legal
-plays** and therefore need to pass.
-
-------------------------------------------------------------------------
-
-## 3.4 Phase 1 --- NICE TO HAVE
-
--   [ ] Sound effects.
--   [ ] Card skins/themes.
--   [ ] Tutorial/in-app rules reference.
--   [ ] Contextual rules/help for hand comparison and scoring explanations.
--   [ ] PWA install support.
--   [ ] Basic and advanced card/deal/play animations.
--   [ ] Additional statistics visualizations.
--   [ ] Potential legal-card dimming/highlighting to improve scanability without recommending a move.
-
-The rules reference should explain:
-
--   Card ranking.
--   Suit ranking.
--   Valid combinations.
--   Five-card ranking.
--   Straight special cases.
--   Basic scoring.
--   Competitive scoring and bomb multipliers.
-
-------------------------------------------------------------------------
-
-## 3.5 Phase 2 --- ONLINE / DEFERRED
-
--   Real-time multiplayer.
--   Matchmaking.
--   Private room codes.
--   Network transport.
--   Reconnection handling.
--   Server-authoritative validation.
--   Player accounts.
--   Friend/invite functionality.
--   Additional AI personalities B--F.
-
-------------------------------------------------------------------------
+- No betting or real-money mechanics.
+- No hidden-information cheating by AI.
+- No duplicate rules authority in React or AI.
+- No "Suggest a Move" feature in Phase 1.
+- No speculative framework whose only purpose is an uncommitted future feature.
 
 # 4. Non-Functional Requirements
 
@@ -915,7 +850,7 @@ without changing the core rules engine.
   Packaging               Static site + optional  Offline browser
                           PWA                     application
 
-  Future backend          Node.js + WebSocket     Online multiplayer
+  Possible backend        TBD                     Online multiplayer is not committed
 
   Future shared engine    Pure TypeScript package Shared server/client
                                                   rules
@@ -1116,107 +1051,33 @@ Authoritative engine randomness such as deck shuffling must also be injectable/s
 
 # 6. AI Opponent Design
 
-The AI architecture uses one shared decision framework for both **Basic** and **Competitive** modes. The Game Engine remains authoritative for legality; AI ranks only Engine-generated legal Moves.
+## 6.1 Phase 1 — Baseline Bot
 
-Six personalities are planned. Personality controls strategic preference, while difficulty controls how competently that preference is executed.
+Phase 1 implements one deterministic Baseline strategy shared by the three bots. Its purpose is to make headless simulation and the first playable product useful without paying the cost of the full advanced AI design.
 
-| ID | Personality | Intended behavior | v1 |
-|---|---|---|---|
-| A | Optimizer | Attempts to maximize final Session outcome using legal-Move evaluation, mode-specific consequences, public information, and bounded planning. | **Build first** |
-| B | Chaotic | Prefers unconventional but strategically defensible choices; future seeded variation may select among similarly valued candidates. | Deferred |
-| C | Risk-Averse / Minimizer | Prioritizes avoiding severe loss/penalty and dangerous remaining-hand states. | Deferred |
-| D | Greedy | Strongly prefers immediate shedding/impact while still respecting rational strategic constraints. | Deferred |
-| E | Spoiler | Strongly values blocking strategically relevant opponents when doing so can improve its own Session outcome. | Deferred |
-| F | Card Counter | Uses advanced deduction/inference from legitimately public information; never receives hidden hands directly. | Deferred |
+The Baseline bot must:
 
-## 6.1 Bot A --- Optimizer
+- choose only from Engine-provided legal Moves;
+- use only permitted `PlayerView`/public information;
+- make deterministic decisions for identical inputs;
+- prefer reasonable card shedding rather than arbitrary first-legal behavior;
+- attempt to conserve powerful resources/hands when spending them is unnecessary;
+- avoid intentionally irrational Plays or Passes merely to appear "easy";
+- remain understandable and testable.
 
-Bot A is the only AI personality required for v1. It should not be described as mathematically or game-theoretically optimal. "Best" means best according to the documented evaluation/search strategy.
+It does not need deep lookahead, exhaustive Session strategy, sophisticated opponent modeling, difficulty profiles, personalities, or Competitive evaluation.
 
-The Optimizer uses shared factors such as:
+The exact heuristic weights remain an implementation/tuning decision as long as the bot satisfies these behavioral constraints and does not duplicate legality rules.
 
-- cards shed;
-- resulting-hand structure and estimated minimum future plays;
-- preservation/breaking of useful combinations;
-- control-card/resource cost;
-- free-lead potential;
-- opponent remaining-card counts and turn position;
-- publicly played cards;
-- mode-specific scoring/risk;
-- current Session standings, score gaps, Round number, and Rounds remaining;
-- bounded endgame/tactical lookahead where enabled by difficulty.
+## 6.2 Deferred AI Design
 
-The bot's objective is the **final five-Round Session outcome**, not simply winning the current Round. It may rationally block the most relevant Session rival or accept a slightly worse immediate Round line when that improves expected Session outcome.
+The richer Optimizer, minimum-play solver, Easy/Normal/Hard capability profiles, deeper bounded search, Session-aware strategy, public-card analysis, personalities, Mystery Bots, and controlled variation remain approved design material in `ai.md` but are not Phase 1 implementation requirements.
 
-### Basic Mode policy
-
-Approximate the best expected Session outcome through strong Round placement. Because the Round continues after first place is established, the bot must keep optimizing for 2nd/3rd placement and continued control.
-
-### Competitive Mode policy
-
-Win the Round when practical while reducing expected penalty exposure if another player finishes first. Evaluation must understand the 10-card threshold, unused-bomb exposure, winner-final-play multipliers, and potentially large Session score swings.
-
-## 6.2 Difficulty
-
-All difficulties:
-
-- try to improve their own final Session outcome;
-- receive the same fair information-access boundary;
-- never receive unrevealed opponent hands;
-- do not know opponents' configured difficulty or personality;
-- initially model opponents as rational players trying to improve their own outcome;
-- are deterministic in the initial implementation;
-- do not intentionally choose bad Moves or unjustified Passes merely to appear weaker.
-
-Expected performance over large balanced simulations should trend **Hard > Normal > Easy**, without guaranteeing the result of any individual deal or Session.
-
-### Easy
-
-- Evaluates a reduced set of reasonable candidate Moves.
-- Uses basic resulting-hand structure and immediate card shedding.
-- Uses limited/minimally weighted minimum-play analysis.
-- Recognizes obvious opponent threats.
-- Uses coarse Session context such as ahead / close / behind.
-- Makes minimal use of public-card history.
-- Uses little or no tactical lookahead and simple endgame reasoning.
-
-### Normal
-
-- Evaluates all or nearly all meaningful legal candidates.
-- Uses full resulting-hand and minimum-play analysis.
-- Evaluates opportunity cost and control preservation.
-- Uses opponent card counts/turn position and publicly played cards.
-- Uses actual Session score gaps and Rounds remaining.
-- Identifies strategically important Session rivals.
-- Uses selective shallow lookahead and a limited endgame planner.
-
-### Hard
-
-- Uses the same fair information but analyzes it more thoroughly.
-- Evaluates the full candidate set and richer opportunity costs.
-- Uses public played-card knowledge systematically.
-- Performs stronger opponent-threat and Session-outcome reasoning.
-- Uses adaptive, bounded deeper tactical/endgame search.
-- Does **not** infer that an opponent lacks a response merely because that opponent passed; passing is voluntary under the house rules. Rich pass-behavior belief modeling is deferred.
-
-Hard is not intended to be a perfect Card Counter. Dedicated inference-heavy behavior remains future Personality F.
+Future AI must continue to obey the same information-safety boundary used by the Baseline bot. A public Pass alone must never be treated as proof that a player lacked a legal response because voluntary passing is legal.
 
 ## 6.3 Algorithm Adaptation and House-Rule Authority
 
-External card-game algorithms may be used as implementation references for efficient representation, hand decomposition, search, or pruning, but they are **never authoritative for Pusoy Dos legality or strength**. Every borrowed technique must be adapted to the confirmed house rules in this document and validated by Engine tests.
-
-In particular, generic poker/Big-Two logic must not override this project's:
-
-- configured Rank and Suit order;
-- special Straight order including `A-2-3-4-5`, `2-3-4-5-6`, and `J-Q-K-A-2`;
-- invalid wrap patterns such as `K-A-2-3-4` and `Q-K-A-2-3`;
-- five-card cross-type hierarchy;
-- Flush comparison rules;
-- Full House/Four-of-a-Kind/other same-type comparison rules;
-- normal permitted use of 2s;
-- Basic/Competitive scoring and Round-ending behavior.
-
-Useful POC techniques include compact internal bitmasks, rank/suit frequency tables, memoized exact minimum-play decomposition, conservative candidate pruning, and bounded endgame search. These remain internal implementation choices rather than shared domain contracts.
+External Big Two/Poker algorithms may be used as implementation references only. Canonical house rules and Engine contracts remain authoritative. For Phase 1, correctness/reliability outranks speed, and speed outranks memory optimization.
 
 # 7. Data and Model Ownership
 
@@ -1239,175 +1100,13 @@ This separation is intended to prevent duplicate models, hidden-information leak
 
 ------------------------------------------------------------------------
 
-# 8. UI / UX Screens
+# 8. UI / UX
 
-## 8.1 Home / Main Menu
+`ui-ux.md` is the authoritative UI/UX design document. Phase 1 implements only its Phase 1 sections.
 
-The Home screen is the application's default landing page and primary navigation hub.
+The Phase 1 UI is intentionally small but complete: Home, minimal Game Setup, Game Table, Round Result, and Session Summary. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
 
-Required primary actions:
-
-- **Play** — opens Game Setup for a new Session.
-- **Stats** — opens the persistent statistics screen.
-- **Settings** — opens application/gameplay settings.
-- **Resume** — shown when a resumable unfinished Session exists and allows the player to return to that Session.
-
-The Home/Main Menu belongs to the UI/application layer. It must not create a separate game-rules or orchestration subsystem.
-
-## 8.2 Game Setup
-
-Required:
-
-- Game mode selection:
-  - Basic
-  - Competitive
-- Per-bot difficulty configuration:
-  - Bot 1: Easy / Normal / Hard
-  - Bot 2: Easy / Normal / Hard
-  - Bot 3: Easy / Normal / Hard
-- Start Session button.
-- Starting a Session transitions from UI setup into Game Orchestrator execution, which creates/starts authoritative game state through the Game Engine.
-
-## 8.3 Game Table
-
-Display:
-
--   Human player's hand.
--   Opponent card backs.
--   Opponent card counts.
--   Opponent identity, difficulty, and current session score, for example `Jihyo (Normal) - 8 pts`.
--   Current round number, for example `Round 3 / 5`.
--   Current trick.
--   Recent play history.
--   A toggleable window containing all publicly played cards.
--   Current player's turn.
--   Clockwise turn indication.
--   Play button.
--   Pass button.
--   Selected combination type and effective rank/strength before the Play button is pressed.
--   Hand type and effective rank/strength whenever a bot plays cards.
--   Legal/illegal selection feedback.
--   Clear table-state feedback such as `PASS`, `TRICK WON`, round winner, and session winner.
--   Pass hint when no legal play exists and human auto-pass is disabled.
-
-### Human card interaction
-
--   Clicking/tapping a card selects it.
--   Clicking/tapping an already selected card deselects it.
--   The Play button is disabled while the selected cards do not form a legal play.
--   Pressing Play is the explicit confirmation step; no additional per-move confirmation dialog is required.
--   Manual card rearrangement must be preserved after cards are played.
--   Cards are only automatically rearranged when the player explicitly presses Sort.
-
-### Human auto-pass
-
-When the auto-pass setting is enabled and the human has zero legal plays:
-
--   the game should not wait for human input;
--   the human-facing history may show `Auto pass — no valid play`;
--   bots must only observe the public action `pass` and must not receive the private reason that no legal move existed.
-
-### Played-card information
-
-The played-card window contains only information that has already become public through normal gameplay. It should help the human review prior plays without revealing hidden cards.
-
-All AI difficulties receive the same permitted public-information boundary. Easy may make only minimal use of played-card history, Normal uses it meaningfully, and Hard may analyze it more systematically. Full inference-focused behavior remains reserved for the future Card Counter personality. A public Pass does not prove the player lacked a legal response because voluntary passing is allowed.
-
-The UI should never rely solely on visual validation. The engine remains authoritative.
-
-## 8.4 Round Result
-
-Display:
-
--   Round number.
--   Official result and round winner.
--   Points gained/lost.
--   Running session totals.
--   Human hand-type usage for the round.
--   Next Round button.
-
-In normal human gameplay, the application remains at this Round Result checkpoint until the user explicitly selects **Next Round**. The next Round must not auto-start. Headless simulation may continue immediately through the same logical checkpoint.
-
-### Competitive Mode scoring presentation
-
-The scoring breakdown must be explicit rather than showing only a final number. For each losing player, the UI should visually explain the calculation in order:
-
-1.  Reveal/show the losing player's remaining hand.
-2.  Show the number of cards remaining and the base penalty.
-3.  Highlight any qualifying unused bomb and apply its multiplier.
-4.  Show any winner-final-play multiplier.
-5.  Show the resulting final penalty.
-6.  After all loser penalties are shown, show the winner's corresponding positive score.
-
-The presentation should make it visually clear which remaining cards caused a bomb multiplier.
-
-In Competitive Mode, the three losing players may have their remaining card counts displayed, but they should not be labeled as official 2nd/3rd/4th placements.
-
-Round-result presentation should be skippable/accelerated when the corresponding pacing preference is enabled.
-
-## 8.5 Session Summary
-
-Display:
-
--   All 5 round results.
--   Per-player session totals.
--   Final ranking.
--   Applied tiebreakers when necessary.
--   Human player's hand-type statistics.
--   Rematch / Play Again with Same Setup.
--   New Session.
--   Home.
-
-A Rematch preserves the selected mode and all three bot difficulty settings. A New Session returns the player to setup.
-
-## 8.6 Stats
-
-Display persistent statistics.
-
-At minimum:
-
-### Basic
-
--   Sessions played
--   Session wins
--   Win rate
--   Average session score
--   Best session score
--   Average placement
--   Best round score
-
-### Competitive
-
--   Sessions played
--   Session wins
--   Win rate
--   Total running score
--   Average session score
--   Best session score
--   Best round score
-
-### Shared
-
--   Cumulative hand-type usage.
-
-Basic and Competitive statistics must remain separate because their scoring and result models are different. The Stats screen should prioritize a concise set of meaningful headline statistics and avoid presenting every tracked metric with equal prominence.
-
-## 8.7 Settings
-
-The Settings screen provides application/gameplay preferences that do not change authoritative Pusoy Dos rules.
-
-Initial settings include:
-
-- Human auto-pass when zero legal plays exist.
-- Presentation pacing:
-  - Relaxed
-  - Fast
-
-Settings should use strong defaults and remain intentionally small. Avoid exposing unnecessary granular controls.
-
-Settings persistence belongs to `persistence.md`; presentation and interaction behavior belongs to `ui-ux.md`.
-
-------------------------------------------------------------------------
+Deferred UI concepts documented there preserve prior decisions but do not imply a post-Phase-1 timeline.
 
 # 9. Future Game Modes and Modifiers
 
@@ -1492,7 +1191,7 @@ slots, or more complex data, IndexedDB can be considered.
 
 ------------------------------------------------------------------------
 
-# 11. Future Online Cross-Play
+# 11. Possible Future Online Cross-Play — Not Committed
 
 This section is informational only and is not part of v1 implementation.
 
@@ -1853,111 +1552,30 @@ implementation.
 
 ------------------------------------------------------------------------
 
-# 15. Milestone Plan
+# 15. Delivery Scope and Future Direction
 
-## M1 --- Shared Domain + Engine Core
+The committed roadmap is the Phase 1 M1–M4 plan in §1.5. No milestone numbers are assigned beyond M4.
 
-Build:
+## 15.1 Deferred approved designs
 
--   shared domain model foundation;
--   card model;
--   rank/suit ordering;
--   deck;
--   shuffle/deal;
--   combination detection and comparison under the confirmed house rules;
--   legal-move generation and move validation;
--   straight special cases;
--   turn/trick state machine;
--   Basic Mode round flow;
--   Competitive Mode round-end/scoring;
--   focused Engine and algorithm unit tests.
+These have meaningful prior design decisions that should be preserved, but they are not Phase 1 implementation requirements and have no committed delivery phase or timeline:
 
-No React UI required.
+- Competitive Mode and its scoring/tiebreak rules.
+- More capable AI, including difficulty levels and deeper reasoning.
+- AI personalities, Mystery Bots, and Surprise Me configuration.
+- Persistence/Resume, persistent statistics, and Settings.
+- Auto-pass convenience.
+- Two-color/four-color suit preference; Phase 1 uses four-color suits by default with no toggle.
+- Manual hand rearrangement and additional UI polish.
+- Progression/achievement concepts already discussed.
 
-## M2 --- Headless Orchestrator + AI POC
+## 15.2 Possible future directions — not committed
 
-Build:
+Online multiplayer, backend/server infrastructure, additional game modes/modifiers, PWA/product packaging, and other expansions are possibilities only. Their presence in architecture notes must not be interpreted as a promise, timeline, or approved implementation plan.
 
--   GameRunner / Orchestrator around the real Engine;
--   four interchangeable AI Controllers;
--   Bot A (Optimizer) with Easy / Normal / Hard capability profiles;
--   Basic and Competitive evaluators;
--   minimum-play analysis and other approved AI analysis helpers;
--   deterministic tie-breaking;
--   full Round execution without UI;
--   full five-Round Session execution without UI;
--   module integration tests across Engine + Orchestrator + AI;
--   explicit invariant checking and reproducible seeded execution.
+## 15.3 Scope-control rule
 
-This milestone proves that the production-oriented gameplay modules work together before UI development begins.
-
-## M3 --- Headless Simulator + Reliability Baseline
-
-Build:
-
--   reusable headless simulation runner using the same Engine, Orchestrator, and AI modules;
--   single-Session and batch simulation modes;
--   automatic continuation through Round Result checkpoints;
--   reproducible failure capture by seed/configuration;
--   regression fixtures for discovered failures;
--   AI outcome/decision-time metrics;
--   Easy / Normal / Hard comparison across balanced simulations;
--   correctness and termination stress runs;
--   profiling hooks for future speed and memory optimization.
-
-POC priority remains **accuracy/reliability first, then speed, then memory usage**. Performance and cache size are measured during this milestone, but correctness is the release gate. Detailed strategy belongs to `testing-simulation.md`.
-
-## M4 --- Playable UI + Offline Product Flow
-
-Build:
-
--   React/Vite application;
--   Home / Main Menu and Game Setup;
--   game table and human hand;
--   per-bot difficulty configuration;
--   Play/Pass and validation feedback;
--   pass hint and optional human auto-pass;
--   turn indicator;
--   selected-hand and bot-play type/strength feedback;
--   played-card history;
--   Relaxed / Fast presentation pacing;
--   Round Result with explicit Competitive scoring breakdown;
--   explicit Next Round flow;
--   Session Summary;
--   current Round and Session score display;
--   manual card rearrangement with explicit Sort behavior;
--   hand-type tracking;
--   persistent statistics;
--   localStorage persistence / resume flow.
-
-UI must consume the already-tested production gameplay modules rather than create a separate rules/game loop.
-
-## M5 --- Polish
-
-Build:
-
--   improved UI;
--   optional animations and event polish;
--   contextual rules/help;
--   potential legal-card dimming/highlighting;
--   PWA/offline install;
--   tutorial/rules reference;
--   sound effects if desired;
--   statistics visualizations.
-
-## M6 --- Future Online / Advanced AI
-
-Separate future effort:
-
--   NetworkController;
--   Node.js server;
--   WebSocket transport;
--   server-authoritative validation;
--   multiplayer rooms;
--   reconnection;
--   additional bot personalities B--F.
-
-------------------------------------------------------------------------
+Known future requirements justify small, clean extension seams when they are inexpensive and improve separation of concerns. They do **not** justify speculative frameworks or implementation of deferred behavior during Phase 1. Phase 1 correctness and a working playable product take priority.
 
 # 16. Rules Summary --- Quick Reference
 

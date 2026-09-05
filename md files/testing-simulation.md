@@ -3,12 +3,12 @@
 ## Testing & Simulation Document (v1.2)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026  
-**Parent document:** `requirements.md` v1.8  
-**Shared model:** `domain-model.md` v1.1  
-**Engine design:** `engine.md` v1.2  
-**Orchestrator design:** `orchestrator.md` v1.2  
-**AI design:** `ai.md` v1.1  
+**Last Modified:** September 5, 2026
+**Parent document:** `requirements.md` v1.9  
+**Shared model:** `domain-model.md` v1.2  
+**Engine design:** `engine.md` v1.3  
+**Orchestrator design:** `orchestrator.md` v1.3  
+**AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
 **Primary POC target:** Fully headless five-Round game/session execution  
 **Language/tooling:** TypeScript + Vitest + headless Node.js execution
@@ -138,6 +138,15 @@ These layers are complementary rather than substitutes.
 A simulation that completes successfully does not prove every Straight edge case is correct. A perfect Straight unit-test suite does not prove the Orchestrator can run five Rounds. Both are required.
 
 ---
+
+# 4.1 Phase 1 Quality Gates
+
+- **M1 Engine gate:** Basic house rules, state transitions, five-Round Session, views/events/invariants pass. Competitive tests are deferred.
+- **M2 Headless-game gate:** four deterministic Baseline controllers complete real Basic Sessions through the Orchestrator with no illegal accepted Moves or hidden-information dependency.
+- **M3 Simulator gate:** repeated seeded Basic Sessions terminate, invariants hold, failures are reproducible, and performance is measured without redefining correctness.
+- **M4 UI/Phase gate:** a human can complete the five-Round Basic product flow against Baseline bots; UI does not duplicate Engine legality/rules; critical interaction and integration tests pass.
+
+Phase 1 is not blocked by deferred Competitive, advanced-AI, persistence, or post-Phase-1 tests.
 
 # 5. Unit Test Strategy
 
@@ -475,7 +484,7 @@ Verify:
 - scores are exactly `+5/+3/+2/0`;
 - Round result and cumulative Session totals are correct.
 
-## 7.25 Competitive Mode Round ending
+## 7.25 Competitive Mode Round ending — Deferred
 
 Verify:
 
@@ -747,7 +756,7 @@ Examples:
 
 Tests should verify policy direction, not force fragile exact evaluator weights unless needed for regression.
 
-## 9.12 Difficulty profiles
+## 9.12 Difficulty profiles — Deferred
 
 Verify:
 
@@ -1933,49 +1942,3 @@ Headless Simulator
 The POC should optimize for **being demonstrably correct before being clever or fast**.
 
 Performance and memory are designed as observable, replaceable implementation concerns. Rule correctness, information safety, deterministic reproducibility, authoritative state integrity, and reliable Session completion are non-negotiable.
-
----
-
-# 46. AI-Assisted Development Verification
-
-During development with coding assistants that have file read/write access but no terminal or shell access:
-
-- the coding assistant is responsible for implementing production code;
-- the coding assistant is responsible for writing the required automated tests;
-- the coding assistant must provide the exact verification commands for the developer to run locally;
-- the developer executes those commands in the real local project environment;
-- a newly implemented task is **READY FOR USER VERIFICATION**, not fully complete, until the developer confirms the required tests, type-checks, and builds succeed;
-- test or compilation failures should be returned to the coding assistant for focused diagnosis and correction;
-- the coding assistant must never claim that an unexecuted test, type-check, or build passed;
-- after a failure is corrected, the assistant must provide the exact commands that should be rerun;
-- unrelated refactoring or specification changes must not be introduced merely to make verification pass.
-
-The normal verification loop is:
-
-```text
-Coding assistant
-  → inspect relevant documentation and source
-  → implement production code
-  → write focused automated tests
-  → provide exact verification commands
-  → READY FOR USER VERIFICATION
-      ↓
-Developer
-  → run focused tests
-  → run required regression tests
-  → run type-check/build when applicable
-      ↓
-If verification fails
-  → return relevant failure output to coding assistant
-  → focused correction
-  → rerun required verification
-      ↓
-If verification succeeds
-  → task is COMPLETE
-  → review diff / commit
-```
-
-This workflow does **not** weaken or change the project's testing requirements, QA gates, Definition of Done, or headless-simulation requirements. It only separates implementation/test authorship from physical command execution when the coding assistant's environment has no shell.
-
-For M1 specifically, the detailed task-level handoff statuses and commands are owned by `m1-task-breakdown.md`. This document remains authoritative for the overall testing and simulation strategy.
-

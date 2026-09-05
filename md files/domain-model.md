@@ -1,15 +1,17 @@
 # Pusoy Dos --- Shared Domain Model
 
-## Domain Model Document (v1.1)
+## Domain Model Document (v1.2)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026\
-**Parent document:** `requirements.md` v1.8\
+**Last Modified:** September 5, 2026
+**Parent document:** `requirements.md` v1.9\
 **Scope:** Shared, implementation-independent game vocabulary and data
 contracts\
 **Language:** TypeScript
 
 ------------------------------------------------------------------------
+
+> **Phase 1 implementation scope:** shared concepts needed by the Basic Mode playable product. Known future vocabulary may remain where it is cheap and stable (for example `GameMode`), but its presence does not require deferred features to be implemented.
 
 # 1. Purpose
 

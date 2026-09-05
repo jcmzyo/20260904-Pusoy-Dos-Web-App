@@ -1,15 +1,17 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.2)
+## Game Engine Document (v1.3)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026\
-**Parent document:** `requirements.md` v1.8\
-**Shared model:** `domain-model.md` v1.1\
+**Last Modified:** September 5, 2026
+**Parent document:** `requirements.md` v1.9\
+**Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
 **Language:** TypeScript
 
 ------------------------------------------------------------------------
+
+> **Phase 1 implementation scope:** Basic Mode only. Competitive sections are preserved as deferred approved design. `RulesetConfig` remains a lightweight extension seam, but Phase 1 must not implement speculative mode/framework complexity merely to support future work.
 
 # 1. Purpose
 
@@ -561,7 +563,7 @@ continuation behavior in `requirements.md`:
     player a free lead;
 -   continue until one active player remains.
 
-## 18.2 Competitive Mode
+## 18.2 Competitive Mode — Deferred Approved Design
 
 The Round ends immediately when the first player goes out.
 
@@ -672,7 +674,7 @@ orchestration code to recalculate them.
 
 ------------------------------------------------------------------------
 
-# 23. Competitive Mode Scoring
+# 23. Competitive Mode Scoring — Deferred Approved Design
 
 The engine must implement the Competitive Mode scoring rules exactly as
 specified in `requirements.md`.
@@ -1272,28 +1274,25 @@ These are private implementation details. The Engine's public contracts remain d
 
 ------------------------------------------------------------------------
 
-# 41. Recommended Implementation Order
+# 41. Phase 1 Recommended Implementation Order
 
-1.  Implement shared types from `domain-model.md`.
-2.  Implement engine rank/suit ordering and deck construction.
-3.  Implement Combination detection.
-4.  Implement Combination comparison and `canBeat`.
-5.  Implement authoritative Round/player/Trick state.
-6.  Implement legal Move generation.
-7.  Implement Move validation.
-8.  Implement Turn and Trick transitions.
-9.  Implement Round setup/dealing.
-10. Implement Basic Mode finish behavior and scoring.
-11. Implement Competitive Mode ending and scoring.
-12. Implement Session progression.
-13. Implement Session winner/tiebreak calculation.
-14. Implement engine events.
-15. Implement Player/Public Views.
-16. Implement invariant validation.
-17. Implement deterministic RNG integration.
-18. Integrate through the Game Orchestrator.
+Phase 1 Engine implementation follows `m1-task-breakdown.md` and implements **Basic Mode only**:
 
-Tests should accompany each stage.
+1. shared M1 domain types;
+2. RulesetConfig and primitive comparison;
+3. combination inspection and comparison;
+4. deck, injected deterministic shuffle, and deal;
+5. complete legal Move generation;
+6. validation and atomic transitions;
+7. Turn/Trick/Pass/free-lead flow;
+8. Basic finished-player continuation;
+9. Basic Round placement/scoring;
+10. five-Round Basic Session/tiebreak;
+11. factual events;
+12. information-safe views;
+13. invariants and full M1 regression.
+
+Competitive ending/scoring remains documented but is not implemented during M1. Tests accompany each stage.
 
 ------------------------------------------------------------------------
 

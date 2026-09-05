@@ -1,13 +1,13 @@
 # Pusoy Dos --- AI System Design
 
-## AI System Document (v1.1)
+## AI System Document (v1.2)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026  
-**Parent document:** `requirements.md` v1.8  
-**Shared model:** `domain-model.md` v1.1  
-**Engine design:** `engine.md` v1.2  
-**Orchestrator design:** `orchestrator.md` v1.2  
+**Last Modified:** September 5, 2026
+**Parent document:** `requirements.md` v1.9  
+**Shared model:** `domain-model.md` v1.2  
+**Engine design:** `engine.md` v1.3  
+**Orchestrator design:** `orchestrator.md` v1.3  
 **Module:** AI System  
 **Language:** TypeScript
 
@@ -373,7 +373,7 @@ The evaluator should re-assess placement goals as players finish and the active 
 
 ---
 
-# 11. Competitive Mode Evaluation
+# 11. Competitive Mode Evaluation — Deferred
 
 Competitive Mode ends immediately when the first player empties their hand.
 
@@ -416,7 +416,7 @@ This is AI analysis derived from authoritative scoring rules; it does not replac
 
 ---
 
-# 12. Personality Model
+# 12. Personality Model — Deferred Beyond Baseline
 
 Personality and difficulty are separate dimensions.
 
@@ -460,7 +460,7 @@ A personality should not require intentional irrationality. For example, a futur
 
 ---
 
-# 13. Difficulty Philosophy
+# 13. Difficulty Philosophy — Deferred
 
 All difficulties:
 
@@ -494,7 +494,7 @@ This is a statistical balancing target, not a guarantee that Hard wins every ind
 
 ---
 
-# 14. Easy Difficulty
+# 14. Easy Difficulty — Deferred
 
 Easy represents a player with sound rules knowledge and basic strategic intent but limited planning depth.
 
@@ -515,7 +515,7 @@ Easy should lose more often over large samples because it overlooks subtle stron
 
 ---
 
-# 15. Normal Difficulty
+# 15. Normal Difficulty — Deferred
 
 Normal is the reference competent AI level and should use most of the initial Optimizer framework.
 
@@ -537,7 +537,7 @@ Normal should feel purposeful and strategically competent without attempting exh
 
 ---
 
-# 16. Hard Difficulty
+# 16. Hard Difficulty — Deferred
 
 Hard uses the same fair information as Easy and Normal but reasons more thoroughly.
 
@@ -883,28 +883,19 @@ Exact file granularity may evolve during implementation.
 
 ---
 
-# 28. Recommended Implementation Order
+# 28. Phase 1 Recommended Implementation Order
 
-1. Define AI configuration types for mode/personality/difficulty integration.
-2. Implement `DecisionContext` construction from safe Engine/Orchestrator inputs.
-3. Consume Engine-generated legal Moves.
-4. Implement efficient own-hand representation.
-5. Implement `HandAnalyzer`.
-6. Implement memoized `MinPlaySolver`.
-7. Implement shared candidate evaluation.
-8. Implement Basic mode evaluator.
-9. Implement Competitive `PenaltyExposureAnalyzer` and evaluator.
-10. Add public-card/control analysis.
-11. Add opponent-threat analysis.
-12. Add Session-score/context analysis.
-13. Implement Easy/Normal/Hard capability profiles.
-14. Implement deterministic tie-breaking.
-15. Add bounded endgame/lookahead planner.
-16. Integrate Optimizer through `AIController`.
-17. Run four-AI headless Sessions.
-18. Measure performance and difficulty separation.
-19. Tune weights/search budgets through simulation.
-20. Add future personalities and controlled seeded variation later.
+Phase 1 does **not** implement the full Optimizer plan described in the deferred sections above. M2 should:
+
+1. define a small deterministic Baseline strategy behind the established controller boundary;
+2. consume only safe `PlayerView` information and Engine-provided legal Moves;
+3. add simple understandable hand/candidate heuristics;
+4. prefer reasonable shedding while conserving powerful cards/hands when unnecessary to spend;
+5. define deterministic tie-breaking;
+6. test legality, determinism, information safety, and representative rational choices;
+7. integrate four Baseline controllers into complete headless Basic Sessions.
+
+Minimum-play DP, Easy/Normal/Hard profiles, deep lookahead, personalities, Competitive evaluation, and advanced tuning are deferred until post-Phase-1 planning.
 
 ---
 

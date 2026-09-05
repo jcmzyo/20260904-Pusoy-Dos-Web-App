@@ -1,12 +1,12 @@
 # Pusoy Dos --- Game Orchestrator Design
 
-## Game Orchestrator / Runner Document (v1.2)
+## Game Orchestrator / Runner Document (v1.3)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026  
-**Parent document:** `requirements.md` v1.8  
-**Shared model:** `domain-model.md` v1.1  
-**Engine design:** `engine.md` v1.2  
+**Last Modified:** September 5, 2026
+**Parent document:** `requirements.md` v1.9  
+**Shared model:** `domain-model.md` v1.2  
+**Engine design:** `engine.md` v1.3  
 **Module:** Game Orchestrator  
 **Language:** TypeScript
 
@@ -297,7 +297,7 @@ AI evaluation behavior belongs in `ai.md`, not here.
 
 The AI Controller must never obtain unrevealed opponent hands from authoritative engine state.
 
-## 9.3 NetworkController — Future
+## 9.3 NetworkController — Possible Future Direction
 
 A future Network Controller may:
 
@@ -569,7 +569,7 @@ A remote invalid/stale Move should be rejected through the same authoritative en
 
 ---
 
-# 18. Human Auto-Pass Coordination
+# 18. Human Auto-Pass Coordination — Deferred
 
 The product supports an optional setting that auto-passes the human **only when zero legal plays exist**.
 
@@ -857,7 +857,7 @@ This is distinct from **persistent save/resume across page reloads**, which belo
 
 ---
 
-# 27. Persistent Save / Resume Boundary
+# 27. Persistent Save / Resume Boundary — Deferred
 
 The requirements include resuming an unfinished Session.
 
@@ -1236,7 +1236,7 @@ Simulation should not copy the rules loop into a separate implementation.
 
 ---
 
-# 42. Future Networking Boundary
+# 42. Future Networking Boundary — Possible Future Direction
 
 Future online multiplayer should primarily replace or add controller and transport concerns rather than rewrite engine rules.
 
@@ -1371,7 +1371,7 @@ At minimum, tests should verify:
 - repeated AI invalid Moves do not create an infinite loop;
 - runner does not invent a replacement legal Move.
 
-## 45.5 Auto-pass
+## 45.5 Auto-pass — Deferred
 
 - auto-pass occurs only when engine legal Move information confirms no legal Play exists;
 - disabled auto-pass still waits for human Pass;
