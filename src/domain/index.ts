@@ -13,3 +13,8 @@
 export type { Rank } from './cards/Rank';
 export type { Suit } from './cards/Suit';
 export type { Card } from './cards/Card';
+export type { PlayerId } from './players/PlayerId';
+export type { GameMode } from './game/GameMode';
+export type { CombinationType } from './combinations/CombinationType';
+export type { Combination } from './combinations/Combination';
+export type { Move, PlayMove, PassMove } from './moves/Move';
