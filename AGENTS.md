@@ -145,7 +145,7 @@ Work on one assigned Txx at a time:
 6. Run typecheck/build as appropriate.
 7. Inspect the diff for unrelated changes.
 8. Verify every current task Definition of Done item.
-9. Report results, including incomplete work.
+9. Report results, including incomplete work. Follow indicated format.
 10. **STOP.**
 
 A task may be reported `COMPLETE` only when every current Definition of Done item for that task is satisfied. Passing tests alone does not satisfy the Definition of Done.
@@ -279,7 +279,11 @@ Treat tests as evidence, not proof. Review whether assertions meaningfully test 
 
 Do not let the PR description, implementation approach, or author's conclusions anchor your review.
 
+Check code quality, following SOLID principles, proper use of architectural design principles, code smell, and potential bugs.
+
 Code review is read-only unless I explicitly ask you to implement the resulting fixes.
+
+Write Completion Report as indicated on this document.
 
 ### Finding Severity
 
@@ -351,6 +355,8 @@ Report blockers with the relevant document sections and concrete options.
 
 ## Completion Report
 
+Completion Report must be present after explicit task implementation/ code review with all the indicated format.
+
 For implementation tasks report:
 
 ### Task
@@ -396,3 +402,53 @@ Confirm no unrelated/deferred work.
 ### Suggested Next Step
 
 Identify the next logical task but **do not implement it**.
+
+For code review report format:
+
+### Mandatory Review Report Format
+
+Every review must use these headings in this order.
+Do not omit a section; use “None” or “Not verified” with a reason.
+
+### Task and Review Scope
+Task ID, PR URL, verified base/head commits, and documents consulted.
+
+### Verdict
+Exactly one verdict from Review Verdicts, on its own line.
+
+### Findings
+Findings ordered by severity, with file/line references, concrete
+failure scenarios, requirement impact, and required corrections.
+If none, state “No actionable findings.”
+
+### Code Quality
+Explicitly assess correctness, maintainability, module boundaries,
+public-contract compatibility, and unnecessary complexity.
+
+### Test Quality
+Assess assertion strength, edge cases, regression coverage,
+determinism, and important gaps. Passing tests alone is insufficient.
+
+### Verification
+Exact commands and observed results. Identify checks not executed.
+
+### Definition of Done
+Assess every current task DoD item as PASS, FAIL, or NOT VERIFIED,
+with supporting evidence.
+
+### Scope and Working Tree
+Identify pre-existing changes, unrelated/deferred work, and whether
+the review modified any files.
+
+### Remaining Risks
+State material limitations or “None identified within review scope.”
+
+### Suggested Next Step
+State the action supported by the verdict without implementing it.
+
+### Prompt to Give the Implementation Agent
+Include only when changes are required and clarification does not
+block the fix. Follow the existing prompt requirements.
+
+Before submitting, check that every required section is present
+and that each conclusion is supported by inspected or executed evidence.
