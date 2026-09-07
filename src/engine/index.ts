@@ -8,10 +8,7 @@
  * legal move generation, move validation, turn/trick/round/session state,
  * scoring, views, and engine events.
  *
- * M1-T05 adds the `RulesetConfig` rule seam and the canonical v1 house
- * ruleset (`defaultRuleset`). No rule algorithms (combination detection,
- * comparison, legal move generation, etc.) are implemented yet; those are
- * later M1 tasks that will consume this configuration data.
+ * Exposes ruleset configuration and state-independent combination inspection.
  *
  * Constraints (see engine.md §4 and requirements.md §5.1):
  * - /engine may depend on /domain.
@@ -21,3 +18,5 @@
 export type { RulesetConfig } from './config/RulesetConfig';
 export type { StraightPattern, StraightRules } from './config/StraightRules';
 export { defaultRuleset } from './config/defaultRuleset';
+export { inspectCombination } from './combinations/inspectCombination';
+export type { CombinationInspectionResult } from './combinations/inspectCombination';
