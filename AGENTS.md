@@ -359,7 +359,7 @@ Report blockers with the relevant document sections and concrete options.
 
 ## Completion Report
 
-Completion Report must be present after explicit task implementation/ code review with all the indicated format.
+Completion Report must be present after explicit task implementation/ code review with all the indicated format. If not applicable, write "N/A".
 
 For implementation tasks report:
 

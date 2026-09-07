@@ -78,6 +78,8 @@ A task is **COMPLETE** only when every task-specific Definition of Done
 item is satisfied. If required verification cannot be executed, use the
 appropriate partial status rather than marking the task complete.
 
+All tasks must have all tests passing.
+
 # 5. Documentation Loading Strategy
 
 Always read the current task in this file. For domain tasks, read

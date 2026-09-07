@@ -17,8 +17,8 @@ export type CombinationInspectionResult =
 /**
  * Recognizes Singles, Pairs, Triples, and Straights without checking ownership, Turn,
  * opening requirements, or whether the cards beat the current Trick.
- * Straight inspection accepts same-suit sequences; final five-card category
- * precedence, including Straight Flush, is implemented in T10.
+ * Same-suit sequences retain Straight property strength but cannot be ordinary
+ * Straights. Straight Flush classification remains unsupported until T10.
  */
 export function inspectCombination(
   cards: readonly Card[],
@@ -50,7 +50,8 @@ export function inspectCombination(
   }
 
   if (inspectedCards.length === 5) {
-    if (!getStraightStrength(inspectedCards, ruleset)) {
+    const sameSuit = inspectedCards.every((card) => card.suit === inspectedCards[0]?.suit);
+    if (sameSuit || !getStraightStrength(inspectedCards, ruleset)) {
       return { valid: false, error: 'INVALID_COMBINATION' };
     }
     return { valid: true, combination: { type: 'straight', cards: inspectedCards } };
