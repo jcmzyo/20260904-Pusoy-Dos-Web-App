@@ -4,7 +4,7 @@
 
 **Status:** Draft for implementation\
 **Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.10\
+**Parent document:** `requirements.md` v1.11\
 **Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
 **Language:** TypeScript

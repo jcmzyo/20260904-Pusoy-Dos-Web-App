@@ -4,9 +4,9 @@
 
 **Status:** Draft for implementation  
 **Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.10  
+**Parent document:** `requirements.md` v1.11  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.4  
+**Engine design:** `engine.md` v1.5  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
