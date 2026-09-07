@@ -36,7 +36,7 @@ describe('inspectCombination', () => {
     expect(recognized).toBe(validCount);
   });
 
-  it.each([0, 4, 5, 6, 13, 52])('rejects unsupported size %i', (size) => {
+  it.each([0, 4, 6, 13, 52])('rejects unsupported size %i', (size) => {
     expect(inspectCombination(deck.slice(0, size), defaultRuleset)).toEqual({
       valid: false, error: 'UNSUPPORTED_CARD_COUNT',
     });
@@ -58,7 +58,7 @@ describe('inspectCombination', () => {
     { rank: 'joker', suit: 'clubs' }, { rank: 3, suit: 'clubs' },
     { rank: '3', suit: 'stars' }, { rank: '3', suit: null },
   ].map((malformed) => ({ malformed })))('rejects malformed card $malformed in every position', ({ malformed }) => {
-    for (const size of [1, 2, 3]) {
+    for (const size of [1, 2, 3, 5]) {
       for (let index = 0; index < size; index += 1) {
         const cards: unknown[] = deck.slice(0, size);
         cards[index] = malformed;

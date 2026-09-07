@@ -1,5 +1,6 @@
 import type { Card, Combination } from '../../domain';
 import type { RulesetConfig } from '../config/RulesetConfig';
+import { getStraightStrength } from './straightStrength';
 
 export type CombinationInspectionResult =
   | { readonly valid: true; readonly combination: Combination }
@@ -14,9 +15,9 @@ export type CombinationInspectionResult =
     };
 
 /**
- * Recognizes Singles, Pairs, and Triples without checking ownership, Turn,
+ * Recognizes Singles, Pairs, Triples, and Straights without checking ownership, Turn,
  * opening requirements, or whether the cards beat the current Trick.
- * Five-card inspection is not yet supported.
+ * Other five-card categories, including Straight Flush, are not yet supported.
  */
 export function inspectCombination(
   cards: readonly Card[],
@@ -25,7 +26,7 @@ export function inspectCombination(
   if (!Array.isArray(cards)) {
     return { valid: false, error: 'INVALID_CARDS' };
   }
-  if (cards.length < 1 || cards.length > 3) {
+  if (cards.length < 1 || (cards.length > 3 && cards.length !== 5)) {
     return { valid: false, error: 'UNSUPPORTED_CARD_COUNT' };
   }
 
@@ -45,6 +46,15 @@ export function inspectCombination(
     }
     seen.add(identity);
     inspectedCards.push({ rank: card.rank, suit: card.suit });
+  }
+
+  if (inspectedCards.length === 5) {
+    // Same-suit sequences belong to Straight Flush, implemented in T10.
+    const sameSuit = inspectedCards.every((card) => card.suit === inspectedCards[0]?.suit);
+    if (sameSuit || !getStraightStrength(inspectedCards, ruleset)) {
+      return { valid: false, error: 'INVALID_COMBINATION' };
+    }
+    return { valid: true, combination: { type: 'straight', cards: inspectedCards } };
   }
 
   if (inspectedCards.some((card) => card.rank !== inspectedCards[0]?.rank)) {
