@@ -82,6 +82,14 @@ describe('house-rule Straights', () => {
     }
   });
 
+  it.each(suits)('detects every same-suit house sequence property in %s without ordinary Straight classification', (suit) => {
+    sequences.forEach((sequence, patternIndex) => {
+      const cards = sequence.map((rank) => ({ rank, suit }));
+      expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: false, error: 'INVALID_COMBINATION' });
+      expect(strength(cards)).toEqual({ patternIndex, effectiveHighRank: sequence[4], effectiveHighSuit: suit });
+    });
+  });
+
   it('consumes configured patterns, effective high and suit order', () => {
     const ruleset = {
       ...defaultRuleset,
@@ -114,4 +122,3 @@ describe('house-rule Straights', () => {
     cards.forEach((card, i) => expect(result.combination.cards[i]).not.toBe(card));
   });
 });
-

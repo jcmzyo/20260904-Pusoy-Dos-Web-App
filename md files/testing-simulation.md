@@ -1,12 +1,12 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.2)
+## Testing & Simulation Document (v1.4)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9  
+**Last Modified:** September 8, 2026
+**Parent document:** `requirements.md` v1.11  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.3  
+**Engine design:** `engine.md` v1.5  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
@@ -279,7 +279,7 @@ Verify:
 
 The following cases require explicit named regression tests because they differ from common poker/Big-Two implementations.
 
-Valid:
+Valid Straight property sequences regardless of suits:
 
 - `A-2-3-4-5`;
 - `2-3-4-5-6`;
@@ -287,14 +287,14 @@ Valid:
 - every normal consecutive five-Rank sequence through `10-J-Q-K-A`;
 - `J-Q-K-A-2`.
 
-Invalid:
+Invalid Straight property sequences:
 
 - `K-A-2-3-4`;
 - `Q-K-A-2-3`;
 - duplicate-Rank five-card sets that cannot be a Straight;
 - any nonconsecutive unsupported sequence.
 
-Tests must verify that a borrowed Straight algorithm has been adapted to these exact house rules.
+Tests must include representative mixed-suit and same-suit examples. A same-suit valid house-rule sequence must pass Straight property detection; final five-card classification is tested separately and must select Straight Flush when Straight and Flush overlap. Verify that a borrowed Straight algorithm has been adapted to these exact house rules.
 
 ## 7.10 Straight strength
 
@@ -315,8 +315,8 @@ For equal effective-high Straights, verify Suit tiebreak uses the Suit of the ef
 
 Verify:
 
-- five Cards of one Suit form a Flush when not classified as Straight Flush;
-- mixed Suits do not form a Flush;
+- every five-Card set of one Suit satisfies the Flush property, including a set whose Ranks also form a valid house-rule sequence;
+- mixed Suits do not satisfy the Flush property;
 - Flush comparison uses Suit before Rank comparison;
 - Diamonds > Hearts > Spades > Clubs;
 - for equal Suit, descending Rank comparison breaks ties;
@@ -346,7 +346,8 @@ This explicitly protects the project from generic evaluators that use kicker com
 
 Verify:
 
-- Straight + Flush simultaneously is Straight Flush;
+- a same-suit valid house-rule sequence satisfies both Straight and Flush property checks;
+- final canonical classification selects Straight Flush because it is the highest-ranking applicable category;
 - all project-specific Straight forms are supported where Suit-valid;
 - comparison uses Straight effective high then the Suit of its effective high Card;
 - house-rule Straight ordering is preserved.

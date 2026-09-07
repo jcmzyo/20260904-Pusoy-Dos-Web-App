@@ -1,9 +1,9 @@
 # Pusoy Dos --- M1 Implementation Task Breakdown
 
-## M1 Task Plan (v2.1)
+## M1 Task Plan (v2.2)
 
 **Status:** Approved Phase 1 execution plan\
-**Last Modified:** September 7, 2026\
+**Last Modified:** September 8, 2026\
 **Milestone:** M1 --- Basic Engine Core\
 **Phase:** Phase 1 --- Initial Playable Basic Game
 
@@ -77,6 +77,8 @@ changing public contracts.
 A task is **COMPLETE** only when every task-specific Definition of Done
 item is satisfied. If required verification cannot be executed, use the
 appropriate partial status rather than marking the task complete.
+
+All tasks must have all tests passing.
 
 # 5. Documentation Loading Strategy
 
@@ -280,8 +282,10 @@ state.
 
 **Tests required:** A2345 valid/weakest/effective high 5; 23456
 valid/second weakest/effective high 6; 34567...10JQKA and JQKA2 valid;
-KA234 and QKA23 invalid; tie uses suit of effective high card.\
-**Acceptance:** exhaustive/representative edge coverage; no
+KA234 and QKA23 invalid; tie uses suit of effective high card; valid
+same-suit sequences pass Straight inspection.\
+**Acceptance:** exhaustive/representative edge coverage; every valid
+house-rule sequence is recognized as a Straight regardless of suits; no
 standard-poker rule silently overrides house rules.
 
 ### Definition of Done
@@ -290,8 +294,13 @@ standard-poker rule silently overrides house rules.
     valid/second weakest with effective high 6.
 -   [ ] 34567 through 10JQKA and JQKA2 are recognized correctly.
 -   [ ] KA234 and QKA23 are rejected.
+-   [ ] Straight inspection recognizes every valid house-rule sequence
+    regardless of suits; same-suit sequences are not rejected.
+-   [ ] Tests explicitly require representative same-suit valid sequences
+    to pass Straight detection.
 -   [ ] Equal effective-high Straights use the suit of the
-    effective-high card.
+    effective-high card; existing effective-high strength and suit-tiebreak
+    semantics remain unchanged.
 -   [ ] Special sequences, invalid wraps, boundaries, and suit tiebreaks
     are explicitly tested.
 -   [ ] Focused tests, regression suite, and typecheck pass.
@@ -305,8 +314,7 @@ within same suit.
 
 ### Definition of Done
 
--   [ ] Valid same-suit five-card hands are recognized as Flushes when
-    not Straight Flushes.
+-   [ ] Every same-suit five-card hand satisfies Flush inspection, including hands whose ranks also form a valid house-rule sequence; final category precedence is handled in T10.
 -   [ ] Flush strength supports suit-first then descending-rank
     comparison.
 -   [ ] Full Houses require a valid triple+pair structure and use triple
@@ -317,18 +325,29 @@ within same suit.
 ## T10 --- Inspect Four-of-a-Kind and Straight Flush
 
 **Tests:** Four-kind requires quad+kicker and compares by quad rank;
-kicker irrelevant to strength; Straight Flush uses house Straight
-semantics.\
-**Acceptance:** all valid five-card categories can be inspected.
+kicker irrelevant to strength; detect Straight/Flush overlap and assign
+the final category using the canonical highest-ranking-applicable policy;
+Straight Flush uses house Straight semantics.\
+**Acceptance:** all valid five-card categories can be inspected and
+overlapping definitions resolve to the strongest applicable canonical
+category.
 
 ### Definition of Done
 
 -   [ ] Four-of-a-Kind requires quad+kicker and uses only quad rank for
     strength.
--   [ ] Straight Flush requires same suit plus a valid house-rule
-    Straight.
+-   [ ] Straight Flush requires both a valid house-rule Straight sequence
+    and one suit.
+-   [ ] Detection identifies overlap between Straight and Flush property
+    checks.
+-   [ ] When multiple five-card definitions apply, final classification
+    selects the highest-ranking applicable category under the canonical
+    hierarchy; Straight + Flush therefore classifies as Straight Flush.
+-   [ ] Tests cover category precedence, including same-suit valid
+    sequences that pass Straight and Flush inspection but classify as
+    Straight Flush.
 -   [ ] Straight Flush preserves all documented special Straight
-    semantics.
+    semantics and its canonical strength/comparison behavior is tested.
 -   [ ] Together with T08--T09, every valid five-card category can be
     inspected.
 -   [ ] Focused tests, regression suite, and typecheck pass.
