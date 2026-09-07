@@ -194,6 +194,8 @@ Do not introduce silent fallback, error swallowing, or automatic state repair un
 
 Unexpected impossible states should fail diagnostically rather than being silently converted into plausible behavior.
 
+Do not alter any whitespace, indentation, line breaks, or code formatting unless explicitly requested. Only output the necessary code logic changes. Preserve the exact formatting of the surrounding code.
+
 ## Verification
 
 Use Node.js >=24 and npm with the existing `package-lock.json`.
@@ -280,6 +282,8 @@ Treat tests as evidence, not proof. Review whether assertions meaningfully test 
 Do not let the PR description, implementation approach, or author's conclusions anchor your review.
 
 Check code quality, following SOLID principles, proper use of architectural design principles, code smell, and potential bugs.
+
+Check if there are unnecessary changes to whitespace, indentation, line breaks, or code formatting unless explicitly requested.
 
 Code review is read-only unless I explicitly ask you to implement the resulting fixes.
 

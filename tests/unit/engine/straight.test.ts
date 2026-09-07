@@ -77,9 +77,16 @@ describe('house-rule Straights', () => {
       const cards = sequence.map((rank, i) => ({ rank, suit: suits[(mask >> (i * 2)) & 3]! }));
       const reference = hand(sequence); reference[4] = { ...reference[4]!, suit: cards[4]!.suit };
       expect(compareStraightStrength(strength(cards), strength(reference), defaultRuleset)).toBe(0);
-      const sameSuit = cards.every((card) => card.suit === cards[0]!.suit);
-      expect(inspectCombination(cards, defaultRuleset).valid).toBe(!sameSuit);
+      expect(inspectCombination(cards, defaultRuleset).valid).toBe(true);
     }
+  });
+
+  it.each(suits)('recognizes every same-suit house sequence in %s during T08 inspection', (suit) => {
+    sequences.forEach((sequence, patternIndex) => {
+      const cards = sequence.map((rank) => ({ rank, suit }));
+      expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: true, combination: { type: 'straight', cards } });
+      expect(strength(cards)).toEqual({ patternIndex, effectiveHighRank: sequence[4], effectiveHighSuit: suit });
+    });
   });
 
   it('consumes configured patterns, effective high and suit order', () => {
@@ -114,4 +121,3 @@ describe('house-rule Straights', () => {
     cards.forEach((card, i) => expect(result.combination.cards[i]).not.toBe(card));
   });
 });
-

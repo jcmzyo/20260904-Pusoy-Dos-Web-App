@@ -1,10 +1,10 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.3)
+## Game Engine Document (v1.5)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9\
+**Last Modified:** September 8, 2026
+**Parent document:** `requirements.md` v1.10\
 **Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
 **Language:** TypeScript
@@ -340,6 +340,18 @@ detectCombination(
 
 Detection must implement the combination definitions and Straight edge
 cases confirmed in `requirements.md`.
+
+A five-card set may satisfy multiple combination properties during inspection:
+
+- **Straight** property: the ranks form a valid house-rule sequence, regardless of suits;
+- **Flush** property: all five cards have the same suit;
+- **Straight Flush** property: both Straight and Flush properties are satisfied.
+
+The engine must preserve those underlying property checks while returning one final canonical `CombinationType`. If multiple five-card definitions apply, select the **highest-ranking applicable category** using the canonical hierarchy:
+
+`Straight < Flush < Full House < Four-of-a-Kind < Straight Flush`
+
+Therefore a same-suit valid house-rule sequence must pass Straight inspection and Flush inspection, while its final canonical classification is Straight Flush. Do not make lower-level property detectors reject a hand merely because a stronger overlapping category also applies.
 
 Detection answers:
 

@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.9)
+## Requirements & Planning Document (v1.11)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026
+**Last Modified:** September 8, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -239,10 +239,13 @@ that new current trick.
 
   Triple                              Exactly 3 cards of the same rank
 
-  Straight                            Exactly 5 consecutive ranks
-                                      according to §2.4
+  Straight                            Exactly 5 cards forming a valid
+                                      house-rule sequence according to
+                                      §2.4, with at least 2 different suits
 
-  Flush                               Exactly 5 cards of the same suit
+  Flush                               Exactly 5 cards of the same suit whose
+                                      ranks do not form a valid house-rule
+                                      sequence
 
   Full House                          Exactly 3 cards of one rank +
                                       exactly 2 cards of another rank
@@ -250,8 +253,9 @@ that new current trick.
   Four-of-a-Kind                      Exactly 4 cards of the same rank +
                                       1 kicker
 
-  Straight Flush                      Exactly 5 consecutive ranks, all of
-                                      the same suit
+  Straight Flush                      Exactly 5 cards of the same suit forming
+                                      a valid house-rule sequence according
+                                      to §2.4
   -----------------------------------------------------------------------
 
 ### Five-card combination ranking
@@ -259,6 +263,10 @@ that new current trick.
 Low → high:
 
 `Straight < Flush < Full House < Four-of-a-Kind < Straight Flush`
+
+A five-card card set may satisfy the defining properties of more than one combination type. When this occurs, its **final canonical classification is the highest-ranking applicable combination** under the hierarchy above.
+
+For example, a same-suit valid house-rule sequence satisfies both Straight and Flush properties and therefore qualifies as a **Straight Flush**, the higher applicable category. Authoritative detection must evaluate applicable five-card definitions and return the strongest valid classification rather than rejecting a lower-type property merely because a stronger overlap exists.
 
 Combination types cannot be mixed for 1-, 2-, or 3-card tricks.
 
@@ -302,7 +310,9 @@ Each five-card type has its own same-type comparison rule.
 
 ### 2.4.1 Straight
 
-A straight is ranked by the **last/highest rank in its sequence**.
+A Straight is exactly five cards forming one of the valid house-rule rank sequences below, with **at least two different suits**. A same-suit valid sequence is a Straight Flush instead.
+
+A Straight is ranked by the **last/highest rank in its sequence**.
 
 The special low straights are:
 
@@ -331,10 +341,10 @@ highest card** using:
 
 Example:
 
--   `3♣ 4♣ 5♣ 6♣ 7♣` is weaker than
+-   `3♦ 4♣ 5♣ 6♣ 7♣` is weaker than
 -   `3♣ 4♥ 5♠ 6♦ 7♥`
 
-because both are 7-high and `7♥ > 7♣`.
+because both are ordinary 7-high Straights and `7♥ > 7♣`.
 
 For the special straights, the effective high card is:
 
@@ -360,7 +370,9 @@ special straights above.
 
 ### 2.4.2 Flush
 
-A flush is compared by **suit first**.
+A Flush is exactly five cards of one suit whose ranks **do not** form a valid house-rule Straight sequence. If the same-suit cards form a valid house-rule sequence, the combination is a Straight Flush instead.
+
+A Flush is compared by **suit first**.
 
 Suit order:
 
@@ -411,8 +423,7 @@ regardless of the kicker.
 
 ### 2.4.5 Straight Flush
 
-A straight flush follows the **same rank-first comparison logic as a
-straight**.
+A Straight Flush is exactly five cards of one suit forming a valid house-rule Straight sequence. It follows the **same rank-first comparison logic as a Straight**.
 
 1.  Compare the effective highest rank of the straight.
 2.  If the highest rank is the same, compare the suit of the highest
@@ -1246,8 +1257,9 @@ Test:
 -   Single.
 -   Pair.
 -   Triple.
--   Straight.
--   Flush.
+-   Straight property detection for every valid house-rule sequence regardless of suits, including same-suit sequences.
+-   Flush property detection for every same-suit five-card set, including sets that also satisfy Straight.
+-   Final five-card classification chooses the highest-ranking applicable category when definitions overlap.
 -   Full House.
 -   Four-of-a-Kind.
 -   Straight Flush.
@@ -1263,6 +1275,8 @@ Explicit tests for:
 -   J-Q-K-A-2.
 -   K-A-2-3-4 invalid.
 -   Q-K-A-2-3 invalid.
+-   A valid sequence with all five cards in one suit still passes Straight property detection, but its final canonical category is Straight Flush.
+-   A valid sequence using at least two suits is classified as Straight when no stronger category applies.
 
 ### Straight comparison
 
@@ -1280,6 +1294,8 @@ Verify:
 -   Hearts \> Spades.
 -   Spades \> Clubs.
 -   Same-suit flushes compare by descending card ranks.
+-   A same-suit hand whose ranks form a valid house-rule sequence still satisfies Flush, but its final canonical category is Straight Flush.
+-   A same-suit hand whose ranks do not form a valid house-rule sequence is classified as Flush.
 
 ### Full house
 
@@ -1293,8 +1309,10 @@ Verify only the four-card rank determines strength.
 
 Verify:
 
-1.  highest rank first;
-2.  highest-card suit second.
+1.  detection requires both one suit and a valid house-rule sequence;
+2.  when Straight and Flush properties overlap, final classification selects Straight Flush as the highest-ranking applicable category;
+3.  highest rank first;
+4.  highest-card suit second.
 
 ### Trick validation
 
