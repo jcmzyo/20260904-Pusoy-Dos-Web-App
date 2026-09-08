@@ -32,7 +32,7 @@ describe('Flush and Full House inspection', () => {
       for (const ordered of [cards, [...cards].reverse()]) {
         expect(getFlushStrength(ordered, defaultRuleset)).toEqual({ suit, descendingRanks: [...selection].reverse() });
         expect(inspectCombination(ordered, defaultRuleset)).toEqual(overlap
-          ? { valid: false, error: 'INVALID_COMBINATION' }
+          ? { valid: true, combination: { type: 'straightFlush', cards: ordered } }
           : { valid: true, combination: { type: 'flush', cards: ordered } });
       }
       properties++;
@@ -88,7 +88,7 @@ describe('Flush and Full House inspection', () => {
   });
 
   it.each([
-    ['3', '3', '3', '3', '2'], ['3', '3', '3', '4', '2'],
+    ['3', '3', '3', '4', '2'],
     ['3', '3', '4', '4', '2'], ['3', '3', '4', '7', '2'], ['3', '4', '6', '8', '2'],
   ] as Rank[][])('rejects non-triple-pair structures and mixed-suit nonsequences: %j', (...selection) => {
     const cards = selection.map((rank, i) => ({ rank, suit: suits[i % 4]! }));

@@ -3,6 +3,7 @@ import type { RulesetConfig } from '../config/RulesetConfig';
 import { getStraightStrength } from './straightStrength';
 import { getFlushStrength } from './flushStrength';
 import { getFullHouseStrength } from './fullHouseStrength';
+import { getFourOfAKindStrength } from './fourOfAKindStrength';
 
 export type CombinationInspectionResult =
   | { readonly valid: true; readonly combination: Combination }
@@ -17,10 +18,9 @@ export type CombinationInspectionResult =
     };
 
 /**
- * Recognizes Singles, Pairs, Triples, Straights, Flushes, and Full Houses without checking ownership, Turn,
+ * Recognizes every canonical combination without checking ownership, Turn,
  * opening requirements, or whether the cards beat the current Trick.
- * Same-suit sequences retain Straight property strength but cannot be ordinary
- * Straights. Straight Flush classification remains unsupported until T10.
+ * Overlapping five-card properties resolve using the configured category order.
  */
 export function inspectCombination(
   cards: readonly Card[],
@@ -54,16 +54,20 @@ export function inspectCombination(
   if (inspectedCards.length === 5) {
     const straight = getStraightStrength(inspectedCards, ruleset);
     const flush = getFlushStrength(inspectedCards, ruleset);
-    if (getFullHouseStrength(inspectedCards)) {
-      return { valid: true, combination: { type: 'fullHouse', cards: inspectedCards } };
+    const properties = {
+      straight: !!straight,
+      flush: !!flush,
+      fullHouse: !!getFullHouseStrength(inspectedCards),
+      fourOfAKind: !!getFourOfAKindStrength(inspectedCards),
+      straightFlush: !!straight && !!flush,
+    };
+    for (let i = ruleset.fiveCardOrder.length - 1; i >= 0; i--) {
+      const type = ruleset.fiveCardOrder[i]!;
+      if (type in properties && properties[type as keyof typeof properties]) {
+        return { valid: true, combination: { type, cards: inspectedCards } };
+      }
     }
-    if (flush && !straight) {
-      return { valid: true, combination: { type: 'flush', cards: inspectedCards } };
-    }
-    if (flush || !straight) {
-      return { valid: false, error: 'INVALID_COMBINATION' };
-    }
-    return { valid: true, combination: { type: 'straight', cards: inspectedCards } };
+    return { valid: false, error: 'INVALID_COMBINATION' };
   }
 
   if (inspectedCards.some((card) => card.rank !== inspectedCards[0]?.rank)) {
