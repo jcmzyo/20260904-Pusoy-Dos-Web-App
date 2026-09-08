@@ -78,14 +78,14 @@ describe('house-rule Straights', () => {
       const reference = hand(sequence); reference[4] = { ...reference[4]!, suit: cards[4]!.suit };
       expect(compareStraightStrength(strength(cards), strength(reference), defaultRuleset)).toBe(0);
       const sameSuit = cards.every((card) => card.suit === cards[0]!.suit);
-      expect(inspectCombination(cards, defaultRuleset).valid).toBe(!sameSuit);
+      expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: true, combination: { type: sameSuit ? 'straightFlush' : 'straight', cards } });
     }
   });
 
   it.each(suits)('detects every same-suit house sequence property in %s without ordinary Straight classification', (suit) => {
     sequences.forEach((sequence, patternIndex) => {
       const cards = sequence.map((rank) => ({ rank, suit }));
-      expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: false, error: 'INVALID_COMBINATION' });
+      expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: true, combination: { type: 'straightFlush', cards } });
       expect(strength(cards)).toEqual({ patternIndex, effectiveHighRank: sequence[4], effectiveHighSuit: suit });
     });
   });
