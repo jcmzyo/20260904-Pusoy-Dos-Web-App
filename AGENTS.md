@@ -214,6 +214,8 @@ Bug fixes should receive regression tests where practical.
 
 Tests for authoritative game behavior must be deterministic. Randomized tests must use a reproducible seed.
 
+Test fixtures and examples must respect canonical domain invariants, including physical card uniqueness. Do not construct impossible game states merely to exercise a comparison case unless the test explicitly targets invalid-state handling.
+
 Never claim a test/build/typecheck passed unless actually executed.
 
 If an unrelated existing failure appears, determine whether your changes caused it. Do not silently repair unrelated problems.

@@ -1,12 +1,12 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.4)
+## Testing & Simulation Document (v1.5)
 
 **Status:** Draft for implementation  
 **Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.11  
+**Parent document:** `requirements.md` v1.12  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.5  
+**Engine design:** `engine.md` v1.6  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
@@ -263,7 +263,10 @@ Verify:
 
 - exactly two equal-Rank Cards form a Pair;
 - two different Ranks do not form a Pair;
-- Pair comparison follows the confirmed Rank/Suit rules;
+- Pair comparison uses Pair Rank first;
+- when two Pairs have the same Rank, compare the highest-Suit Card contained in each Pair using `Clubs < Spades < Hearts < Diamonds`;
+- a physically valid equal-Rank example uses four distinct cards, such as `7♠ 7♦ > 7♣ 7♥`;
+- tests never reuse one physical Card in both compared Pairs;
 - pair-generation does not create duplicates or omit valid suit combinations.
 
 ## 7.8 Triple detection/comparison
@@ -272,7 +275,9 @@ Verify:
 
 - exactly three equal-Rank Cards form a Triple;
 - mixed Ranks are invalid;
-- Triple comparison follows the confirmed house rule;
+- Triple comparison uses Rank only;
+- different-Rank Triples compare by Rank;
+- do **not** fabricate two distinct equal-Rank Triples as a gameplay comparison case, because that would require six cards of one Rank while the deck contains only four;
 - generated Triples are complete and unique.
 
 ## 7.9 Straight validity
@@ -329,7 +334,8 @@ Verify:
 - `3 + 2` Rank-count structure is valid;
 - other count patterns are invalid;
 - Full House strength is determined only by Triple Rank;
-- Pair Rank does not override Triple Rank.
+- Pair Rank does not override Triple Rank;
+- two distinct same-Triple-Rank Full Houses are not fabricated as a gameplay tie because one deck cannot supply two separate triples of that Rank.
 
 ## 7.13 Four-of-a-Kind validity/comparison
 
@@ -338,7 +344,7 @@ Verify:
 - exactly four equal-Rank Cards plus one kicker is valid;
 - strength is determined only by the four-card Rank;
 - kicker does not affect strength;
-- multiple possible kickers create distinct playable Card sets but identical Combination strength when the quad Rank is identical.
+- two distinct same-quad-Rank Four-of-a-Kind plays are impossible in one deck, so tests must not manufacture that matchup by duplicating the quad cards.
 
 This explicitly protects the project from generic evaluators that use kicker comparison.
 
@@ -360,7 +366,11 @@ Verify:
 Straight < Flush < Full House < Four-of-a-Kind < Straight Flush
 ```
 
-Explicitly test every adjacent hierarchy boundary and representative nonadjacent boundaries.
+- every stronger category strictly beats every weaker category regardless of internal Rank/Suit contents;
+- same-category comparisons use that category's own documented rule;
+- explicitly test every adjacent hierarchy boundary and representative nonadjacent boundaries;
+- comparison fixtures representing opposing plays use physically distinct cards from one standard 52-card deck;
+- impossible complete ties are not presented as reachable normal-play scenarios.
 
 ## 7.16 Cross-type five-card responses
 

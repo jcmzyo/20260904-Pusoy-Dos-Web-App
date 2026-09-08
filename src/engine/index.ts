@@ -20,3 +20,4 @@ export type { StraightPattern, StraightRules } from './config/StraightRules';
 export { defaultRuleset } from './config/defaultRuleset';
 export { inspectCombination } from './combinations/inspectCombination';
 export type { CombinationInspectionResult } from './combinations/inspectCombination';
+export { compareSameCategoryCombinations } from './combinations/compareSameCategoryCombinations';

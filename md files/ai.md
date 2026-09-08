@@ -1,12 +1,12 @@
 # Pusoy Dos --- AI System Design
 
-## AI System Document (v1.2)
+## AI System Document (v1.3)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9  
+**Last Modified:** September 8, 2026
+**Parent document:** `requirements.md` v1.12  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.3  
+**Engine design:** `engine.md` v1.6  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **Module:** AI System  
 **Language:** TypeScript

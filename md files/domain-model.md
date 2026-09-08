@@ -1,10 +1,10 @@
 # Pusoy Dos --- Shared Domain Model
 
-## Domain Model Document (v1.2)
+## Domain Model Document (v1.3)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9\
+**Last Modified:** September 8, 2026
+**Parent document:** `requirements.md` v1.12\
 **Scope:** Shared, implementation-independent game vocabulary and data
 contracts\
 **Language:** TypeScript
