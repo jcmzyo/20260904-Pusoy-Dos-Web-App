@@ -1,6 +1,8 @@
 import type { Card, Combination } from '../../domain';
 import type { RulesetConfig } from '../config/RulesetConfig';
 import { getStraightStrength } from './straightStrength';
+import { getFlushStrength } from './flushStrength';
+import { getFullHouseStrength } from './fullHouseStrength';
 
 export type CombinationInspectionResult =
   | { readonly valid: true; readonly combination: Combination }
@@ -15,7 +17,7 @@ export type CombinationInspectionResult =
     };
 
 /**
- * Recognizes Singles, Pairs, Triples, and Straights without checking ownership, Turn,
+ * Recognizes Singles, Pairs, Triples, Straights, Flushes, and Full Houses without checking ownership, Turn,
  * opening requirements, or whether the cards beat the current Trick.
  * Same-suit sequences retain Straight property strength but cannot be ordinary
  * Straights. Straight Flush classification remains unsupported until T10.
@@ -50,8 +52,15 @@ export function inspectCombination(
   }
 
   if (inspectedCards.length === 5) {
-    const sameSuit = inspectedCards.every((card) => card.suit === inspectedCards[0]?.suit);
-    if (sameSuit || !getStraightStrength(inspectedCards, ruleset)) {
+    const straight = getStraightStrength(inspectedCards, ruleset);
+    const flush = getFlushStrength(inspectedCards, ruleset);
+    if (getFullHouseStrength(inspectedCards)) {
+      return { valid: true, combination: { type: 'fullHouse', cards: inspectedCards } };
+    }
+    if (flush && !straight) {
+      return { valid: true, combination: { type: 'flush', cards: inspectedCards } };
+    }
+    if (flush || !straight) {
       return { valid: false, error: 'INVALID_COMBINATION' };
     }
     return { valid: true, combination: { type: 'straight', cards: inspectedCards } };
