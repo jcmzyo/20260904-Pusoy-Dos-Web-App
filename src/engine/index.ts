@@ -28,3 +28,4 @@ export type { CombinationInspectionResult } from './combinations/inspectCombinat
 export { compareSameCategoryCombinations } from './combinations/compareSameCategoryCombinations';
 export { canBeat } from './combinations/canBeat';
 export { generateLegalOpeningMoves } from './moves/generateLegalOpeningMoves';
+export { generateLegalResponseMoves } from './moves/generateLegalResponseMoves';
