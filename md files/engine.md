@@ -1,9 +1,9 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.6)
+## Game Engine Document (v1.7)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 8, 2026
+**Last Modified:** September 9, 2026
 **Parent document:** `requirements.md` v1.12\
 **Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
@@ -140,6 +140,38 @@ const result = engine.submitMove(state, move);
 
 A successful operation returns the resulting authoritative state and
 factual events. A rejected Move leaves authoritative state unchanged.
+
+### Incremental implementation of the final transaction contract
+
+The completed `submitMove(...)` contract is atomic: once a Move is accepted,
+all consequences applicable to that Move must be reflected in the returned
+authoritative state before that result is exposed to callers.
+
+M1 may implement the internals required by this transaction incrementally.
+Validation may therefore be implemented before all later Turn, Trick,
+finished-player, Round, scoring, and Session consequences exist.
+
+This sequencing does **not** permit an intermediate task to expose a
+partially applied accepted Move as a valid authoritative post-Move state.
+Until the required consequences for a Move class are implemented, the task
+acceptance criteria apply only to the internal component explicitly assigned
+to that task.
+
+A suitable internal decomposition may include responsibilities such as:
+
+```ts
+validateMove(state, move)
+applyAcceptedPlay(state, move)
+applyAcceptedPass(state, move)
+resolveFinishedPlayer(state)
+resolveRoundCompletion(state)
+resolveSessionCompletion(state)
+```
+
+These names are illustrative rather than mandatory public contracts. The
+architectural requirement is that the completed public authoritative
+transaction composes these concerns without duplicating rules and without
+making half-transitions externally observable.
 
 The implementation may use immutable updates or controlled internal
 mutation, but externally exposed state must behave as

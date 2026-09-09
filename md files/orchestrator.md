@@ -1,12 +1,12 @@
 # Pusoy Dos --- Game Orchestrator Design
 
-## Game Orchestrator / Runner Document (v1.4)
+## Game Orchestrator / Runner Document (v1.5)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 8, 2026
+**Last Modified:** September 9, 2026
 **Parent document:** `requirements.md` v1.12  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.6  
+**Engine design:** `engine.md` v1.7  
 **Module:** Game Orchestrator  
 **Language:** TypeScript
 
