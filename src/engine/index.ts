@@ -29,3 +29,4 @@ export { compareSameCategoryCombinations } from './combinations/compareSameCateg
 export { canBeat } from './combinations/canBeat';
 export { generateLegalOpeningMoves } from './moves/generateLegalOpeningMoves';
 export { generateLegalResponseMoves } from './moves/generateLegalResponseMoves';
+export { generateLegalFreeLeadMoves } from './moves/generateLegalFreeLeadMoves';
