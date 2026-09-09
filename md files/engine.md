@@ -1,10 +1,10 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.5)
+## Game Engine Document (v1.6)
 
 **Status:** Draft for implementation\
 **Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.11\
+**Parent document:** `requirements.md` v1.12\
 **Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
 **Language:** TypeScript
@@ -393,6 +393,9 @@ Comparison must implement the canonical rules in `requirements.md`,
 including:
 
 -   same-size response requirements for Singles, Pairs, and Triples;
+-   Single Rank-first then Suit comparison;
+-   Pair Rank-first comparison, with equal-Rank Pairs resolved by the highest-Suit card contained in each Pair;
+-   Triple Rank-only comparison, recognizing that two distinct equal-Rank Triples are physically impossible in one standard 52-card deck;
 -   five-card hierarchy;
 -   cross-type five-card responses;
 -   Straight special ordering;
@@ -400,6 +403,10 @@ including:
 -   Full House comparison;
 -   Four-of-a-Kind comparison;
 -   Straight Flush comparison.
+
+A stronger five-card category must strictly beat every weaker five-card category regardless of internal card values. Same-category comparison then uses only that category's canonical rule.
+
+Comparison tests and examples must respect physical deck uniqueness. They must not create two different gameplay combinations that reuse the same physical card or require more than four cards of one Rank. Comparator equality may still be handled deterministically for identical inputs, but such synthetic equality must not be presented as a reachable response scenario when the deck makes it impossible.
 
 No AI preference belongs in this calculation.
 
@@ -737,7 +744,7 @@ The UI decides how this information is presented.
 
 # 24. Session Winner and Tiebreaks
 
-The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.7.
+The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.12.
 
 First compare final Session totals. If still tied:
 

@@ -1,9 +1,9 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.0)
+## UI / UX Document (v1.1)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 5, 2026  
+**Last Modified:** September 8, 2026
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---
