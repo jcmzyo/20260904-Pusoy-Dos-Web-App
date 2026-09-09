@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, Move, Rank } from '../../../src/domain';
-import { defaultRuleset } from '../../../src/engine';
+import { createDeck, defaultRuleset } from '../../../src/engine';
 import * as engine from '../../../src/engine';
 import { validateMove } from '../../../src/engine/moves/validateMove';
 import type { MoveValidationContext } from '../../../src/engine/moves/validateMove';
@@ -147,10 +147,18 @@ describe('Basic finished-player continuation', () => {
     expect(next.kind === 'continue' && next.progression.trick).toEqual({ kind: 'response', current: { type: 'pair', cards: initial.players[1]!.hand.slice(0, 2) } });
   });
 
-  it('records a finisher on a legal opening without retaining the opening restriction', () => {
-    const state: MoveValidationContext = { ...context([[card('3')], [card('4')], [card('5')], [card('6')]]), trick: { kind: 'opening' } };
-    const result = resolve(state);
-    expect(result.finishOrder).toEqual(['south']);
-    expect(result.kind === 'continue' && result.progression.trick.kind).toBe('response');
+  it('removes the opening card and advances to a response without recording a finish', () => {
+    const deck = createDeck();
+    const hands = ids.map((_, index) => deck.slice(index * 13, (index + 1) * 13));
+    const state: MoveValidationContext = { ...context(hands), trick: { kind: 'opening' } };
+    const result = resolve(state, [], null, { kind: 'play', playerId: 'south', cards: [card('3')] });
+    expect(hands.map((hand) => hand.length)).toEqual([13, 13, 13, 13]);
+    expect(new Set(hands.flat().map((entry) => `${entry.rank}-${entry.suit}`)).size).toBe(52);
+    expect(result.finishOrder).toEqual([]);
+    expect(result.players[0]).toEqual({ playerId: 'south', active: true, hand: hands[0]!.slice(1) });
+    expect(result.players.slice(1)).toEqual(state.players.slice(1));
+    expect(result.kind).toBe('continue');
+    if (result.kind !== 'continue') throw new Error('Expected continuation');
+    expect(result.progression).toEqual({ currentPlayerId: 'west', trick: { kind: 'response', current: { type: 'single', cards: [card('3')] } }, responseCycle: { lastSuccessfulPlayerId: 'south', passedPlayerIds: [] } });
   });
 });
