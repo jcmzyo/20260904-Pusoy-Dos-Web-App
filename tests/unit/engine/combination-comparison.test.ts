@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, Combination, Rank, Suit } from '../../../src/domain';
-import { compareSameCategoryCombinations, defaultRuleset, inspectCombination } from '../../../src/engine';
+import { canBeat, compareSameCategoryCombinations, defaultRuleset, inspectCombination } from '../../../src/engine';
 
 const ranks: readonly Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 const suits: readonly Suit[] = ['clubs', 'spades', 'hearts', 'diamonds'];
@@ -32,6 +32,7 @@ function compare(a: readonly Card[], b: readonly Card[], ruleset = defaultRulese
   const left = combination(a);
   const right = combination(b);
   const result = Math.sign(compareSameCategoryCombinations(left, right, ruleset));
+  expect(canBeat(left, right, ruleset)).toBe(result > 0);
   expect(Math.sign(compareSameCategoryCombinations({ ...left, cards: [...a].reverse() }, { ...right, cards: [...b].reverse() }, ruleset))).toBe(result);
   return result;
 }
@@ -129,6 +130,7 @@ describe('same-category combination comparison', () => {
       const original = combination(cards);
       const frozen = Object.freeze({ ...original, cards: Object.freeze(original.cards.map((card) => Object.freeze(card))) });
       expect(compareSameCategoryCombinations(frozen, frozen, defaultRuleset)).toBe(0);
+      expect(canBeat(frozen, frozen, defaultRuleset)).toBe(false);
       expect(compareSameCategoryCombinations(frozen, combination([...cards].reverse()), defaultRuleset)).toBe(0);
       expect(frozen.cards).toEqual(cards);
     }
