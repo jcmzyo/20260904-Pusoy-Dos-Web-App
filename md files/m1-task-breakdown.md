@@ -1,6 +1,6 @@
 # Pusoy Dos --- M1 Implementation Task Breakdown
 
-## M1 Task Plan (v2.2)
+## M1 Task Plan (v2.4)
 
 **Status:** Approved Phase 1 execution plan\
 **Last Modified:** September 8, 2026\
@@ -77,8 +77,6 @@ changing public contracts.
 A task is **COMPLETE** only when every task-specific Definition of Done
 item is satisfied. If required verification cannot be executed, use the
 appropriate partial status rather than marking the task complete.
-
-All tasks must have all tests passing.
 
 # 5. Documentation Loading Strategy
 
@@ -354,18 +352,28 @@ category.
 
 ## T11 --- Compare same-category combinations
 
-**Tests:** Singles/Pairs/Triples and every five-card category according
-to house rules.\
-**Acceptance:** deterministic strict comparison result.
+**Tests:** Singles, Pairs, Triples, and every five-card category according
+to house rules; all opposing-hand fixtures must respect physical deck
+uniqueness.\
+**Acceptance:** deterministic strict comparison result using the canonical
+comparison rule for each category.
 
 ### Definition of Done
 
--   [ ] Singles, Pairs, Triples, and every five-card category compare
-    according to canonical house rules.
--   [ ] Equal-strength handling is deterministic and consistent with the
-    comparison contract.
--   [ ] Representative lower/equal/higher cases are tested for every
-    category.
+-   [ ] Singles compare by Rank first, then Suit for equal Ranks.
+-   [ ] Pairs compare by Pair Rank first; equal-Rank Pairs compare the
+    highest-Suit card contained in each Pair.
+-   [ ] Equal-Rank Pair tests use four distinct physical cards, e.g.
+    `7♠ 7♦ > 7♣ 7♥`; no card is duplicated across the two Pairs.
+-   [ ] Triples compare by Rank only.
+-   [ ] Tests do not fabricate two distinct equal-Rank Triples, because
+    one standard deck contains only four cards of each Rank.
+-   [ ] Every five-card category uses its canonical same-type comparison
+    rule.
+-   [ ] Tests and examples do not manufacture impossible same-deck ties
+    by reusing a physical card or requiring more copies of a Rank than exist.
+-   [ ] Comparator handling remains deterministic for identical inputs
+    even when such equality is not a reachable opposing-play scenario.
 -   [ ] Focused tests, regression suite, and typecheck pass.
 
 ## T12 --- Compare five-card hierarchy and cross-type responses
@@ -378,9 +386,11 @@ Flush, including cross-category wins/losses.\
 
 -   [ ] Five-card order is exactly Straight \< Flush \< Full House \<
     Four-of-a-Kind \< Straight Flush.
--   [ ] Higher categories beat lower categories; same-category
-    comparison uses canonical rules.
--   [ ] Cross-category win/loss cases are explicitly tested.
+-   [ ] Every higher five-card category strictly beats every lower
+    category regardless of internal Rank/Suit contents; same-category
+    comparison uses that category's canonical rule.
+-   [ ] Cross-category win/loss cases are explicitly tested with
+    physically realizable, non-duplicated card fixtures.
 -   [ ] No bomb, interrupt, or trick-breaking exception is introduced.
 -   [ ] Focused tests, regression suite, and typecheck pass.
 

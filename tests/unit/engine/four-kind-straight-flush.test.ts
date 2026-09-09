@@ -40,10 +40,15 @@ describe('Four-of-a-Kind and Straight Flush inspection', () => {
     expect(count).toBe(624);
   });
 
-  it('supports lower, equal and higher quad strength independently of the kicker', () => {
+  it('supports lower and higher quad strength independently of the kicker with disjoint hands', () => {
     for (const [i, a] of ranks.entries()) for (const [j, b] of ranks.entries()) {
-      const left = getFourOfAKindStrength(quad(a, a === '2' ? 'A' : '2'))!;
-      const right = getFourOfAKindStrength(quad(b, b === '3' ? '4' : '3', 'diamonds'))!;
+      if (i === j) continue;
+      const remaining = ranks.filter((rank) => rank !== a && rank !== b);
+      const leftCards = quad(a, remaining[0]!);
+      const rightCards = quad(b, remaining[remaining.length - 1]!, 'diamonds');
+      expect(leftCards.some((card) => rightCards.some((other) => card.rank === other.rank && card.suit === other.suit))).toBe(false);
+      const left = getFourOfAKindStrength(leftCards)!;
+      const right = getFourOfAKindStrength(rightCards)!;
       expect(Math.sign(compareRank(left.quadRank, right.quadRank, defaultRuleset))).toBe(Math.sign(i - j));
     }
   });
@@ -64,9 +69,10 @@ describe('Four-of-a-Kind and Straight Flush inspection', () => {
     });
   });
 
-  it('uses Straight rank-first strength for every Straight Flush pair, including equal strength and suit ties', () => {
+  it('uses Straight rank-first strength for disjoint Straight Flushes, including effective-high suit tiebreaks', () => {
     sequences.forEach((a, i) => sequences.forEach((b, j) => {
       for (const [s, aSuit] of suits.entries()) for (const [t, bSuit] of suits.entries()) {
+        if (aSuit === bSuit && a.some((rank) => b.includes(rank))) continue;
         const left = getStraightStrength(suited(a, aSuit), defaultRuleset)!;
         const right = getStraightStrength(suited(b, bSuit), defaultRuleset)!;
         expect(Math.sign(compareStraightStrength(left, right, defaultRuleset))).toBe(Math.sign(i - j || s - t));

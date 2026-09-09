@@ -64,8 +64,10 @@ describe('house-rule Straights', () => {
   it('orders every sequence pair from A2345 through JQKA2 before considering suit', () => {
     sequences.forEach((a, i) => sequences.forEach((b, j) => {
       for (const aSuit of suits) for (const bSuit of suits) {
-        const left = hand(a); left[4] = { ...left[4]!, suit: aSuit };
-        const right = hand(b); right[4] = { ...right[4]!, suit: bSuit };
+        if (aSuit === bSuit && a.some((rank) => (b as readonly Rank[]).includes(rank))) continue;
+        const left = a.map((rank) => ({ rank, suit: aSuit }));
+        const right = b.map((rank) => ({ rank, suit: bSuit }));
+        expect(left.some((card) => right.some((other) => card.rank === other.rank && card.suit === other.suit))).toBe(false);
         const expected = Math.sign(i - j || suits.indexOf(aSuit) - suits.indexOf(bSuit));
         expect(Math.sign(compareStraightStrength(strength(left), strength(right), defaultRuleset))).toBe(expected);
       }
@@ -73,10 +75,9 @@ describe('house-rule Straights', () => {
   });
 
   it('ignores every non-effective-high suit for all 1024 suit assignments per sequence', () => {
-    for (const sequence of sequences) for (let mask = 0; mask < 1024; mask++) {
+    for (const [patternIndex, sequence] of sequences.entries()) for (let mask = 0; mask < 1024; mask++) {
       const cards = sequence.map((rank, i) => ({ rank, suit: suits[(mask >> (i * 2)) & 3]! }));
-      const reference = hand(sequence); reference[4] = { ...reference[4]!, suit: cards[4]!.suit };
-      expect(compareStraightStrength(strength(cards), strength(reference), defaultRuleset)).toBe(0);
+      expect(strength(cards)).toEqual({ patternIndex, effectiveHighRank: sequence[4], effectiveHighSuit: cards[4]!.suit });
       const sameSuit = cards.every((card) => card.suit === cards[0]!.suit);
       expect(inspectCombination(cards, defaultRuleset)).toEqual({ valid: true, combination: { type: sameSuit ? 'straightFlush' : 'straight', cards } });
     }
@@ -102,7 +103,7 @@ describe('house-rule Straights', () => {
     const low = hand(sequences[10]); const high = hand(sequences[0]);
     expect(strength(low, ruleset).effectiveHighRank).toBe('J');
     expect(compareStraightStrength(strength(low, ruleset), strength(high, ruleset), ruleset)).toBeLessThan(0);
-    const other = hand(sequences[10]); other[0] = { ...other[0]!, suit: 'diamonds' };
+    const other = hand(sequences[10]).map((card) => ({ ...card, suit: suits[(suits.indexOf(card.suit) + 1) % 4]! })); other[0] = { ...other[0]!, suit: 'diamonds' };
     expect(compareStraightStrength(strength(low, ruleset), strength(other, ruleset), ruleset)).toBeGreaterThan(0);
     expect(inspectCombination(hand(sequences[1]), ruleset).valid).toBe(false);
   });
