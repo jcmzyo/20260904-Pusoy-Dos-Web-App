@@ -21,3 +21,4 @@ export { defaultRuleset } from './config/defaultRuleset';
 export { inspectCombination } from './combinations/inspectCombination';
 export type { CombinationInspectionResult } from './combinations/inspectCombination';
 export { compareSameCategoryCombinations } from './combinations/compareSameCategoryCombinations';
+export { canBeat } from './combinations/canBeat';
