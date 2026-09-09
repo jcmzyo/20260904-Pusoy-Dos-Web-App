@@ -20,6 +20,8 @@ export type { StraightPattern, StraightRules } from './config/StraightRules';
 export { defaultRuleset } from './config/defaultRuleset';
 export { createDeck } from './cards/createDeck';
 export { shuffleDeck } from './cards/shuffleDeck';
+export { dealDeck } from './cards/dealDeck';
+export type { DealResult } from './cards/dealDeck';
 export type { RNG } from './rng/RNG';
 export { inspectCombination } from './combinations/inspectCombination';
 export type { CombinationInspectionResult } from './combinations/inspectCombination';
