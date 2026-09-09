@@ -1,9 +1,9 @@
 # Pusoy Dos --- M1 Implementation Task Breakdown
 
-## M1 Task Plan (v2.4)
+## M1 Task Plan (v2.5)
 
 **Status:** Approved Phase 1 execution plan\
-**Last Modified:** September 8, 2026\
+**Last Modified:** September 9, 2026\
 **Milestone:** M1 --- Basic Engine Core\
 **Phase:** Phase 1 --- Initial Playable Basic Game
 
@@ -493,25 +493,45 @@ enumeration where practical.\
     candidate is omitted.
 -   [ ] Focused tests, regression suite, and typecheck pass.
 
-## T19 --- Validate and atomically submit Moves
+## T19 --- Implement authoritative Move validation used by `submitMove`
 
-**Tests:** wrong player, cards not owned, invalid combination, illegal
-Pass, non-beating response, opening violation; accepted Play removes
-exactly submitted cards; rejected Move causes no partial mutation.\
+**Tests:** wrong player, cards not owned, duplicate submission, invalid
+combination, illegal Pass, non-beating response, opening violation; valid
+Play/Pass intents recognized without exposing a half-transitioned game
+state; rejected Move causes no mutation.\
 **Acceptance:** ordinary invalid Moves return structured errors rather
-than exceptions.
+than exceptions; T19 implements validation only and does not pull T20--T24
+transition behavior forward.
 
 ### Definition of Done
 
--   [ ] Wrong-turn, unowned-card, invalid-combination, illegal-Pass,
-    non-beating, and opening-violation Moves are rejected.
--   [ ] Accepted Plays remove exactly the submitted cards and perform
-    the intended transition.
+-   [ ] Wrong-turn, unowned-card, duplicate-card, invalid-combination,
+    illegal-Pass, non-beating, and opening-violation Moves are rejected.
+-   [ ] Valid Play and valid voluntary Pass intents are recognized as valid
+    by the authoritative validation component.
 -   [ ] Every rejected Move leaves authoritative state unchanged.
 -   [ ] Ordinary invalid input returns structured errors rather than
     exceptions.
--   [ ] Atomic rejection/no-partial-mutation is explicitly tested.
+-   [ ] Accepted validation does **not** expose a partially applied
+    authoritative post-Move state.
+-   [ ] Validation is reusable by later T20--T24 transition work without
+    duplicating the validation rules.
+-   [ ] T19 does not implement Turn advancement, Trick reset,
+    finished-player continuation, Round scoring, or Session consequences
+    merely to satisfy the completed `submitMove(...)` contract.
+-   [ ] Atomic rejection/no-partial-mutation behavior is explicitly tested.
 -   [ ] Focused tests, regression suite, and typecheck pass.
+
+### Sequencing clarification
+
+`engine.md` defines the **completed** `submitMove(...)` operation as an atomic
+authoritative transaction. M1 intentionally builds that transaction
+incrementally. T19 supplies its validation component; T20 and later tasks add
+the accepted-Move consequences assigned to them.
+
+No task may return a partially transitioned accepted Move as a normal
+public authoritative result merely because later consequences have not yet
+been implemented.
 
 ## T20 --- Implement Turn rotation and response-cycle Pass tracking
 

@@ -1,12 +1,12 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.5)
+## Testing & Simulation Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 8, 2026
+**Last Modified:** September 9, 2026
 **Parent document:** `requirements.md` v1.12  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.6  
+**Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
@@ -404,6 +404,31 @@ Verify:
 - Pass is rejected on a required free lead/opening lead when rules require a Play.
 
 The voluntary-Pass test is important because AI inference must not treat Pass as proof of hidden-hand impossibility.
+
+## 7.18.1 T19 validation boundary versus later transition tasks
+
+T19 tests the reusable authoritative validation component, not the completed
+state-transition pipeline.
+
+Verify:
+
+- invalid Move intents return structured rejection results;
+- rejected Moves leave authoritative state unchanged;
+- valid Play and Pass intents can be recognized as valid by the validation
+  component;
+- a valid T19 result is not asserted to be a completed post-Move
+  authoritative state;
+- T19 tests do not require Turn advancement, Trick reset, finished-player
+  continuation, Round scoring, or Session completion before their assigned
+  later tasks exist;
+- once T20+ transition behavior exists, integration tests verify that
+  `submitMove(...)` composes validation and all then-applicable consequences
+  atomically;
+- tests never bless a half-transitioned accepted Move as a legitimate public
+  Engine result.
+
+This distinction preserves the final Engine atomicity contract while allowing
+M1 to implement its internals in small, reviewable tasks.
 
 ## 7.19 Legal Move generation
 
