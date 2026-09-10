@@ -2,6 +2,9 @@ import type { Move, PlayerId } from '../domain';
 import type { RulesetConfig } from './config/RulesetConfig';
 import { inspectCombination } from './combinations/inspectCombination';
 import type { GameEvent } from './events/GameEvent';
+import { generateLegalFreeLeadMoves } from './moves/generateLegalFreeLeadMoves';
+import { generateLegalOpeningMoves } from './moves/generateLegalOpeningMoves';
+import { generateLegalResponseMoves } from './moves/generateLegalResponseMoves';
 import type { MoveValidationError } from './moves/validateMove';
 import type { RNG } from './rng/RNG';
 import { createBasicSession, resolveBasicSession, startBasicRound } from './sessions/resolveBasicSession';
@@ -32,6 +35,22 @@ export function startRound(previous: BasicSessionState, rng: RNG): EngineResult 
     { type: 'CARDS_DEALT', roundNumber, players: round.context.players.map(({ playerId, hand }) => ({ playerId, cardCount: hand.length })) },
     { type: 'TURN_CHANGED', roundNumber, playerId: round.context.currentPlayerId },
   ] };
+}
+
+/** Returns no Moves outside the participant's active Turn; callers need no private-state or legality logic. */
+export function getLegalMoves(state: BasicSessionState, playerId: PlayerId, ruleset: RulesetConfig): readonly Move[] {
+  const round = state.round;
+  if (state.kind !== 'inProgress' || round?.kind !== 'inProgress') return [];
+  const { context } = round;
+  if (!context.sessionActive || !context.roundActive || context.currentPlayerId !== playerId) return [];
+  const player = context.players.find((entry) => entry.playerId === playerId);
+  if (!player?.active || player.hand.length === 0) return [];
+  if (context.trick.kind === 'response') {
+    return generateLegalResponseMoves(player.hand, playerId, context.trick.current, ruleset);
+  }
+  return context.trick.kind === 'opening'
+    ? generateLegalOpeningMoves(player.hand, playerId, ruleset)
+    : generateLegalFreeLeadMoves(player.hand, playerId, ruleset);
 }
 
 /** Events describe the completed transaction in causal order; rejection emits nothing. */
