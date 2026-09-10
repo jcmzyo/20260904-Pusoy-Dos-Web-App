@@ -35,3 +35,4 @@ export type { EngineResult, MoveResult } from './GameEngine';
 export type { GameEvent } from './events/GameEvent';
 export { getPlayerView, getPublicView } from './views/viewFactory';
 export type { PlayerView, PublicGameView, PublicTrickView } from './views/PublicGameView';
+export { EngineInvariantError, assertEngineInvariants, assertMoveInvariants } from './invariants';
