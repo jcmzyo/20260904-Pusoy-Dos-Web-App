@@ -33,3 +33,5 @@ export { generateLegalFreeLeadMoves } from './moves/generateLegalFreeLeadMoves';
 export { createSession, startRound, submitMove } from './GameEngine';
 export type { EngineResult, MoveResult } from './GameEngine';
 export type { GameEvent } from './events/GameEvent';
+export { getPlayerView, getPublicView } from './views/viewFactory';
+export type { PlayerView, PublicGameView, PublicTrickView } from './views/PublicGameView';
