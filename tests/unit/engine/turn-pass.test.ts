@@ -100,7 +100,7 @@ describe('internal Turn rotation and response-cycle Pass tracking', () => {
     expect(result).not.toHaveProperty('accepted');
     expect(result).not.toHaveProperty('events');
     expect(engine).not.toHaveProperty('resolveTurnAndPass');
-    expect(engine).not.toHaveProperty('submitMove');
+    expect(engine.submitMove).not.toBe(resolveTurnAndPass);
   });
 
   it('fails diagnostically on impossible rotation and response-cycle input', () => {

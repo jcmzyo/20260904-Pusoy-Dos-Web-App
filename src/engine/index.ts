@@ -30,3 +30,6 @@ export { canBeat } from './combinations/canBeat';
 export { generateLegalOpeningMoves } from './moves/generateLegalOpeningMoves';
 export { generateLegalResponseMoves } from './moves/generateLegalResponseMoves';
 export { generateLegalFreeLeadMoves } from './moves/generateLegalFreeLeadMoves';
+export { createSession, startRound, submitMove } from './GameEngine';
+export type { EngineResult, MoveResult } from './GameEngine';
+export type { GameEvent } from './events/GameEvent';
