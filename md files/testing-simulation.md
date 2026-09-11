@@ -1,12 +1,12 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.2)
+## Testing & Simulation Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9  
+**Last Modified:** September 9, 2026
+**Parent document:** `requirements.md` v1.12  
 **Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.3  
+**Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.3  
 **AI design:** `ai.md` v1.2  
 **Module:** Testing & Simulation  
@@ -263,7 +263,10 @@ Verify:
 
 - exactly two equal-Rank Cards form a Pair;
 - two different Ranks do not form a Pair;
-- Pair comparison follows the confirmed Rank/Suit rules;
+- Pair comparison uses Pair Rank first;
+- when two Pairs have the same Rank, compare the highest-Suit Card contained in each Pair using `Clubs < Spades < Hearts < Diamonds`;
+- a physically valid equal-Rank example uses four distinct cards, such as `7♠ 7♦ > 7♣ 7♥`;
+- tests never reuse one physical Card in both compared Pairs;
 - pair-generation does not create duplicates or omit valid suit combinations.
 
 ## 7.8 Triple detection/comparison
@@ -272,14 +275,16 @@ Verify:
 
 - exactly three equal-Rank Cards form a Triple;
 - mixed Ranks are invalid;
-- Triple comparison follows the confirmed house rule;
+- Triple comparison uses Rank only;
+- different-Rank Triples compare by Rank;
+- do **not** fabricate two distinct equal-Rank Triples as a gameplay comparison case, because that would require six cards of one Rank while the deck contains only four;
 - generated Triples are complete and unique.
 
 ## 7.9 Straight validity
 
 The following cases require explicit named regression tests because they differ from common poker/Big-Two implementations.
 
-Valid:
+Valid Straight property sequences regardless of suits:
 
 - `A-2-3-4-5`;
 - `2-3-4-5-6`;
@@ -287,14 +292,14 @@ Valid:
 - every normal consecutive five-Rank sequence through `10-J-Q-K-A`;
 - `J-Q-K-A-2`.
 
-Invalid:
+Invalid Straight property sequences:
 
 - `K-A-2-3-4`;
 - `Q-K-A-2-3`;
 - duplicate-Rank five-card sets that cannot be a Straight;
 - any nonconsecutive unsupported sequence.
 
-Tests must verify that a borrowed Straight algorithm has been adapted to these exact house rules.
+Tests must include representative mixed-suit and same-suit examples. A same-suit valid house-rule sequence must pass Straight property detection; final five-card classification is tested separately and must select Straight Flush when Straight and Flush overlap. Verify that a borrowed Straight algorithm has been adapted to these exact house rules.
 
 ## 7.10 Straight strength
 
@@ -315,8 +320,8 @@ For equal effective-high Straights, verify Suit tiebreak uses the Suit of the ef
 
 Verify:
 
-- five Cards of one Suit form a Flush when not classified as Straight Flush;
-- mixed Suits do not form a Flush;
+- every five-Card set of one Suit satisfies the Flush property, including a set whose Ranks also form a valid house-rule sequence;
+- mixed Suits do not satisfy the Flush property;
 - Flush comparison uses Suit before Rank comparison;
 - Diamonds > Hearts > Spades > Clubs;
 - for equal Suit, descending Rank comparison breaks ties;
@@ -329,7 +334,8 @@ Verify:
 - `3 + 2` Rank-count structure is valid;
 - other count patterns are invalid;
 - Full House strength is determined only by Triple Rank;
-- Pair Rank does not override Triple Rank.
+- Pair Rank does not override Triple Rank;
+- two distinct same-Triple-Rank Full Houses are not fabricated as a gameplay tie because one deck cannot supply two separate triples of that Rank.
 
 ## 7.13 Four-of-a-Kind validity/comparison
 
@@ -338,7 +344,7 @@ Verify:
 - exactly four equal-Rank Cards plus one kicker is valid;
 - strength is determined only by the four-card Rank;
 - kicker does not affect strength;
-- multiple possible kickers create distinct playable Card sets but identical Combination strength when the quad Rank is identical.
+- two distinct same-quad-Rank Four-of-a-Kind plays are impossible in one deck, so tests must not manufacture that matchup by duplicating the quad cards.
 
 This explicitly protects the project from generic evaluators that use kicker comparison.
 
@@ -346,7 +352,8 @@ This explicitly protects the project from generic evaluators that use kicker com
 
 Verify:
 
-- Straight + Flush simultaneously is Straight Flush;
+- a same-suit valid house-rule sequence satisfies both Straight and Flush property checks;
+- final canonical classification selects Straight Flush because it is the highest-ranking applicable category;
 - all project-specific Straight forms are supported where Suit-valid;
 - comparison uses Straight effective high then the Suit of its effective high Card;
 - house-rule Straight ordering is preserved.
@@ -359,7 +366,11 @@ Verify:
 Straight < Flush < Full House < Four-of-a-Kind < Straight Flush
 ```
 
-Explicitly test every adjacent hierarchy boundary and representative nonadjacent boundaries.
+- every stronger category strictly beats every weaker category regardless of internal Rank/Suit contents;
+- same-category comparisons use that category's own documented rule;
+- explicitly test every adjacent hierarchy boundary and representative nonadjacent boundaries;
+- comparison fixtures representing opposing plays use physically distinct cards from one standard 52-card deck;
+- impossible complete ties are not presented as reachable normal-play scenarios.
 
 ## 7.16 Cross-type five-card responses
 
@@ -393,6 +404,31 @@ Verify:
 - Pass is rejected on a required free lead/opening lead when rules require a Play.
 
 The voluntary-Pass test is important because AI inference must not treat Pass as proof of hidden-hand impossibility.
+
+## 7.18.1 T19 validation boundary versus later transition tasks
+
+T19 tests the reusable authoritative validation component, not the completed
+state-transition pipeline.
+
+Verify:
+
+- invalid Move intents return structured rejection results;
+- rejected Moves leave authoritative state unchanged;
+- valid Play and Pass intents can be recognized as valid by the validation
+  component;
+- a valid T19 result is not asserted to be a completed post-Move
+  authoritative state;
+- T19 tests do not require Turn advancement, Trick reset, finished-player
+  continuation, Round scoring, or Session completion before their assigned
+  later tasks exist;
+- once T20+ transition behavior exists, integration tests verify that
+  `submitMove(...)` composes validation and all then-applicable consequences
+  atomically;
+- tests never bless a half-transitioned accepted Move as a legitimate public
+  Engine result.
+
+This distinction preserves the final Engine atomicity contract while allowing
+M1 to implement its internals in small, reviewable tasks.
 
 ## 7.19 Legal Move generation
 

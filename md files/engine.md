@@ -1,10 +1,10 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.3)
+## Game Engine Document (v1.7)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9\
+**Last Modified:** September 9, 2026
+**Parent document:** `requirements.md` v1.12\
 **Shared model:** `domain-model.md` v1.2\
 **Module:** Game Engine\
 **Language:** TypeScript
@@ -140,6 +140,38 @@ const result = engine.submitMove(state, move);
 
 A successful operation returns the resulting authoritative state and
 factual events. A rejected Move leaves authoritative state unchanged.
+
+### Incremental implementation of the final transaction contract
+
+The completed `submitMove(...)` contract is atomic: once a Move is accepted,
+all consequences applicable to that Move must be reflected in the returned
+authoritative state before that result is exposed to callers.
+
+M1 may implement the internals required by this transaction incrementally.
+Validation may therefore be implemented before all later Turn, Trick,
+finished-player, Round, scoring, and Session consequences exist.
+
+This sequencing does **not** permit an intermediate task to expose a
+partially applied accepted Move as a valid authoritative post-Move state.
+Until the required consequences for a Move class are implemented, the task
+acceptance criteria apply only to the internal component explicitly assigned
+to that task.
+
+A suitable internal decomposition may include responsibilities such as:
+
+```ts
+validateMove(state, move)
+applyAcceptedPlay(state, move)
+applyAcceptedPass(state, move)
+resolveFinishedPlayer(state)
+resolveRoundCompletion(state)
+resolveSessionCompletion(state)
+```
+
+These names are illustrative rather than mandatory public contracts. The
+architectural requirement is that the completed public authoritative
+transaction composes these concerns without duplicating rules and without
+making half-transitions externally observable.
 
 The implementation may use immutable updates or controlled internal
 mutation, but externally exposed state must behave as
@@ -341,6 +373,18 @@ detectCombination(
 Detection must implement the combination definitions and Straight edge
 cases confirmed in `requirements.md`.
 
+A five-card set may satisfy multiple combination properties during inspection:
+
+- **Straight** property: the ranks form a valid house-rule sequence, regardless of suits;
+- **Flush** property: all five cards have the same suit;
+- **Straight Flush** property: both Straight and Flush properties are satisfied.
+
+The engine must preserve those underlying property checks while returning one final canonical `CombinationType`. If multiple five-card definitions apply, select the **highest-ranking applicable category** using the canonical hierarchy:
+
+`Straight < Flush < Full House < Four-of-a-Kind < Straight Flush`
+
+Therefore a same-suit valid house-rule sequence must pass Straight inspection and Flush inspection, while its final canonical classification is Straight Flush. Do not make lower-level property detectors reject a hand merely because a stronger overlapping category also applies.
+
 Detection answers:
 
 > Do these cards form a valid canonical Combination, and if so which
@@ -381,6 +425,9 @@ Comparison must implement the canonical rules in `requirements.md`,
 including:
 
 -   same-size response requirements for Singles, Pairs, and Triples;
+-   Single Rank-first then Suit comparison;
+-   Pair Rank-first comparison, with equal-Rank Pairs resolved by the highest-Suit card contained in each Pair;
+-   Triple Rank-only comparison, recognizing that two distinct equal-Rank Triples are physically impossible in one standard 52-card deck;
 -   five-card hierarchy;
 -   cross-type five-card responses;
 -   Straight special ordering;
@@ -388,6 +435,10 @@ including:
 -   Full House comparison;
 -   Four-of-a-Kind comparison;
 -   Straight Flush comparison.
+
+A stronger five-card category must strictly beat every weaker five-card category regardless of internal card values. Same-category comparison then uses only that category's canonical rule.
+
+Comparison tests and examples must respect physical deck uniqueness. They must not create two different gameplay combinations that reuse the same physical card or require more than four cards of one Rank. Comparator equality may still be handled deterministically for identical inputs, but such synthetic equality must not be presented as a reachable response scenario when the deck makes it impossible.
 
 No AI preference belongs in this calculation.
 
@@ -725,7 +776,7 @@ The UI decides how this information is presented.
 
 # 24. Session Winner and Tiebreaks
 
-The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.7.
+The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.12.
 
 First compare final Session totals. If still tied:
 
