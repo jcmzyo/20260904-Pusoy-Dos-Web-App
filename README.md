@@ -43,4 +43,4 @@ later foundational task — see task breakdown notes.
 ## Status
 
 This repository currently contains only the M1 (Basic Engine Core) project
-scaffold. No gameplay rules, AI, orchestrator, or UI are implemented yet.
+scaffold. No AI, orchestrator, or UI are implemented yet.
