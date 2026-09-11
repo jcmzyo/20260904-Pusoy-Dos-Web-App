@@ -4,7 +4,7 @@
 
 **Status:** Draft for implementation\
 **Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.12\
+**Parent document:** `requirements.md` v1.13\
 **Scope:** Shared, implementation-independent game vocabulary and data
 contracts\
 **Language:** TypeScript

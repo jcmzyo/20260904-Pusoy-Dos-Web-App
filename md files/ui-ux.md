@@ -1,9 +1,9 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.1)
+## UI / UX Document (v1.2)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 8, 2026
+**Last Modified:** September 11, 2026
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---
@@ -92,9 +92,19 @@ Use one clean sans-serif/system font stack, a small consistent button system, si
 
 Status must never rely on color alone: current turn has explicit text/highlight; PASS and DONE have labels; selected cards have position/treatment; invalid actions have text.
 
-# 10. Responsive Requirement
+# 10. Landscape-First Responsive Requirement
 
-Use one responsive component hierarchy rather than separate desktop/mobile game implementations. Mobile may scroll the human hand horizontally. Phase 1 must remain usable on common phone and desktop widths; visual perfection is not required before functional correctness.
+Use one responsive component hierarchy rather than separate desktop/mobile game implementations. Phase 1 gameplay is **landscape-first**. Supported targets include desktop/laptop, non-fullscreen/windowed desktop browsers, tablet landscape, and supported phone landscape.
+
+Portrait gameplay is not required. In portrait, show a clear **Rotate your device to continue** state and prevent the game table from presenting itself as a cramped usable layout. If even landscape dimensions are below the documented minimum, show resize/unsupported-size guidance. Do not rely on browser orientation locking.
+
+The main game area should stay inside a documented landscape aspect-ratio/viewport envelope rather than stretching independently to fill arbitrary browser geometry. Safe margins/letterboxing are acceptable. The exact target ratio/range is finalized during M4 detailed design.
+
+Cards must preserve one constant width:height ratio at every supported viewport. Text and critical controls must use bounded responsive sizing with documented minimum readable/touchable sizes. When space is constrained, prefer hand scrolling, controlled card overlap, panel reflow, drawers/tabs/overlays, or safe margins before distorting cards or shrinking core text/controls below usability thresholds.
+
+Responsive design means preserving information hierarchy and usability, not uniformly shrinking the whole interface. On constrained landscape screens, Played Cards/Event Log and other secondary information may move into overlays while current turn, hand to beat/free lead, player counts, human hand, Play/Pass, and essential score/status remain easy to understand.
+
+M4 QA must test representative large desktop, normal laptop, small/windowed desktop, tablet landscape, large phone landscape, small supported phone landscape, and unsupported portrait/undersized states.
 
 # 11. Deferred Approved UI Ideas — No Timeline
 
@@ -106,4 +116,4 @@ Online/multiplayer UI and other product expansions are not part of the committed
 
 # 13. Phase 1 UI Acceptance
 
-M4/Phase 1 is complete when a human can start a Basic Session, understand the active turn and current trick, select/validate/play/pass, receive explicit no-legal-move guidance, observe PASS/DONE/public history/scores, complete five Rounds with explicit Round Result checkpoints, and reach a correct Session Summary using the production Engine/Orchestrator without duplicated game-rule logic in React.
+M4/Phase 1 is complete when a human can start a Basic Session, understand the active turn and current trick, select/validate/play/pass, receive explicit no-legal-move guidance, observe PASS/DONE/public history/scores, complete five Rounds with explicit Round Result checkpoints, and reach a correct Session Summary using the production Engine/Orchestrator without duplicated game-rule logic in React. The same gameplay UI must remain coherent on the documented supported landscape viewport classes, including non-fullscreen windows; cards preserve aspect ratio, text/critical controls remain readable/usable, and portrait/undersized states fail gracefully with rotate/resize guidance.

@@ -1,14 +1,14 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.6)
+## Testing & Simulation Document (v1.7)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 9, 2026
-**Parent document:** `requirements.md` v1.12  
-**Shared model:** `domain-model.md` v1.2  
+**Last Modified:** September 11, 2026
+**Parent document:** `requirements.md` v1.13  
+**Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
-**Orchestrator design:** `orchestrator.md` v1.3  
-**AI design:** `ai.md` v1.2  
+**Orchestrator design:** `orchestrator.md` v1.6  
+**AI design:** `ai.md` v1.5  
 **Module:** Testing & Simulation  
 **Primary POC target:** Fully headless five-Round game/session execution  
 **Language/tooling:** TypeScript + Vitest + headless Node.js execution
@@ -1909,10 +1909,10 @@ After the headless POC, consider:
 
 The QA pass originally identified several documentation inconsistencies. The user approved the required resolutions, and the following have now been synchronized:
 
-1. `requirements.md` v1.8 now places the **headless Engine + Orchestrator + AI POC and simulator before React/UI development**.
-2. `orchestrator.md` v1.2 now describes Easy/Normal/Hard differences as **reasoning capability/breadth/depth**, not deliberate bad play or sabotage.
-3. `orchestrator.md` v1.2 now states that the initial deterministic AI requires no separate AI RNG state; AI RNG replay metadata is required only if future controlled randomness is introduced.
-4. `requirements.md` v1.8 now uses the same deterministic replay wording.
+1. `requirements.md` (currently v1.13; first synchronized at v1.8) places the **headless Engine + Orchestrator + AI POC and simulator before React/UI development**.
+2. `orchestrator.md` (currently v1.6; first synchronized at v1.2) describes Easy/Normal/Hard differences as **reasoning capability/breadth/depth**, not deliberate bad play or sabotage.
+3. `orchestrator.md` (currently v1.6; first synchronized at v1.2) states that the initial deterministic AI requires no separate AI RNG state; AI RNG replay metadata is required only if future controlled randomness is introduced.
+4. `requirements.md` (currently v1.13; first synchronized at v1.8) uses the same deterministic replay wording.
 5. Detailed testing, simulation infrastructure, regression policy, and metrics remain owned by this document; `requirements.md` retains only product-level obligations and milestone intent.
 
 No gameplay-house-rule conflict was introduced by this synchronization.
@@ -1978,3 +1978,55 @@ Headless Simulator
 The POC should optimize for **being demonstrably correct before being clever or fast**.
 
 Performance and memory are designed as observable, replaceable implementation concerns. Rule correctness, information safety, deterministic reproducibility, authoritative state integrity, and reliable Session completion are non-negotiable.
+
+------------------------------------------------------------------------
+
+# M2 Baseline AI Verification Addendum
+
+Phase 1 Baseline AI verification must explicitly cover the selected deterministic hybrid policy.
+
+Required properties include:
+
+- same permitted state/candidate set produces the same Move repeatedly;
+- shuffled `legalMoves` order does not change the selected Move;
+- cold vs warm decomposition cache does not change the selected Move;
+- PASS can be selected while legal beating Plays exist when the documented evaluator prefers preservation;
+- a cheap rational Play can beat PASS when appropriate;
+- immediate finish cannot be overridden by PASS;
+- exact decomposition fixtures return the true minimum partition count under canonical project combinations;
+- fixed-pivot/memoization optimizations preserve exact results;
+- AI receives no opponent-private hand/state;
+- public Pass is never treated as proof of no legal response;
+- decision instrumentation does not alter selection semantics.
+
+Performance tests should record real decision/decomposition metrics rather than enforce an arbitrary initial millisecond SLA.
+
+------------------------------------------------------------------------
+
+# M3 Failure Analysis and Replay Addendum
+
+M3 simulation is a reliability/debugging harness, not merely a batch counter. Every detected failed simulation must produce enough structured evidence to reproduce and investigate the first incorrect transition.
+
+At minimum retain/report where applicable:
+
+```text
+seed + relevant configuration
+Session/batch index
+Round number
+Turn/action index
+current player / Trick context
+legal Moves
+chosen Move
+relevant PlayerView
+recent/complete GameEvents
+AI DecisionTrace if enabled
+invariant/error
+exception/stack trace
+authoritative diagnostic snapshot when needed
+```
+
+A valid deal must not be silently skipped as "unplayable." A failure either terminates normally after diagnosis or fails loudly with reproducible diagnostics.
+
+Confirmed simulation defects should create focused regression coverage and/or a retained deterministic failing-seed fixture. The original seed must be replayed after the fix, followed by the broader deterministic regression batch.
+
+Normal successful batch logs should remain compact; detailed traces may be captured on failure/replay to avoid unnecessary log volume.

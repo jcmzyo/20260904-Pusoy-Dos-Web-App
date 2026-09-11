@@ -1,11 +1,11 @@
 # Pusoy Dos --- Game Orchestrator Design
 
-## Game Orchestrator / Runner Document (v1.5)
+## Game Orchestrator / Runner Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 9, 2026
-**Parent document:** `requirements.md` v1.12  
-**Shared model:** `domain-model.md` v1.2  
+**Last Modified:** September 11, 2026
+**Parent document:** `requirements.md` v1.13  
+**Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
 **Module:** Game Orchestrator  
 **Language:** TypeScript
@@ -102,6 +102,13 @@ The Game Orchestrator owns:
 - exposing integration points for persistence and simulation without implementing either subsystem.
 
 ---
+
+## M2 Baseline Controller Decision Boundary
+
+For Phase 1, the Orchestrator supplies the Baseline controller with only the documented safe `PlayerView`, Engine-produced legal Moves, and request identity/context. The Baseline controller may strategically choose `PassMove` even when legal beating Plays exist; the Orchestrator must not auto-replace that choice with a Play. PASS legality remains Engine-authoritative.
+
+The Orchestrator does not perform AI decomposition/evaluation and does not reorder/filter candidates in a way that changes semantics. AI `DecisionTrace`/instrumentation may be routed to tests or M3 diagnostics, but it is non-authoritative and must not influence game-state transitions.
+
 
 # 4. Non-Responsibilities
 
@@ -1529,7 +1536,7 @@ These open decisions should not be silently inferred during implementation if th
 
 # 50. Cross-Document Synchronization Status
 
-The previously recorded Round Result / explicit **Next Round** clarification and parent-version metadata mismatch have been synchronized in the September 5, 2026 documentation pass.
+The previously recorded Round Result / explicit **Next Round** clarification and parent-version metadata mismatch have been synchronized in the September 11, 2026 documentation pass (see `milestone-doc-update.md`).
 
 Current orchestration constraints relevant to AI/performance are:
 

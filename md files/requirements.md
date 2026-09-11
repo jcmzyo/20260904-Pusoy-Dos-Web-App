@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.12)
+## Requirements & Planning Document (v1.13)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 8, 2026
+**Last Modified:** September 11, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -141,15 +141,15 @@ A **milestone** must produce a concrete, testable technical output. A **phase** 
 
 ## M2 — Baseline AI + Headless Game
 
-**Technical output:** the production Engine and Orchestrator can complete a five-Round Basic Session autonomously with four deterministic Baseline controllers. The Baseline bot must be legal and reasonably rational, including conserving powerful cards/hands where practical, but does not require deep search, difficulty profiles, personalities, or sophisticated opponent modeling.
+**Technical output:** the production Engine and Orchestrator can complete a five-Round Basic Session autonomously with four deterministic Baseline controllers. The Baseline bot uses a deterministic hybrid policy: Engine-authorized candidates, strategic PASS when responding, exact memoized remaining-hand decomposition as the primary hand-structure signal, lightweight tactical/context evaluation, and canonical deterministic tie-breaking. It does not require deep search, difficulty profiles, personalities, Monte Carlo, or sophisticated opponent modeling.
 
 ## M3 — Headless Simulator + Reliability
 
-**Technical output:** deterministic batch simulation of real production Sessions with reproducible seeds, invariant checking, failure reproduction, termination checks, regression coverage, and measured performance.
+**Technical output:** deterministic batch simulation of real production Sessions with reproducible seeds, invariant checking, structured diagnostic traces, failed-seed replay, termination/stuck detection, regression-fixture capture, and measured engineering performance. A failing deal must be treated as a diagnosable software/controller defect until shown otherwise, not silently skipped as an "unplayable" seed.
 
 ## M4 — Minimal Playable UI
 
-**Technical output:** a React/Vite UI integrated with the same Engine/Orchestrator used headlessly. A human can complete a five-Round Basic Session against three Baseline bots.
+**Technical output:** a landscape-first React/Vite UI integrated with the same Engine/Orchestrator used headlessly. A human can complete a five-Round Basic Session against three Baseline bots on supported desktop/laptop/tablet/phone landscape viewports, including non-fullscreen browser windows, with ratio-preserving cards and bounded readable typography/control sizing. Portrait/undersized gameplay fails gracefully with rotate/resize guidance.
 
 ### Phase 1 working product
 
@@ -680,7 +680,7 @@ Competitive Mode **skips average placement entirely**. Only the Round winner has
 ## 2.6.4 Session Flow
 
 1.  Choose Basic or Competitive mode.
-2.  Configure each AI bot's difficulty independently.
+2.  Configure each AI bot's difficulty independently. **Deferred for Phase 1:** Phase 1 implements a single deterministic Baseline bot behavior only (see §3.3, §6.1). This step does not apply until a difficulty system is implemented; no phase or milestone is currently committed for that work, and Phase 1 Game Setup/UI must not present a difficulty selector.
 3.  Start the session.
 4.  Play 5 rounds.
 5.  Before each round:
@@ -733,7 +733,7 @@ Track:
 - [ ] Pure TypeScript authoritative Engine with no React dependency.
 - [ ] Deterministic injected Engine randomness for shuffle/deal and reproducible headless execution.
 - [ ] Engine-generated legal Moves and authoritative Move validation.
-- [ ] Baseline bot that always chooses from legal Moves, behaves reasonably, and attempts to conserve powerful cards/hands; no deep search/difficulty/personality requirement.
+- [ ] Deterministic Baseline bot using Engine-authorized actions, strategic PASS evaluation, exact memoized hand decomposition, lightweight contextual evaluation, and canonical tie-breaking; no deep search/difficulty/personality requirement.
 - [ ] Headless execution through the production Orchestrator/controllers.
 - [ ] Reusable deterministic batch simulator with invariants and failure reproduction.
 - [ ] Minimal React/Vite playable UI described by `ui-ux.md`.
@@ -742,7 +742,7 @@ Track:
 - [ ] Round Result checkpoint after every Round showing official placement, Round points, and updated cumulative Session score; explicit Next Round.
 - [ ] Session Summary after Round 5 with final result and tiebreak information when applicable.
 - [ ] Four-color suits by default: Hearts red, Diamonds orange, Clubs blue, Spades black; no Phase 1 toggle.
-- [ ] Basic responsive usability on common phone and desktop widths.
+- [ ] Landscape-first responsive usability on documented desktop/laptop/tablet/phone landscape viewports, including non-fullscreen windows; cards preserve ratio, text/controls remain usable, and portrait/undersized states show rotate/resize guidance.
 - [ ] No save/Resume in Phase 1. In-app leaving an unfinished Session warns that progress will be lost; browser close/refresh warning is used where supported.
 
 ## 3.2 Phase 1 — SHOULD HAVE
@@ -750,7 +750,7 @@ Track:
 - [ ] Clear validation explanations for invalid/non-beating selections.
 - [ ] Simple green Modern Casino Table visual foundation using reusable design tokens/components.
 - [ ] Information overlays pause game progression while open.
-- [ ] Deterministic diagnostics sufficient to reproduce simulation failures.
+- [ ] Deterministic simulation diagnostics include structured failure traces and failed-seed replay sufficient to identify the failing transition and create regression coverage.
 
 A SHOULD item may be deferred within Phase 1 only if the Phase 1 working-product acceptance criteria remain satisfied and the deferral is explicitly recorded; it must not be silently dropped.
 
@@ -1060,11 +1060,11 @@ Requirements:
 
 # 5.3 Determinism and Randomness
 
-The initial AI is **deterministic**: given the same permitted game state, legal Moves, mode, personality, and difficulty, it should choose the same Move. Initial difficulty differences must come from reasoning capability rather than random mistakes.
+The Phase 1 Baseline AI is **deterministic**: given the same permitted player-facing state, same private hand, same candidate action set, and same Baseline configuration, it must choose the same Move. Reordering an otherwise identical `legalMoves` collection must not alter the selected action. Cold/warm memoization state must also not alter the decision.
 
-If controlled AI variation is introduced later, it must use an injectable/seeded RNG and should normally vary only among strategically defensible candidates rather than force irrational play.
+The Phase 1 Baseline Bot uses no decision randomness. If controlled AI variation is introduced later, it must use an injectable/seeded RNG and should normally vary only among strategically defensible candidates rather than force irrational play.
 
-Determinism/reproducibility is particularly important for AI unit tests, simulations, bug reproduction, debugging, and balancing.
+Determinism/reproducibility is particularly important for AI unit tests, simulations, bug reproduction, debugging, and later balancing.
 
 Authoritative engine randomness such as deck shuffling must also be injectable/seedable for deterministic tests.
 
@@ -1074,31 +1074,38 @@ Authoritative engine randomness such as deck shuffling must also be injectable/s
 
 ## 6.1 Phase 1 — Baseline Bot
 
-Phase 1 implements one deterministic Baseline strategy shared by the three bots. Its purpose is to make headless simulation and the first playable product useful without paying the cost of the full advanced AI design.
+Phase 1 implements one deterministic Baseline strategy shared by the three bots. Its purpose is to provide rational, reproducible play for headless execution and the first playable product without paying the cost of advanced imperfect-information search.
 
-The Baseline bot must:
+The selected M2 algorithm is a **deterministic hybrid Move evaluator**. It:
 
-- choose only from Engine-provided legal Moves;
-- use only permitted `PlayerView`/public information;
-- make deterministic decisions for identical inputs;
-- prefer reasonable card shedding rather than arbitrary first-legal behavior;
-- attempt to conserve powerful resources/hands when spending them is unnecessary;
-- avoid intentionally irrational Plays or Passes merely to appear "easy";
-- remain understandable and testable.
+- chooses only among Engine-authorized actions;
+- treats PASS as a first-class strategic candidate whenever responding, even when legal beating Plays exist;
+- forbids PASS on free lead according to Engine legality;
+- immediately prefers a legal Move that empties the bot's hand;
+- evaluates candidate resulting hands using **exact memoized bitmask decomposition** to estimate the minimum number of valid future Plays required to partition the remaining hand;
+- combines that primary hand-structure signal with lightweight resource preservation, immediate shedding value, Trick/control context, PASS opportunity cost, and public opponent remaining-card pressure;
+- uses only permitted `PlayerView`/public information;
+- uses canonical deterministic tie-breaking independent of input Move ordering;
+- avoids intentionally irrational Plays or Passes merely to appear "easy";
+- remains explainable and instrumentable for tests/debugging.
 
-It does not need deep lookahead, exhaustive Session strategy, sophisticated opponent modeling, difficulty profiles, personalities, or Competitive evaluation.
+The decomposition estimate is not a prediction of actual future Turns and must not assume opponent cooperation. It is a structural signal that may be overridden by obvious tactical context such as immediate finish or urgent opponent pressure.
 
-The exact heuristic weights remain an implementation/tuning decision as long as the bot satisfies these behavioral constraints and does not duplicate legality rules.
+A public Pass alone must never be treated as proof that another player lacked a legal response because voluntary passing is legal.
+
+Detailed evaluator precedence/constants may be refined in M2 design, but substantial ambiguity must be recorded rather than hidden behind arbitrary weights.
 
 ## 6.2 Deferred AI Design
 
-The richer Optimizer, minimum-play solver, Easy/Normal/Hard capability profiles, deeper bounded search, Session-aware strategy, public-card analysis, personalities, Mystery Bots, and controlled variation remain approved design material in `ai.md` but are not Phase 1 implementation requirements.
+Deferred techniques include difficulty profiles, personalities, sophisticated opponent inference, deep search, Minimax/MaxN, hidden-hand determinization, Monte Carlo, MCTS/ISMCTS, machine learning, neural networks, advanced card counting, Competitive Mode strategy, and controlled random/personality behavior.
 
-Future AI must continue to obey the same information-safety boundary used by the Baseline bot. A public Pass alone must never be treated as proof that a player lacked a legal response because voluntary passing is legal.
+The AI/Controller boundary should remain replaceable so stronger future strategies do not require Engine changes.
 
 ## 6.3 Algorithm Adaptation and House-Rule Authority
 
-External Big Two/Poker algorithms may be used as implementation references only. Canonical house rules and Engine contracts remain authoritative. For Phase 1, correctness/reliability outranks speed, and speed outranks memory optimization.
+External Big Two/Poker algorithms may be used as implementation references only. Canonical house rules and Engine contracts remain authoritative. External suit ordering, Straight semantics, five-card hierarchy, bomb rules, opening rules, legality assumptions, or comparison semantics must not be imported without independent verification against this project.
+
+For Phase 1, correctness/reliability outranks speed, and speed outranks memory optimization. Exact <=13-card decomposition should be benchmarked on the real TypeScript implementation before approximation is considered.
 
 # 7. Data and Model Ownership
 
