@@ -1,19 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/domain';
 import { chooseBaselineMove, evaluateCandidates } from '../../../src/ai';
-import { createDeck, createSession, defaultRuleset, generateLegalFreeLeadMoves, generateLegalResponseMoves, inspectCombination, startRound, submitMove } from '../../../src/engine';
+import { assertEngineInvariants, assertMoveInvariants, createDeck, createSession, defaultRuleset, generateLegalFreeLeadMoves, generateLegalResponseMoves, getLegalMoves, inspectCombination, startRound, submitMove } from '../../../src/engine';
+import type { BasicSessionState } from '../../../src/engine/sessions/resolveBasicSession';
 import { createPlayerTurnRequest } from '../../../src/orchestrator';
 import type { PlayerTurnRequest } from '../../../src/orchestrator';
+import * as decomposition from '../../../src/ai/decomposition/minPlays';
 
 const c = (rank: Card['rank'], suit: Card['suit'] = 'clubs'): Card => ({ rank, suit });
 const same = (a: Card, b: Card) => a.rank === b.rank && a.suit === b.suit;
 
-function request(hand: readonly Card[], currentCards?: readonly Card[]): PlayerTurnRequest {
+function request(hand: readonly Card[], currentCards?: readonly Card[], opponentCounts: readonly number[] = [3, 3, 3]): PlayerTurnRequest {
   const inspected = currentCards && inspectCombination(currentCards, defaultRuleset);
   if (inspected && !inspected.valid) throw new Error('Invalid fixture combination.');
   const current = inspected && inspected.valid ? inspected.combination : undefined;
   const opponents = createDeck().filter((card) => card.rank !== '3' &&
-    !hand.some((held) => same(card, held)) && !currentCards?.some((played) => same(card, played))).slice(0, 9);
+    !hand.some((held) => same(card, held)) && !currentCards?.some((played) => same(card, played))).slice(0, opponentCounts.reduce((sum, count) => sum + count, 0));
   const playedCards = createDeck().filter((card) => !hand.some((held) => same(card, held)) && !opponents.some((held) => same(card, held)));
   return {
     requestId: 'evaluation', playerId: 'south',
@@ -22,8 +24,8 @@ function request(hand: readonly Card[], currentCards?: readonly Card[]): PlayerT
       playerId: 'south', hand, mode: 'basic', status: 'inProgress', playerIds: ['south', 'west', 'north', 'east'], roundNumber: 1,
       completedRounds: [], standings: [], result: null,
       round: {
-        status: 'inProgress', currentPlayerId: 'south', finishOrder: [], playedCards,
-        players: ['south', 'west', 'north', 'east'].map((playerId) => ({ playerId, cardCount: playerId === 'south' ? hand.length : 3, finished: false })),
+        status: 'inProgress', currentPlayerId: 'south', finishOrder: ['west', 'north', 'east'].filter((_, index) => opponentCounts[index] === 0), playedCards,
+        players: ['south', 'west', 'north', 'east'].map((playerId, index) => ({ playerId, cardCount: index === 0 ? hand.length : opponentCounts[index - 1]!, finished: index > 0 && opponentCounts[index - 1] === 0 })),
         trick: current ? { kind: 'response', current } : { kind: 'freeLead' },
       },
     },
@@ -31,6 +33,136 @@ function request(hand: readonly Card[], currentCards?: readonly Card[]): PlayerT
 }
 
 describe('core Baseline evaluation', () => {
+  it.each([1, 2])('contests with a reserved 2 when any active opponent has %i cards', (count) => {
+    const hand = [c('4'), c('7'), c('2', 'diamonds')];
+    expect(chooseBaselineMove(request(hand, [c('A')]))).toMatchObject({ kind: 'pass' });
+    for (let seat = 0; seat < 3; seat += 1) {
+      const counts = [3, 3, 3];
+      counts[seat] = count;
+      const input = request(hand, [c('A')], counts);
+      expect(chooseBaselineMove(input)).toEqual({ kind: 'play', playerId: 'south', cards: [c('2', 'diamonds')] });
+      expect(evaluateCandidates(input)[0]).toMatchObject({ minPlays: 2, singleTwoReserveCost: 0 });
+    }
+  });
+
+  it('prefers contesting to preserving 2s at equal decomposition under pressure', () => {
+    const hand = [c('2', 'hearts'), c('2', 'diamonds'), c('4'), c('7')];
+    expect(chooseBaselineMove(request(hand, [c('A')]))).toMatchObject({ kind: 'pass' });
+    const input = request(hand, [c('A')], [2, 3, 3]);
+    const evaluations = evaluateCandidates(input);
+    expect(evaluations.every(({ minPlays }) => minPlays === 3)).toBe(true);
+    expect(chooseBaselineMove(input)).toEqual({ kind: 'play', playerId: 'south', cards: [c('2', 'hearts')] });
+  });
+
+  it('does not create pressure from own low count or finished opponents', () => {
+    const hand = [c('2', 'hearts'), c('2', 'diamonds')];
+    const input = request(hand, [c('A')], [0, 3, 3]);
+    expect(chooseBaselineMove(input)).toMatchObject({ kind: 'pass' });
+    expect(evaluateCandidates(input).every(({ minPlays }) => minPlays === 1)).toBe(true);
+  });
+
+  it('keeps pressure after an opponent PASS whether their private hand could respond or not', () => {
+    const inputs: PlayerTurnRequest[] = [];
+    for (const canRespond of [false, true]) {
+      const state: BasicSessionState = { ...createSession(['south', 'west', 'north', 'east']).state, roundNumber: 1,
+        round: { kind: 'inProgress', finishOrder: [], responseCycle: { lastSuccessfulPlayerId: 'north', passedPlayerIds: [] },
+          context: { sessionActive: true, roundActive: true, currentPlayerId: 'east',
+            trick: { kind: 'response', current: { type: 'single', cards: [c('A')] } },
+            players: [
+              { playerId: 'south', active: true, hand: [c('4'), c('7'), c('2', 'diamonds')] },
+              { playerId: 'west', active: true, hand: [c(canRespond ? '5' : '2'), c('8'), c('9')] },
+              { playerId: 'north', active: true, hand: [c('10'), c('J'), c('Q')] },
+              { playerId: 'east', active: true, hand: [c(canRespond ? '2' : '5')] },
+            ],
+          },
+        },
+      };
+      assertEngineInvariants(state, defaultRuleset);
+      expect(getLegalMoves(state, 'east', defaultRuleset).some((move) => move.kind === 'play')).toBe(canRespond);
+      const pass = { kind: 'pass', playerId: 'east' } as const;
+      const result = submitMove(state, pass, defaultRuleset);
+      expect(result.accepted).toBe(true);
+      assertMoveInvariants(state, pass, result, defaultRuleset);
+      expect(result.events).toContainEqual({ type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'east' });
+      const input = createPlayerTurnRequest(result.state, defaultRuleset);
+      expect(input.playerId).toBe('south');
+      expect(input.view.round!.players.find(({ playerId }) => playerId === 'east')).toEqual({ playerId: 'east', cardCount: 1, finished: false });
+      expect(input.view.round!.players.every((player) => !('hand' in player))).toBe(true);
+      const choice = chooseBaselineMove(input);
+      expect(choice).toEqual({ kind: 'play', playerId: 'south', cards: [c('2', 'diamonds')] });
+      expect(submitMove(result.state, choice, defaultRuleset).accepted).toBe(true);
+      inputs.push(input);
+    }
+    expect(inputs[0]!.view).toEqual(inputs[1]!.view);
+    expect(inputs[0]!.legalMoves).toEqual(inputs[1]!.legalMoves);
+  });
+
+  it('keeps structural preservation, cheap commitments, forced PASS and finish priority under pressure', () => {
+    const counts = [1, 2, 3];
+    expect(chooseBaselineMove(request([c('4'), c('5', 'spades'), c('6'), c('7', 'hearts'), c('8')], [c('3', 'diamonds')], counts))).toMatchObject({ kind: 'pass' });
+    expect(chooseBaselineMove(request([c('7'), c('9'), c('2', 'diamonds')], [c('6')], counts))).toMatchObject({ kind: 'play', cards: [c('7')] });
+    expect(evaluateCandidates(request([c('4')], [c('A')], counts))).toMatchObject([{ move: { kind: 'pass' }, passOpportunityCost: 0 }]);
+    expect(chooseBaselineMove(request([c('2', 'diamonds')], [c('A')], counts))).toMatchObject({ kind: 'play', cards: [c('2', 'diamonds')] });
+    const freeLead = request([c('4'), c('7'), c('2', 'diamonds')], undefined, counts);
+    expect(chooseBaselineMove(freeLead)).toEqual(chooseBaselineMove(request(freeLead.view.hand)));
+  });
+
+  it('locks full decisions across repeated execution, reordered inputs, real cache warmth and metrics on/off', () => {
+    const opening = createPlayerTurnRequest(startRound(createSession(['south', 'west', 'north', 'east']).state, { next: () => 0 }).state, defaultRuleset);
+    const fixtures = [
+      opening,
+      request([c('4'), c('7'), c('2', 'diamonds')], [c('A')]),
+      request([c('4'), c('7'), c('2', 'diamonds')], [c('A')], [1, 3, 3]),
+      request([c('2', 'hearts'), c('2', 'diamonds'), c('4'), c('7')], [c('A')], [2, 3, 3]),
+      request([c('A'), c('2', 'spades'), c('3', 'hearts'), c('4'), c('5', 'diamonds')]),
+      request([c('4')], [c('A')], [1, 3, 3]),
+      request([c('7'), c('9'), c('2', 'diamonds')], [c('6')], [1, 2, 3]),
+      request([c('6'), c('6', 'spades'), c('9')], [c('5')], [2, 3, 3]),
+      request([c('4'), c('5', 'spades'), c('6'), c('7', 'hearts'), c('8')], [c('3', 'diamonds')], [1, 3, 3]),
+      request([c('6'), c('6', 'spades'), c('6', 'hearts'), c('6', 'diamonds'), c('4'), c('5')],
+        [c('3'), c('3', 'spades'), c('3', 'hearts'), c('7'), c('7', 'spades')]),
+    ];
+    const createDecomposer = decomposition.createHandDecomposer;
+    for (const input of fixtures) {
+      const before = JSON.stringify(input);
+      const expected = chooseBaselineMove(input);
+      for (const collectMetrics of [false, true]) {
+        for (const warm of [false, true]) {
+          const analyzer = createDecomposer(input.view.hand, defaultRuleset, { collectMetrics });
+          if (warm) {
+            for (const move of input.legalMoves) {
+              analyzer.minPlays(move.kind === 'pass' ? input.view.hand : input.view.hand.filter((card) => !move.cards.some((played) => same(card, played))));
+            }
+          }
+          const beforeMetrics = analyzer.getMetrics();
+          const factory = vi.spyOn(decomposition, 'createHandDecomposer').mockReturnValue(analyzer);
+          try {
+            for (let repetition = 0; repetition < 3; repetition += 1) {
+              expect(chooseBaselineMove(input)).toEqual(expected);
+              const legalMoves = [...input.legalMoves.slice(repetition), ...input.legalMoves.slice(0, repetition)].reverse()
+                .map((move) => move.kind === 'pass' ? move : { ...move, cards: [...move.cards].reverse() });
+              const reordered = { ...input, legalMoves, view: { ...input.view, hand: [...input.view.hand].reverse(),
+                round: { ...input.view.round!, players: [...input.view.round!.players].reverse(), playedCards: [...input.view.round!.playedCards].reverse() } } };
+              expect(chooseBaselineMove(reordered)).toEqual(expected);
+            }
+            expect(factory).toHaveBeenCalledTimes(6);
+            const afterMetrics = analyzer.getMetrics();
+            if (collectMetrics) {
+              expect(afterMetrics!.cacheHits).toBeGreaterThan(beforeMetrics!.cacheHits);
+              if (warm) expect(afterMetrics!.cacheMisses).toBe(beforeMetrics!.cacheMisses);
+              else expect(afterMetrics!.cacheMisses).toBeGreaterThan(beforeMetrics!.cacheMisses);
+            } else {
+              expect(afterMetrics).toBeUndefined();
+            }
+          } finally {
+            factory.mockRestore();
+          }
+        }
+      }
+      expect(JSON.stringify(input)).toBe(before);
+    }
+  });
+
   it('breaks equal Four-of-a-Kind strength by canonical kicker identity under reordered input', () => {
     const input = request([c('6'), c('6', 'spades'), c('6', 'hearts'), c('6', 'diamonds'), c('4'), c('5')],
       [c('3'), c('3', 'spades'), c('3', 'hearts'), c('7'), c('7', 'spades')]);
