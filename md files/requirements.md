@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.13)
+## Requirements & Planning Document (v1.14)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 11, 2026
+**Last Modified:** September 14, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -37,7 +37,7 @@ The codebase should preserve clean boundaries that do not unnecessarily block fu
 
 -   Online multiplayer/networking.
 -   Accounts, cloud saves, or leaderboards.
--   Additional bot personalities beyond the Optimizer Bot.
+-   Multiple bot difficulty/personality systems in the Phase 1 release.
 -   Sound design/music as a v1 requirement.
 
 
@@ -62,11 +62,11 @@ Detailed design and implementation decisions belong in dedicated subsystem docum
 | `domain-model.md` | Shared Domain Model | Shared, implementation-independent TypeScript concepts used across modules, such as cards, ranks, suits, combinations, moves, player IDs, and game modes |
 | `engine.md` | Game Engine | Authoritative game rules, validation, state transitions, scoring, engine-owned state, information-safe views, and engine event contracts |
 | `orchestrator.md` | Game Orchestrator | Coordinates game flow, player controllers, engine execution, events, and round/session progression |
-| `ai.md` | AI System | Bot move selection, strategies, personalities, difficulty behavior, and permitted game information |
+| `ai.md` | AI System | Phase 1 Baseline move selection, permitted game information, deterministic decision behavior, and deferred stronger-strategy extension boundaries |
 | `ui-ux.md` | UI Layer | Screens, interactions, presentation, feedback, accessibility, responsive behavior, and quality-of-life features |
 | `persistence.md` | Game Persistence | Saving/loading resumable state, settings, statistics, storage schema, versioning, and migrations |
 | `events-logging.md` | Event & Logging System | Structured gameplay events, game history, debug logging, formatting, and event consumers |
-| `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic simulation, regression testing, and AI balancing support |
+| `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic reliability simulation, replay/regression testing, and future evaluation support |
 
 Future online multiplayer may introduce a separate `networking.md` when that work enters scope. Shared domain concepts should be defined once in `domain-model.md` rather than duplicated inside subsystem documents. Player-controller contracts should initially be documented with the orchestrator, while engine configuration, authoritative state, ruleset configuration, player/public views, and engine event contracts should initially be documented with the engine.
 
@@ -124,7 +124,7 @@ This section is the **canonical glossary for shared game/domain terms** used acr
 | **Winner Final Play** | The winner's last played combination in Competitive Mode. It triggers the winner-final-play multiplier when it satisfies one of the qualifying conditions defined in §2.6.2. |
 | **Public Information** | Game information every player is entitled to know, such as publicly played cards, current trick, scores, and opponent card counts where applicable. |
 | **Private Information** | Game information restricted to a particular player or authorized component, primarily the unrevealed cards in a player's hand. |
-| **Game Mode** | The rule configuration governing round-ending and scoring behavior. v1 provides **Basic** and **Competitive** modes. |
+| **Game Mode** | The rule configuration governing round-ending and scoring behavior. Phase 1 implements **Basic Mode** only. **Competitive Mode** is a deferred approved design retained for future consideration. |
 | **Ruleset** | The configured set of shared Pusoy Dos rule values and comparison behavior used by the authoritative engine. |
 
 When a later section needs to specify the detailed behavior of one of these terms, it should define the **rule or algorithm**, not introduce a competing definition.
@@ -677,49 +677,32 @@ Competitive Mode **skips average placement entirely**. Only the Round winner has
 
 ------------------------------------------------------------------------
 
-## 2.6.4 Session Flow
+## 2.6.4 Phase 1 Session Flow
 
-1.  Choose Basic or Competitive mode.
-2.  Configure each AI bot's difficulty independently. **Deferred for Phase 1:** Phase 1 implements a single deterministic Baseline bot behavior only (see §3.3, §6.1). This step does not apply until a difficulty system is implemented; no phase or milestone is currently committed for that work, and Phase 1 Game Setup/UI must not present a difficulty selector.
-3.  Start the session.
-4.  Play 5 rounds.
-5.  Before each round:
-    -   shuffle the full deck;
-    -   deal 13 cards to each player;
-    -   identify the player holding 3♣;
-    -   that player opens with a valid combination containing 3♣.
-6.  After each Round, calculate the official Round result and update cumulative Session totals.
-7.  Enter the **Round Result** checkpoint and show the official Round result/scores plus updated cumulative Session totals.
-8.  In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**.
-9.  Headless simulation may pass through the same checkpoint and continue immediately without an artificial wait.
-10. After Round 5, show the Session summary.
-11. Apply the mode-specific Session tiebreakers if necessary.
-12. Update persistent local statistics.
+1. Start a new **Basic Mode** Session.
+2. Use one human player and three deterministic Baseline bots.
+3. Play exactly 5 Rounds.
+4. Before each Round:
+    - shuffle the full deck using the Engine's deterministic RNG path;
+    - deal 13 cards to each player;
+    - identify the player holding 3♣;
+    - that player opens with a valid combination containing 3♣.
+5. After each Round, calculate the official Basic Round result and update cumulative Session totals.
+6. Enter the **Round Result** checkpoint and show official placements, Round points, and updated cumulative Session totals.
+7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**.
+8. Headless execution/simulation may pass through the same checkpoint and continue immediately without an artificial wait.
+9. After Round 5, show the Session Summary and apply Basic Mode Session tiebreakers if necessary.
+10. Phase 1 does not select AI difficulty, persist unfinished Sessions, or update persistent player statistics.
+
+Competitive Mode uses the deferred rules defined elsewhere in §2.6 when/if that feature enters committed scope; it is not selectable in Phase 1.
 
 ------------------------------------------------------------------------
 
-# 2.7 Hand-Type Tracking
+# 2.7 Hand-Type Tracking — Deferred
 
-Track the **human player's** played combinations.
+Persistent/per-session player statistics are not required in Phase 1.
 
-The following types are counted separately:
-
--   Single
--   Pair
--   Triple
--   Straight
--   Flush
--   Full House
--   Four-of-a-Kind
--   Straight Flush
-
-The two special low straights are included in the **Straight** count.
-
-Track:
-
-1.  Per-round counts.
-2.  Per-session cumulative counts.
-3.  Persistent cumulative counts across all sessions.
+If statistics enter a future committed scope, combination counts may include Single, Pair, Triple, Straight, Flush, Full House, Four-of-a-Kind, and Straight Flush, with the two special low Straights counted under Straight. The exact persistence/statistics schema must be designed with that future work rather than implemented implicitly during M3 or M4.
 
 ------------------------------------------------------------------------
 
@@ -794,7 +777,7 @@ No gameplay operation should require a network request.
 For the initial POC, engineering tradeoffs follow this order:
 
 1. **Accuracy and reliability** --- authoritative rules, legal-Move generation, scoring, state transitions, and AI analysis must be correct and reproducible.
-2. **Speed** --- optimize computation after correctness is established and measured. A slower device may legitimately take longer, especially for Hard search, provided computation remains bounded and the application stays responsive.
+2. **Speed** --- optimize computation after correctness is established and measured. A slower device may legitimately take longer, provided computation remains bounded and the application stays responsive.
 3. **Memory usage** --- memoization/caching may use additional memory in the POC when it materially improves correctness, simplicity, or speed. Memory reduction and cache policies may be optimized later.
 
 Additional requirements:
@@ -805,7 +788,7 @@ Additional requirements:
 - Actual AI computation time and simulated presentation delay are separate concerns.
 - Target AI presentation delay is approximately 0.3--1.5 seconds and may be tuned independently from computation.
 - Headless simulation uses no artificial thinking delay.
-- AI/search implementations must provide room for future profiling, cache optimization, pruning improvements, and faster algorithms without changing public game contracts.
+- AI implementations must provide room for future profiling, cache optimization, and stronger algorithms without changing public game contracts.
 - The AI delay must not be part of the engine's game rules.
 
 ## 4.3 Portability
@@ -917,20 +900,18 @@ Recommended high-level source organization:
     NetworkController (future)
 
   /ai
-    strategies
-    personalities
-    difficulty
-    rng
+    baseline
+    analysis
+    evaluation
+    tracing
 
   /ui
     pages
     components
     navigation
     game
-    stats
-    settings
 
-  /persistence
+  /persistence (deferred)
     snapshots
     statistics
     settings
@@ -1116,9 +1097,9 @@ The model ownership rules are:
 - **`domain-model.md`** defines stable shared domain concepts such as `Card`, `Rank`, `Suit`, `PlayerId`, `GameMode`, `CombinationType`, `Combination`, and `Move`.
 - **`engine.md`** defines authoritative/internal runtime state and engine public contracts such as Round/Session/Trick state, internal player state, validation results, scoring breakdowns, Player/Public Views, and engine event contracts.
 - **`orchestrator.md`** defines PlayerController and game-runner/orchestration contracts.
-- **`ai.md`** defines bot personalities, difficulty behavior, evaluation data, and AI-specific state.
-- **`ui-ux.md`** defines UI view state, navigation, card-selection/manual-ordering state, presentation models, and screen behavior.
-- **`persistence.md`** defines saved-game snapshots, statistics records, settings persistence, storage versions, and migrations.
+- **`ai.md`** defines the Phase 1 Baseline bot decision policy, analysis/evaluation data, deterministic tracing, permitted information, and extension boundaries for deferred stronger AI.
+- **`ui-ux.md`** defines UI view state, navigation, Phase 1 card selection/sorting, presentation models, responsive behavior, and screen behavior.
+- **`persistence.md`** is deferred for Phase 1; if later created, it will define saved-game snapshots, statistics records, settings persistence, storage versions, and migrations.
 - **`events-logging.md`** defines event retention, formatting, debug/history records, filtering, and consumers.
 - **`testing-simulation.md`** defines simulation scenarios, aggregate metrics, fixtures, and test-run configuration.
 
@@ -1465,25 +1446,24 @@ Verify:
 -   With identical deterministic configuration and the same Engine RNG seed/state, the same headless execution is reproducible.
 -   Initial AI move selection is deterministic and does not require a separate AI RNG seed. If future controlled AI variation is introduced, its AI RNG seed/state becomes part of replay metadata.
 
-Simulation should eventually be used to evaluate and tune Bot A's
-strategy.
+Phase 1 M3 simulation is a reliability/debugging harness, not an AI balancing tournament. Future AI evaluation may reuse the simulator after stronger AI work enters committed scope.
 
 ------------------------------------------------------------------------
 
 # 12.4 Manual Testing
 
-Test:
+Test Phase 1 behaviors including:
 
--   Desktop browser.
--   Mobile browser.
--   Small screens.
--   Card selection/misclicks.
--   Rapid clicking.
--   Round transitions.
--   Session transitions.
--   Refresh/resume behavior.
--   Offline operation.
--   Persistence after closing/reopening the browser.
+- desktop/laptop landscape;
+- supported tablet/phone landscape;
+- non-fullscreen/windowed browser layouts;
+- unsupported portrait and undersized guidance;
+- card selection and rapid repeated input;
+- Play/Pass validation;
+- Round Result and explicit Next Round;
+- full five-Round Session transition to Session Summary;
+- leave/reload behavior clearly communicating that unfinished progress is not saved;
+- offline gameplay after required application assets are available.
 
 ------------------------------------------------------------------------
 
@@ -1534,69 +1514,40 @@ application assets.
 
 ------------------------------------------------------------------------
 
-# 14. Open Design / Research Items
+# 14. Remaining Phase 1 Design / Implementation Items
 
-These are not unresolved game rules. They are implementation/research
-tasks.
+These are implementation details still to be finalized inside the committed M3/M4 work. They are not unresolved game rules.
 
-## 14.1 Bot A evaluation strategy
+## 14.1 M3 reliability harness details
 
-Research and prototype different approaches for the Optimizer Bot.
+M3 task design may finalize implementation details such as:
 
-The final implementation should document:
+- simulator configuration/seed representation;
+- trace/failure artifact formatting;
+- generous nontermination/progress guard thresholds;
+- deterministic acceptance seed-set/batch size;
+- compact summary/report formatting.
 
--   evaluation criteria;
--   weighting;
--   lookahead depth;
--   handling of opponent risk;
--   handling of bombs;
--   endgame behavior;
--   how difficulty modifies the strategy.
+These choices must not create a second gameplay implementation or redefine Engine rules.
 
-Do not describe Bot A as "objectively optimal" unless a mathematically
-justified optimal solver is actually implemented.
+## 14.2 M4 responsive layout contract
 
-## 14.2 AI balancing
+M4 must explicitly define and then consistently test:
 
-Use seeded simulations to compare:
+- representative supported viewport dimensions;
+- minimum supported landscape dimensions;
+- the play-area aspect-ratio/envelope;
+- the constant card width:height ratio;
+- minimum readable core typography;
+- minimum usable critical control/touch sizes;
+- reflow/collapse behavior for secondary panels;
+- unsupported portrait/undersized behavior.
 
--   Easy vs Normal vs Hard.
--   Win rates.
--   Average placement.
--   Average cards remaining.
--   Competitive Mode scores.
+These are intentionally finalized during M4 implementation/design rather than guessed in advance. The result must satisfy `ui-ux.md` and the M4 milestone requirements.
 
-Difficulty should feel meaningfully different without being artificially
-unfair.
+## 14.3 Deferred research/design
 
-## 14.3 UI design
-
-The visual design can evolve independently as long as it preserves the engine/UI boundary.
-
-Current UX direction:
-
--   prioritize readable game state over decorative animation;
--   always explain what combination was played and its effective strength;
--   keep animation as Nice to Have rather than a core milestone dependency;
--   provide strong defaults and avoid an overgrown settings screen;
--   use Relaxed / Fast as the main pacing control rather than many granular timing settings;
--   preserve manual hand organization until the player explicitly requests sorting;
--   keep legal-card dimming/highlighting as a potential future improvement rather than a committed v1 behavior;
--   contextual help is useful but lower priority than the engine and basic playable UI.
-
-## 14.4 Future setup-modifier rules
-
-Before implementing Card Exchange, explicitly define:
-
--   simultaneous vs sequential selection;
--   when received cards become visible to the recipient;
--   whether exchanged cards are publicly revealed;
--   modifier ordering when multiple setup modifiers are enabled;
--   AI selection strategy for exchange decisions.
-
-These are intentionally deferred and must not be inferred silently during
-implementation.
-
+Stronger AI, AI difficulty/personality systems, Competitive strategy, persistence/statistics/settings, setup modifiers, richer pacing controls, and other post-Phase-1 ideas remain deferred. Existing prior designs may be preserved, but they must not be treated as current implementation tasks.
 
 ------------------------------------------------------------------------
 
@@ -1688,6 +1639,6 @@ Round ends when the first player goes out.
 Highest session total wins, followed by:
 
 1.  Most round wins.
-2.  Best average placement.
+2.  Best average placement across the 5 Rounds; lower average is better.
 3.  Highest single best-round score.
 4.  Genuine tie if still tied.

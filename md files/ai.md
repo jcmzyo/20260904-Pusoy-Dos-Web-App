@@ -3,8 +3,8 @@
 ## AI System Document (v1.5)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 11, 2026  
-**Parent document:** `requirements.md` v1.13  
+**Last Modified:** September 14, 2026  
+**Parent document:** `requirements.md` v1.14  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  

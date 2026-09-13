@@ -3,8 +3,8 @@
 ## Testing & Simulation Document (v1.7)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 11, 2026
-**Parent document:** `requirements.md` v1.13  
+**Last Modified:** September 14, 2026
+**Parent document:** `requirements.md` v1.14  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
@@ -25,7 +25,7 @@ The testing strategy is organized into three primary layers:
 
 1. **Unit Tests** --- prove individual rules, algorithms, and components are correct in isolation.
 2. **Integration Tests** --- prove real modules work together correctly across their public boundaries.
-3. **Headless Game Simulator** --- exercise full games and Sessions repeatedly using the same production Engine, Orchestrator, and AI code, providing stress testing, regression reproduction, diagnostics, performance measurements, and later AI balancing.
+3. **Headless Game Simulator** --- exercise full games and Sessions repeatedly using the same production Engine, Orchestrator, and Baseline AI code, providing deterministic reliability testing, regression reproduction, diagnostics, and engineering performance measurements. Future AI balancing is outside committed Phase 1 scope.
 
 The central QA principle is:
 
@@ -520,7 +520,7 @@ Verify:
 - scores are exactly `+5/+3/+2/0`;
 - Round result and cumulative Session totals are correct.
 
-## 7.25 Competitive Mode Round ending — Deferred
+## 7.25–7.29 Competitive Mode Engine Tests — Deferred Approved Design
 
 Verify:
 
@@ -529,7 +529,7 @@ Verify:
 - no official loser placement is required for Session tiebreaking;
 - no post-win gameplay Move is accepted.
 
-## 7.26 Competitive base penalty
+### 7.25 Deferred design verification
 
 Boundary tests are mandatory:
 
@@ -539,7 +539,7 @@ Boundary tests are mandatory:
 - 10 remaining Cards uses ×2 base;
 - 13 remaining Cards uses ×2 base.
 
-## 7.27 Unused Bomb detection
+### 7.26 Deferred design verification
 
 For a losing player's final hand verify one boolean unused-bomb multiplier is triggered by at least one of:
 
@@ -554,7 +554,7 @@ Verify:
 - Straight Flush + 2 still produce only one unused-bomb ×2;
 - invalid pseudo-Straights such as `KA234` do not produce Straight Flush bomb qualification.
 
-## 7.28 Winner-final-play multiplier
+### 7.27 Deferred design verification
 
 Verify a winner-final-play ×2 applies when final Combination contains/qualifies as defined by requirements:
 
@@ -564,7 +564,7 @@ Verify a winner-final-play ×2 applies when final Combination contains/qualifies
 
 Verify multiple qualifying properties still produce only one winner-final-play ×2.
 
-## 7.29 Competitive multiplier stacking
+### 7.28 Deferred design verification
 
 Verify independent boolean multipliers combine as:
 
@@ -574,7 +574,7 @@ base × unusedBomb(1 or 2) × winnerFinal(1 or 2)
 
 Maximum combined multiplier from these two conditions is ×4, not ×8 or higher.
 
-## 7.30 Competitive zero-sum scoring
+### 7.29 Deferred design verification
 
 Verify:
 
@@ -584,7 +584,7 @@ Verify:
 
 The exact sign representation should follow Engine contracts consistently in all tests.
 
-## 7.31 Session lifecycle
+## 7.30 Basic Session lifecycle
 
 Verify:
 
@@ -594,7 +594,7 @@ Verify:
 - cumulative Session totals equal sum of authoritative Round results;
 - completed Session rejects further gameplay progression.
 
-## 7.32 Basic Session tiebreak
+## 7.31 Basic Session tiebreak
 
 Verify order:
 
@@ -606,7 +606,7 @@ Verify order:
 
 Create fixtures where each successive criterion is required.
 
-## 7.33 Competitive Session tiebreak
+### 7.32 Deferred design verification
 
 Verify order:
 
@@ -617,7 +617,7 @@ Verify order:
 
 Verify average loser placement is **not** used.
 
-## 7.34 Engine views and information safety
+## 7.33 Engine views and information safety
 
 Verify `PlayerView` for player A:
 
@@ -631,7 +631,7 @@ Verify `PlayerView` for player A:
 
 Test all four seat perspectives against the same authoritative state.
 
-## 7.35 Engine events
+## 7.34 Engine events
 
 For each important state transition verify:
 
@@ -699,16 +699,15 @@ For every AI decision:
 
 ## 9.2 Determinism
 
-Given identical:
+Given identical semantic:
 
 - `PlayerView`;
 - legal Move set;
-- game mode;
-- personality;
-- difficulty;
-- Session context;
+- Baseline controller configuration;
 
-initial v1 AI must return the same Move.
+the Phase 1 Baseline AI must return the same Move.
+
+The decision must also remain unchanged when legal Moves arrive in a different array order and when non-semantic cache/instrumentation state differs.
 
 ## 9.3 Hidden-information safety
 
@@ -758,70 +757,73 @@ If the solver uses canonical remaining-card/lowest-set-bit pruning, compare its 
 
 The optimization must remove duplicate partition exploration only; it must not remove any valid partition class.
 
-## 9.9 Basic vs Competitive evaluation
-
-Use identical Card position/legal candidate sets where mode incentives should rationally differ.
-
-Verify evaluator can rank candidates differently because:
-
-- Basic values final placement;
-- Competitive values immediate win and penalty exposure.
-
-Do not assert arbitrary exact numerical scores unless those weights are intentionally stable contracts.
-
-## 9.10 Competitive penalty exposure
-
-Verify candidate evaluation recognizes:
-
-- crossing 10 remaining Cards to 9 changes base exposure;
-- removing a 2 can remove unused-bomb exposure;
-- breaking a four-of-a-kind may remove or change bomb exposure as defined by resulting hand;
-- breaking a Straight Flush may remove qualifying bomb exposure;
-- immediate Round-end threat changes urgency.
-
-## 9.11 Session-aware behavior
-
-Use fixtures where current Round-only utility conflicts with final Session utility.
-
-Verify Session context is capable of changing selected candidate when strategically justified.
-
-Examples:
-
-- Round 5 Basic leader protects against the only rival capable of overtaking;
-- Competitive leader avoids catastrophic penalty exposure when a risky line offers only a small current-Round upside.
-
-Tests should verify policy direction, not force fragile exact evaluator weights unless needed for regression.
-
-## 9.12 Difficulty profiles — Deferred
+## 9.9 Baseline candidate construction and canonical ordering
 
 Verify:
 
-- Easy uses Easy capability profile;
-- Normal uses Normal profile;
-- Hard uses Hard profile;
-- all receive the same fair-information entitlement;
-- Easy does not intentionally choose an irrational/illegal Move merely to lose;
-- Hard does not gain access to hidden information;
-- search budgets/profile features differ as designed.
+- free lead contains legal Play candidates only;
+- responding includes legal PASS as a first-class candidate;
+- PASS remains available even when beating Plays exist;
+- shuffled Engine legal-Move input order does not change the canonical candidate order;
+- immediate-finishing Plays are identified;
+- candidate construction does not invent Moves outside the Engine-authorized set.
 
-## 9.13 Search bounds
+## 9.10 Baseline structured candidate evaluation
 
-Verify bounded search respects configured:
+Verify representative documented behavior:
 
-- maximum depth;
-- maximum node count;
-- endgame activation threshold;
-- cancellation/termination condition where implemented.
+- immediate legal finish has terminal priority;
+- exact minimum-play decomposition is the primary hand-structure signal;
+- cheap Play may beat unnecessary PASS;
+- strategic PASS may beat wasting a major control resource;
+- Pair/five-card structure preservation follows the implemented evaluator;
+- high-value 2 use/preservation follows the implemented evaluator;
+- canonical tie-breaking resolves otherwise equal candidates.
 
-A bounded-search limit is a safety/reliability mechanism. For the POC, exact millisecond deadlines are not required as deterministic correctness gates.
+Expected Moves must derive from the implemented/documented Baseline policy rather than arbitrary test preferences.
 
-## 9.14 Candidate pruning safety
+## 9.11 Public opponent-pressure behavior
 
-Any future candidate-pruning optimization must be tested against an unpruned/reference evaluator on controlled positions.
+Verify:
 
-If pruning cannot be proven semantics-preserving, it should be conservative and must not be enabled merely for speed during the accuracy-first POC.
+- public remaining-card counts may increase pressure to contest;
+- opponent with one/few cards can affect documented choices;
+- no specific unseen holding is assumed;
+- opponent PASS is never treated as proof that the opponent could not beat the previous Play.
 
----
+## 9.12 Final Baseline determinism
+
+For identical semantic inputs, verify the selected Move is unchanged across:
+
+- repeated execution;
+- shuffled legal-Move input order;
+- cold versus warm decomposition cache;
+- instrumentation enabled versus disabled.
+
+No uncontrolled `Math.random()` or timing-dependent choice is permitted.
+
+## 9.13 DecisionTrace and instrumentation safety
+
+Verify:
+
+- DecisionTrace/metrics describe the decision without becoming authoritative state;
+- enabling diagnostics does not change the selected Move;
+- diagnostic information is not fed back as hidden strategic knowledge;
+- decomposition/cache counters remain non-semantic.
+
+## 9.14 Deferred AI testing
+
+The following are **not Phase 1 gates** and must not be implemented merely because older planning discussed them:
+
+- Easy/Normal/Hard capability separation;
+- personalities;
+- Optimizer/advanced search;
+- Competitive AI evaluation/penalty exposure;
+- AI tournament/balance targets;
+- Monte Carlo/MCTS/ISMCTS or deeper lookahead;
+- material Session-standing strategy beyond the completed Baseline policy.
+
+If any of these enter a future committed scope, define new requirements and tests at that time.
 
 # 10. Orchestrator Unit Tests
 
@@ -987,7 +989,7 @@ Verify:
 - no automatic normal-human continuation;
 - cumulative Session totals updated.
 
-## 12.6 Complete Competitive Round
+## 12.6 Complete Competitive Round — Deferred
 
 Execute a deterministic Round to first-out completion.
 
@@ -1014,13 +1016,13 @@ Verify:
 - Basic tiebreak applies correctly;
 - Session stops cleanly.
 
-## 12.8 Complete five-Round Competitive Session
+## 12.8 Complete five-Round Competitive Session — Deferred
 
 Verify same lifecycle with Competitive scoring and Competitive-specific tiebreak order.
 
 ## 12.9 Real AIController integration
 
-Run real Optimizer AI through GameRunner and Engine.
+Run the production deterministic Baseline AI through GameRunner and Engine.
 
 Verify:
 
@@ -1030,11 +1032,18 @@ Verify:
 - no hidden state is passed through Orchestrator;
 - all four AI controllers can act as distinct seats.
 
-## 12.10 Difficulty integration
+## 12.10 Baseline controller integration
 
-Run Sessions with per-bot Easy/Normal/Hard configuration.
+Run Sessions with four production Baseline controllers.
 
-Verify configuration reaches correct AI profile while opponent difficulty remains unavailable as strategic input.
+Verify:
+
+- each controller receives only safe `PlayerView` + Engine-authorized legal Moves;
+- returned Moves pass through normal Engine validation;
+- strategic PASS is preserved and not replaced by Orchestrator policy;
+- four Baseline controllers complete Basic Rounds and exactly five-Round Basic Sessions;
+- no difficulty/personality configuration is required.
+
 
 ## 12.11 Deterministic replay integration
 
@@ -1293,32 +1302,25 @@ Primary use:
 
 # 20. Simulator Configuration
 
-Conceptual configuration may include:
+Phase 1 M3 simulator configuration should contain only values that materially identify/reproduce a production run, such as:
 
-```ts
-interface SimulationConfig {
-  readonly mode: GameMode;
-  readonly sessionCount: number;
-  readonly engineSeed: string | number;
-  readonly players: readonly SimulationPlayerConfig[];
-  readonly ruleset: RulesetConfig;
-  readonly invariantChecks: boolean;
-  readonly decisionTracing: DecisionTraceLevel;
-  readonly eventCapture: EventCaptureLevel;
-}
-```
+- explicit Engine shuffle/deal seed;
+- run/session identifier;
+- Basic ruleset/config identity;
+- seat/controller mapping;
+- optional software/version metadata useful for diagnostics;
+- trace/instrumentation options that must not alter gameplay semantics.
 
-Exact type ownership/names may change during implementation.
+Phase 1 uses deterministic Baseline controllers. There is no AI difficulty/personality selection and no separate AI RNG seed/state.
 
-The simulator owns batch configuration; it should not push simulation-only fields into `/domain`.
+Future controller configuration may be added only if a later approved feature materially changes deterministic behavior.
 
----
 
 # 21. Artificial Delay Policy
 
 Headless simulation must contain **no artificial bot thinking delay**.
 
-Actual AI compute time may vary by device and difficulty.
+Actual Baseline AI compute time may vary by device and game state.
 
 Presentation pacing belongs to UI/application concerns.
 
@@ -1343,12 +1345,10 @@ For initial deterministic AI, recommended metadata:
 - game mode;
 - Engine RNG seed;
 - player seat order;
-- each player's AI personality;
-- each player's difficulty;
-- any AI search configuration that materially changes behavior;
+- controller mapping/configuration that materially affects deterministic behavior;
 - initial Session configuration.
 
-Because initial AI has no controlled move randomness, separate AI RNG state is not required unless future controlled randomness is introduced.
+Because the Phase 1 Baseline AI has no controlled move randomness, separate AI RNG state is not required unless a future approved AI introduces controlled randomness.
 
 If future AI randomness is added, its seed/state must then become part of replay metadata.
 
@@ -1459,27 +1459,12 @@ Do not treat a high Session count as proof of correctness if targeted unit/integ
 
 ---
 
-# 27. Simulation Metrics --- AI Quality
+# 27. Simulation Metrics — Future AI Evaluation (Deferred)
 
-After reliability is established, collect:
+M3 does **not** use simulation as an AI tournament or difficulty-balancing framework.
 
-- Session wins by difficulty;
-- final Session rank by difficulty;
-- Basic average Session score;
-- Competitive average Session score;
-- Round wins;
-- average cards remaining at Competitive loss;
-- frequency of each Combination type played;
-- Pass frequency;
-- free-lead frequency;
-- unused-bomb exposure at Competitive Round end;
-- winner-final multiplier frequency;
-- AI minimum-play estimate distribution where useful;
-- AI decision-score components where tracing is enabled.
+Future AI work may reuse the simulator to study strategy quality, but such metrics are not Phase 1 correctness gates and must not drive M3 implementation. Any future AI evaluation should be specified when stronger AI enters committed scope.
 
-These metrics support tuning but do not redefine correct behavior.
-
----
 
 # 28. Simulation Metrics --- Performance
 
@@ -1488,9 +1473,9 @@ Because POC priority is correctness > speed > memory, performance should initial
 Track distributions such as:
 
 - Engine legal-Move generation duration;
-- AI decision duration by difficulty;
+- Baseline AI decision-duration distribution;
 - MinPlay solver duration;
-- search node counts;
+- decomposition states/cache metrics when instrumentation is enabled;
 - cache hits/misses where useful;
 - total Session runtime;
 - batch throughput.
@@ -1509,7 +1494,7 @@ Exact performance budgets should be defined after profiling representative deskt
 
 A slower device may take longer without being considered incorrect.
 
-However, unbounded growth, runaway search, or accidental exponential behavior that prevents practical completion is a reliability issue and should be fixed even during the POC.
+However, unbounded growth or accidental pathological computation that prevents practical completion is a reliability issue and should be fixed even during Phase 1.
 
 ---
 
@@ -1542,43 +1527,12 @@ These changes must preserve result equivalence.
 
 ---
 
-# 30. AI Difficulty Evaluation Methodology
+# 30. Future AI Evaluation Methodology — Deferred
 
-The desired long-run ordering is:
+Easy/Normal/Hard, personality matchups, Optimizer comparisons, Competitive AI evaluation, and statistical AI balancing are not part of Phase 1 or M3.
 
-```text
-Hard > Normal > Easy
-```
+If stronger AI becomes a future committed milestone, evaluation should be designed then using controlled seeds, seat rotation, adequate samples, and the same information-safety rules. M3 must not weaken or alter the Baseline Bot merely to manufacture target win rates.
 
-statistically under fair conditions.
-
-This is not guaranteed in every deal or Session.
-
-## 30.1 Seat rotation
-
-To reduce seat/deal bias, matchup experiments should rotate difficulty/personality assignments through all four seats.
-
-## 30.2 Shared seed sets
-
-When comparing AI versions/difficulties, use common seed sets where practical so they face comparable deal distributions.
-
-## 30.3 Multiple modes
-
-Evaluate Basic and Competitive separately because objectives and score distributions differ.
-
-## 30.4 Statistical interpretation
-
-Do not declare one difficulty superior from a tiny sample.
-
-Report sample count and uncertainty where practical.
-
-Formal statistical tests may be added later if tuning decisions become sensitive.
-
-## 30.5 No artificial losing
-
-If Easy performs too strongly, weaken its reasoning capability according to `ai.md`; do not inject obviously bad Moves merely to force target win rates.
-
----
 
 # 31. Deterministic Regression Strategy
 
@@ -1631,9 +1585,9 @@ rejects KA234 as Straight
 compares Flush by Suit before Rank
 ignores kicker when comparing Four-of-a-Kind
 continues Basic trick after outgoing player's final play when beatable
-skips average placement in Competitive Session tiebreak
 rejects invalid Move without state mutation
-Hard AI cannot access hidden opponent hands
+Baseline AI cannot access hidden opponent hands
+strategic Pass remains legal when a beating Play exists
 same seed reproduces full deterministic Session
 ```
 
@@ -1684,7 +1638,7 @@ tests/
     smoke/
     reliability/
     deterministic/
-    balancing/
+    future-ai-evaluation/  # deferred
     performance/
 
   fixtures/
@@ -1705,7 +1659,7 @@ Recommended logical suites:
 - default fast unit suite;
 - integration suite;
 - short simulation smoke suite;
-- long simulation/balancing suite;
+- long reliability/performance suite; future AI-balancing suites are deferred;
 - optional performance suite.
 
 Long-running simulation should not make every local unit-test run slow.
@@ -1751,7 +1705,7 @@ all unit tests
 + headless simulation smoke batch
 ```
 
-Long balancing/performance batches can run less frequently during POC development.
+Long reliability/performance batches can run less frequently during Phase 1 development; future AI-balancing batches are deferred.
 
 ---
 
@@ -1794,7 +1748,7 @@ Required:
 - Pass/Trick tests green;
 - finished-player handling green;
 - Basic full Round test green;
-- Competitive full Round/scoring test green;
+- Competitive Round/scoring tests are deferred and do not gate Phase 1;
 - Engine invariants green.
 
 ## Gate 3 --- Session Core
@@ -1803,7 +1757,7 @@ Required:
 
 - five-Round Session lifecycle green;
 - Basic tiebreak tests green;
-- Competitive tiebreak tests green;
+- Competitive tiebreak tests are deferred and do not gate Phase 1;
 - deterministic shuffle/replay foundation green.
 
 ## Gate 4 --- Orchestrator Integration
@@ -1817,16 +1771,17 @@ Required:
 - no duplicated Turn request;
 - full five-Round scripted Session through GameRunner succeeds.
 
-## Gate 5 --- AI Integration
+## Gate 5 --- Baseline AI Integration
 
 Required:
 
-- AI returns legal Engine Move;
+- Baseline legal-set compliance tests green;
+- strategic PASS behavior tests green;
+- exact decomposition tests green;
+- repeated/input-order/cache/instrumentation determinism tests green;
 - hidden-information safety tests green;
-- deterministic AI tests green;
-- MinPlay tests green;
-- Basic/Competitive evaluator tests green;
-- four real AI controllers complete a Session.
+- four production Baseline controllers complete Basic headless Sessions.
+
 
 ## Gate 6 --- Headless POC Reliability
 
@@ -1839,52 +1794,46 @@ Required:
 - failures are reproducible by seed/config;
 - performance metrics are captured, even if not yet gated.
 
-Only after this gate should AI balancing/tuning become a major focus.
+Passing this gate establishes M3 reliability readiness for M4. AI balancing/tuning remains deferred unless selected in a future committed milestone.
 
 ---
 
-# 39. Definition of Done --- Headless POC
+# 39. Definition of Done — Phase 1 Headless Reliability
 
-The headless POC is considered functionally complete when:
+The headless reliability foundation is complete when:
 
-1. Project builds and type-checks.
-2. Core Engine rules have comprehensive unit coverage, especially all confirmed house-rule deviations from generic poker/Big-Two rules.
-3. Basic and Competitive Round flows pass integration tests.
-4. Both mode-specific Session tiebreak paths are tested.
-5. GameRunner completes a five-Round Session without React/UI.
-6. Four real Optimizer AIControllers can complete complete Sessions.
-7. Engine/Orchestrator invariants are checked during tests/simulation.
-8. Initial deterministic run can be reproduced from configuration/seed.
-9. Simulator can run a configurable batch of Sessions.
-10. Simulator records sufficient failure context for reproduction.
-11. No known correctness/invariant defect remains open at POC signoff.
-12. Actual computation performance is measured but correctness is not sacrificed to meet arbitrary early timing targets.
-13. Memory/caching behavior is observable enough to detect unbounded growth, but aggressive memory optimization is deferred until profiling justifies it.
+1. M1 Engine Basic rules/invariants remain green.
+2. M2 production GameRunner and four deterministic Baseline controllers complete official five-Round Basic Sessions.
+3. M3 single-seed execution uses the same production Engine/Orchestrator/controller path.
+4. Runtime invariants detect representative corruption.
+5. Structured failure artifacts capture seed/config and relevant failure context.
+6. Nontermination/progress guards fail loudly rather than hanging or inventing outcomes.
+7. Recorded seed/config can be replayed deterministically.
+8. Batch execution never silently skips a failing seed.
+9. Confirmed simulation defects become focused regressions in the owning component.
+10. A documented M3 acceptance batch completes with zero unresolved invariant/legality/lifecycle/nontermination failures.
+11. Performance is measured without arbitrary fixed millisecond or huge-session-count gates.
+12. Competitive Mode, difficulty/personality systems, persistence, and UI are not required for M3 completion.
 
-The exact number of Sessions required for final stress confidence should be chosen after implementation performance is known rather than invented in advance.
 
----
+# 40. Out of Scope for M3 / Phase 1 Headless Reliability
 
-# 40. Out of Scope for Initial Headless POC
+Not required:
 
-The following are not required to prove the current headless POC:
-
-- React component tests;
-- visual regression testing;
-- browser compatibility testing;
-- PWA/offline-cache testing;
-- `localStorage` persistence tests;
-- save migration tests;
-- animation/pacing tests;
+- Competitive Mode implementation/tests as an active gate;
+- Easy/Normal/Hard difficulty systems;
+- personalities;
+- Optimizer/advanced-search AI;
+- AI balancing/tournament targets;
+- persistent statistics;
+- persistence/Resume;
+- React/UI behavior;
 - online/network testing;
-- additional AI personalities;
-- Monte Carlo/ISMCTS testing;
-- controlled random AI variation;
-- UI accessibility testing.
+- Monte Carlo/MCTS/ISMCTS;
+- fixed production performance SLAs.
 
-They remain part of the broader project where required by `requirements.md`, but should not block the current headless milestone.
+Deferred tests may remain documented for future reference, but they must not block M3.
 
----
 
 # 41. Future Testing Extensions
 
@@ -1898,7 +1847,7 @@ After the headless POC, consider:
 - mutation testing;
 - performance regression thresholds;
 - memory regression thresholds;
-- statistical AI balance reports;
+- future statistical AI balance reports;
 - future personality matchup matrices;
 - Monte Carlo/search algorithm equivalence/sanity tests;
 - online server-authority tests.
@@ -1907,79 +1856,74 @@ After the headless POC, consider:
 
 # 42. Cross-Document Synchronization Status
 
-The QA pass originally identified several documentation inconsistencies. The user approved the required resolutions, and the following have now been synchronized:
+**Last synchronization:** September 14, 2026
 
-1. `requirements.md` (currently v1.13; first synchronized at v1.8) places the **headless Engine + Orchestrator + AI POC and simulator before React/UI development**.
-2. `orchestrator.md` (currently v1.6; first synchronized at v1.2) describes Easy/Normal/Hard differences as **reasoning capability/breadth/depth**, not deliberate bad play or sabotage.
-3. `orchestrator.md` (currently v1.6; first synchronized at v1.2) states that the initial deterministic AI requires no separate AI RNG state; AI RNG replay metadata is required only if future controlled randomness is introduced.
-4. `requirements.md` (currently v1.13; first synchronized at v1.8) uses the same deterministic replay wording.
-5. Detailed testing, simulation infrastructure, regression policy, and metrics remain owned by this document; `requirements.md` retains only product-level obligations and milestone intent.
+This document is synchronized to `requirements.md` v1.14 and the committed Phase 1 roadmap:
 
-No gameplay-house-rule conflict was introduced by this synchronization.
+1. M1 is the authoritative Basic Engine foundation.
+2. M2 uses one deterministic Baseline AI with exact memoized minimum-play decomposition, strategic PASS evaluation, lightweight public context, and canonical deterministic tie-breaking.
+3. M3 is a deterministic reliability/debugging harness using the production Engine + GameRunner + Baseline controllers.
+4. M3 prioritizes invariants, failure artifacts, replay, stuck detection, regression fixtures, and reproducible batches.
+5. Competitive Mode is a deferred approved design, not a Phase 1 implementation/test gate.
+6. Easy/Normal/Hard, personalities, Optimizer/advanced search, and AI balancing are deferred.
+7. Persistence/Resume/statistics/settings are deferred.
+8. M4 owns human-playable React/UI and responsive QA; M3 does not implement UI.
+
+No canonical gameplay rule was changed by this cleanup.
 
 ---
 
 # 43. Current Conflict Status
 
-There are **no known unresolved documentation conflicts requiring product approval** from this QA synchronization pass.
+There are **no known unresolved product/rule conflicts requiring approval** in the current M3 testing scope.
 
-Any future conflict discovered during implementation or testing must be surfaced before changing product/rule semantics in the owning documents. Implementation optimizations may be changed freely only when they preserve the established public contracts and house-rule behavior.
+If implementation reveals a conflict with canonical requirements or an established module boundary, report `CONFLICT / CLARIFICATION REQUIRED` before changing semantics.
 
 ---
 
 # 44. Recommended Immediate Implementation Order
 
-After this document is approved, recommended coding order is:
+With M1 and M2 complete, the next testing/simulation work is:
 
 ```text
-1. Project/test scaffolding
-2. Shared Domain types
-3. Engine Card/Rank/Suit/deck
-4. Combination detection + tests
-5. Combination comparison + tests
-6. Legal Move generation + tests
-7. Engine state/Turn/Trick + tests
-8. Basic Mode Round flow/scoring + tests
-9. Competitive Mode Round flow/scoring + tests
-10. Session lifecycle/tiebreaks + tests
-11. Engine views/events/invariants
-12. Orchestrator/GameRunner + integration tests
-13. AI HandAnalyzer + MinPlaySolver + tests
-14. Basic/Competitive AI evaluators + difficulty profiles
-15. AIController integration tests
-16. Headless single-Session runner
-17. Headless batch simulator
-18. Reliability/invariant runs
-19. Performance/memory measurement
-20. AI tuning/balancing
-21. UI work after headless POC confidence is established
+1. Define M3 simulation configuration/run identity.
+2. Run one explicit seeded production Session.
+3. Integrate runtime invariant checks.
+4. Capture structured trace/failure artifacts.
+5. Add nontermination/progress guards.
+6. Implement deterministic single-Session replay.
+7. Implement configurable seeded batch execution.
+8. Add compact reliability/performance metrics.
+9. Establish failed-seed regression-fixture workflow.
+10. Run M3 acceptance and full M1–M2 regressions.
+11. Proceed to M4 only after M3 acceptance is satisfied.
 ```
 
-Tests should be written alongside each implementation stage rather than postponed until the simulator exists.
+Tests remain written alongside each task rather than postponed until final acceptance.
 
 ---
 
 # 45. QA Summary
 
-The testing architecture for the headless POC is intentionally layered:
+The current Phase 1 quality stack is:
 
 ```text
-Unit Tests
-  prove rules and algorithms
-      ↓
-Integration Tests
-  prove module boundaries and complete flows
-      ↓
-Headless Simulator
-  prove repeated real execution, reproducibility,
-  reliability, and later AI quality/performance
+M1 Unit/Engine Tests
+    prove canonical Basic rules and state transitions
+        ↓
+M2 Controller/AI/Headless Integration
+    prove deterministic complete production Sessions
+        ↓
+M3 Reliability Simulator
+    prove repeated execution, diagnostics, replay,
+    invariants, nontermination protection, and regressions
+        ↓
+M4 UI/Application QA
+    prove the same production game is human-playable
 ```
 
-The POC should optimize for **being demonstrably correct before being clever or fast**.
+Correctness, information safety, deterministic reproducibility, authoritative-state integrity, and reliable Session completion remain non-negotiable. Performance is observed and improved from evidence rather than arbitrary targets.
 
-Performance and memory are designed as observable, replaceable implementation concerns. Rule correctness, information safety, deterministic reproducibility, authoritative state integrity, and reliable Session completion are non-negotiable.
-
-------------------------------------------------------------------------
 
 # M2 Baseline AI Verification Addendum
 

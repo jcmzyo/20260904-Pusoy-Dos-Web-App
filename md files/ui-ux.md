@@ -4,6 +4,7 @@
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
 **Last Modified:** September 11, 2026
+**Parent document:** `requirements.md` v1.14\
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---

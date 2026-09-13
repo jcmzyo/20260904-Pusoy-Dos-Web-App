@@ -5,13 +5,13 @@
 
 ## New milestone documents
 
-- `m2-baseline-ai-headless-task-breakdown.md` (v1.0 at time of this update)
-- `m3-simulation-reliability.md` (v1.0 at time of this update)
+- `m2-baseline-ai-headless-task-breakdown.md` (v1.1 at time of this update)
+- `m3-simulation-reliability-task-breakdown.md` (v1.1 at time of this update)
 - `m4-playable-ui.md` (v1.0 at time of this update)
 
 ## Updated design documents
 
-- `requirements.md` v1.13, from v1.12
+- `requirements.md` v1.14
 - `ai.md` v1.5, from v1.4
 - `orchestrator.md` v1.6, from v1.5
 - `testing-simulation.md` v1.7, from v1.6

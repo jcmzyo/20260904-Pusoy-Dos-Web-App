@@ -4,7 +4,7 @@
 
 **Status:** Draft for implementation\
 **Last Modified:** September 9, 2026
-**Parent document:** `requirements.md` v1.13\
+**Parent document:** `requirements.md` v1.14\
 **Shared model:** `domain-model.md` v1.3\
 **Module:** Game Engine\
 **Language:** TypeScript
@@ -776,7 +776,7 @@ The UI decides how this information is presented.
 
 # 24. Session Winner and Tiebreaks
 
-The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.12.
+The engine applies the mode-specific Session winner/tiebreak rules from `requirements.md` v1.14.
 
 First compare final Session totals. If still tied:
 

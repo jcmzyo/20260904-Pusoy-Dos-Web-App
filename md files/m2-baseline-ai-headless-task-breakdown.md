@@ -6,7 +6,7 @@
 **Last Modified:** September 11, 2026  
 **Milestone:** M2 --- Baseline AI + Headless Game  
 **Phase:** Phase 1 --- Initial Playable Basic Game  
-**Parent requirements:** `requirements.md` v1.13  
+**Parent requirements:** `requirements.md` v1.14  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
