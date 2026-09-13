@@ -1,6 +1,6 @@
 import type { Move, PlayerId } from '../domain';
-import { getPublicView, submitMove } from '../engine';
-import type { EngineResult, MoveResult, RulesetConfig } from '../engine';
+import { getPublicView, startRound, submitMove } from '../engine';
+import type { EngineResult, MoveResult, PublicGameView, RNG, RulesetConfig } from '../engine';
 import type { PlayerController } from './controllers/PlayerController';
 import { createPlayerTurnRequest } from './requests/createPlayerTurnRequest';
 import type { TurnRequestId } from './requests/PlayerTurnRequest';
@@ -18,12 +18,20 @@ export type ControllerTurnResult =
       readonly context: { readonly requestId: TurnRequestId; readonly playerId: PlayerId };
     });
 
+export type RunnerStatus = 'READY' | 'ROUND_ACTIVE' | 'ROUND_RESULT' | 'SESSION_COMPLETE';
+
+export interface RoundResultCheckpoint {
+  readonly status: 'ROUND_RESULT';
+  readonly view: PublicGameView;
+}
+
 /** Coordinates Turns and autonomous Rounds against an existing Engine Session. */
 export class GameRunner {
   private state: EngineResult['state'];
   private readonly controllers: ReadonlyMap<PlayerId, PlayerController>;
   private turnPending = false;
   private roundPending = false;
+  private continuationPending = false;
   private activeRequest: PendingTurn | undefined;
 
   constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>) {
@@ -41,15 +49,42 @@ export class GameRunner {
     this.controllers = registered;
   }
 
+  getStatus(): RunnerStatus {
+    const view = getPublicView(this.state);
+    if (view.status === 'completed') return 'SESSION_COMPLETE';
+    if (view.round?.status === 'completed') return 'ROUND_RESULT';
+    return view.round === null ? 'READY' : 'ROUND_ACTIVE';
+  }
+
+  /** The final Round checkpoint remains available alongside the official Session result. */
+  getRoundResultCheckpoint(): RoundResultCheckpoint | null {
+    const view = getPublicView(this.state);
+    return view.round?.status === 'completed' ? { status: 'ROUND_RESULT', view } : null;
+  }
+
+  /** Starts exactly one next Round; the caller explicitly drives its Turns with runTurn/runRound. */
+  continueToNextRound(rng: RNG): EngineResult {
+    if (this.continuationPending || this.roundPending || this.turnPending) throw new Error('A controller Turn, Round or continuation is already pending.');
+    if (this.getStatus() !== 'ROUND_RESULT') throw new Error('Continuation requires a Round Result checkpoint in an unfinished Session.');
+    this.continuationPending = true;
+    try {
+      const result = startRound(this.state, rng);
+      this.state = result.state;
+      return result;
+    } finally {
+      this.continuationPending = false;
+    }
+  }
+
   /** Overlapping calls fail rather than queueing an unintended additional Turn. */
   async runTurn(): Promise<ControllerTurnResult> {
-    if (this.roundPending) throw new Error('A controller Round is already pending.');
+    if (this.roundPending || this.continuationPending) throw new Error('A controller Round or continuation is already pending.');
     return this.executeTurn();
   }
 
   /** Runs the active Round; returns the final Engine transaction or stops at the first rejected Move. */
   async runRound(): Promise<ControllerTurnResult> {
-    if (this.roundPending || this.turnPending) throw new Error('A controller Turn or Round is already pending.');
+    if (this.roundPending || this.turnPending || this.continuationPending) throw new Error('A controller Turn, Round or continuation is already pending.');
     const view = getPublicView(this.state);
     if (view.status !== 'inProgress' || view.round?.status !== 'inProgress') {
       throw new Error('Round execution requires an active Round.');
