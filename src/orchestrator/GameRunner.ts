@@ -11,6 +11,7 @@ interface PendingTurn {
   readonly state: EngineResult['state'];
 }
 
+/** Adds request context only to rejections for diagnostics; accepted Engine results pass through unchanged. */
 export type ControllerTurnResult =
   | Extract<MoveResult, { accepted: true }>
   | (Extract<MoveResult, { accepted: false }> & {
