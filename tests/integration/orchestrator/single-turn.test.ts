@@ -136,7 +136,7 @@ describe('serialized single controller Turn', () => {
     const submit = vi.spyOn(engine, 'submitMove');
     try {
       const result = await runner.runTurn();
-      expect(result).toEqual(expected);
+      expect(result).toEqual({ ...expected, context: { requestId: mapping.get(move.playerId)!.chooseMove.mock.calls[0]![0].requestId, playerId: move.playerId } });
       expect(result.accepted).toBe(false);
       expect(result.state).toBe(state);
       expect(result.events).toEqual([]);
