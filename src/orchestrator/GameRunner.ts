@@ -18,11 +18,12 @@ export type ControllerTurnResult =
       readonly context: { readonly requestId: TurnRequestId; readonly playerId: PlayerId };
     });
 
-/** Coordinates explicitly requested single Turns against an existing Engine Session. */
+/** Coordinates Turns and autonomous Rounds against an existing Engine Session. */
 export class GameRunner {
   private state: EngineResult['state'];
   private readonly controllers: ReadonlyMap<PlayerId, PlayerController>;
   private turnPending = false;
+  private roundPending = false;
   private activeRequest: PendingTurn | undefined;
 
   constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>) {
@@ -42,6 +43,29 @@ export class GameRunner {
 
   /** Overlapping calls fail rather than queueing an unintended additional Turn. */
   async runTurn(): Promise<ControllerTurnResult> {
+    if (this.roundPending) throw new Error('A controller Round is already pending.');
+    return this.executeTurn();
+  }
+
+  /** Runs the active Round; returns the final Engine transaction or stops at the first rejected Move. */
+  async runRound(): Promise<ControllerTurnResult> {
+    if (this.roundPending || this.turnPending) throw new Error('A controller Turn or Round is already pending.');
+    const view = getPublicView(this.state);
+    if (view.status !== 'inProgress' || view.round?.status !== 'inProgress') {
+      throw new Error('Round execution requires an active Round.');
+    }
+    this.roundPending = true;
+    try {
+      while (true) {
+        const result = await this.executeTurn();
+        if (!result.accepted || getPublicView(result.state).round?.status === 'completed') return result;
+      }
+    } finally {
+      this.roundPending = false;
+    }
+  }
+
+  private async executeTurn(): Promise<ControllerTurnResult> {
     if (this.turnPending) throw new Error('A controller Turn is already pending.');
     this.turnPending = true;
     try {
