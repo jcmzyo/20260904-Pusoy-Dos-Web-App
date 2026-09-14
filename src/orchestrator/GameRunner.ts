@@ -4,6 +4,7 @@ import type { EngineResult, MoveResult, PublicGameView, RNG, RulesetConfig } fro
 import type { PlayerController } from './controllers/PlayerController';
 import { createPlayerTurnRequest } from './requests/createPlayerTurnRequest';
 import type { TurnRequestId } from './requests/PlayerTurnRequest';
+import type { RunnerDiagnostic, RunnerDiagnosticObserver } from './RunnerDiagnostic';
 
 interface PendingTurn {
   readonly requestId: TurnRequestId;
@@ -36,7 +37,7 @@ export class GameRunner {
   private continuationPending = false;
   private activeRequest: PendingTurn | undefined;
 
-  constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>, private readonly checkInvariants = false) {
+  constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>, private readonly checkInvariants = false, private readonly diagnosticObserver?: RunnerDiagnosticObserver) {
     if (this.checkInvariants) assertEngineInvariants(state, this.ruleset);
     const playerIds = getPublicView(state).playerIds;
     const registered = new Map(controllers);
@@ -50,6 +51,10 @@ export class GameRunner {
     }
     this.state = state;
     this.controllers = registered;
+  }
+
+  private diagnose(entry: RunnerDiagnostic): void {
+    if (this.diagnosticObserver) this.diagnosticObserver(JSON.parse(JSON.stringify(entry)) as RunnerDiagnostic);
   }
 
   getStatus(): RunnerStatus {
@@ -71,8 +76,10 @@ export class GameRunner {
     if (this.getStatus() !== 'ROUND_RESULT') throw new Error('Continuation requires a Round Result checkpoint in an unfinished Session.');
     this.continuationPending = true;
     try {
+      this.diagnose({ kind: 'roundStart', state: this.state });
       if (this.checkInvariants) assertEngineInvariants(this.state, this.ruleset);
       const result = startRound(this.state, rng);
+      this.diagnose({ kind: 'transaction', result });
       if (this.checkInvariants) assertEngineInvariants(result.state, this.ruleset);
       this.state = result.state;
       return result;
@@ -109,7 +116,9 @@ export class GameRunner {
     if (this.turnPending) throw new Error('A controller Turn is already pending.');
     this.turnPending = true;
     try {
+      this.diagnose({ kind: 'turnStart', state: this.state });
       const request = createPlayerTurnRequest(this.state, this.ruleset);
+      this.diagnose({ kind: 'request', state: this.state, request });
       const controller = this.controllers.get(request.playerId);
       if (!controller) throw new Error(`Missing controller for player ${request.playerId}, request ${request.requestId}.`);
       if (controller.playerId !== request.playerId) throw new Error(`Controller mapping for player ${request.playerId} identifies player ${controller.playerId}, request ${request.requestId}.`);
@@ -118,6 +127,7 @@ export class GameRunner {
       let move: Move;
       try {
         move = await controller.chooseMove(request);
+        this.diagnose({ kind: 'proposal', move });
       } catch (cause) {
         throw new Error(`Controller failed for request ${pending.requestId}, player ${pending.playerId}.`, { cause });
       }
@@ -152,6 +162,7 @@ export class GameRunner {
     // Detached input preserves transition evidence even if an Engine defect mutates its input.
     const previous = this.checkInvariants ? JSON.parse(JSON.stringify(this.state)) as EngineResult['state'] : undefined;
     const result = submitMove(this.state, move, this.ruleset);
+    this.diagnose({ kind: 'transaction', result });
     if (previous) assertMoveInvariants(previous, move, result, this.ruleset);
     this.state = result.state;
     return result.accepted ? result : { ...result, context: { requestId: pending.requestId, playerId: pending.playerId } };

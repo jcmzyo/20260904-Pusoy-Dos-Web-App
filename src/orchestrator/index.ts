@@ -3,3 +3,4 @@ export type { PlayerTurnRequest, TurnRequestId } from './requests/PlayerTurnRequ
 export { createPlayerTurnRequest } from './requests/createPlayerTurnRequest';
 export { GameRunner } from './GameRunner';
 export type { ControllerTurnResult, RoundResultCheckpoint, RunnerStatus } from './GameRunner';
+export type { RunnerDiagnostic, RunnerDiagnosticObserver } from './RunnerDiagnostic';
