@@ -43,7 +43,7 @@ function comparable(recorded: RecordedSimulationResult, includeTrace: boolean): 
 
 function comparableTrace(trace: readonly SimulationTraceEntry[]): unknown {
   // Decision instrumentation and its extra indices are not authoritative transitions.
-  return trace.filter((entry) => entry.kind !== 'decision').map(({ index, ...entry }) => entry);
+  return trace.filter((entry) => entry.kind !== 'decision').map(({ index, developerHands, ...entry }) => entry);
 }
 
 function stableFailureMessage(message: string, failure: SimulationFailure): string {

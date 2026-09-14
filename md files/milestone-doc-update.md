@@ -40,3 +40,11 @@ The prior AI document still described Basic + Competitive, Easy/Normal/Hard, Opt
 The prior requirements deferred the richer minimum-play solver. The researched M2 decision now explicitly requires exact memoized minimum-play decomposition for the Baseline Bot, so that requirement has been updated.
 
 No canonical Pusoy Dos house rule was changed.
+
+## September 15, 2026 — M3-T11 follow-on
+
+- M3 task breakdown v1.2 adds M3-T11, its acceptance criteria, task map/dependency order, and milestone completion requirement.
+- Testing strategy v1.8 defines readable console/file traces, explicit private-hand diagnostics, information safety, and unchanged deterministic replay.
+- README documents the runnable command, options, exit codes, and current headless implementation status.
+- Requirements v1.14 already authorize M3 diagnostic tracing; shared domain, Engine, Orchestrator, and AI contracts are unchanged. Earlier version references above record the September 11 update, not current versions.
+- The application package version remains 0.1.0; this update increments the affected design-document versions rather than declaring a product release.

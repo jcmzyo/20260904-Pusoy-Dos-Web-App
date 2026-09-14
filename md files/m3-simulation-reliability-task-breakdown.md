@@ -1,9 +1,9 @@
 # Pusoy Dos --- M3 Headless Simulator + Reliability
 
-## Milestone Design + Task Breakdown (v1.1)
+## Milestone Design + Task Breakdown (v1.2)
 
 **Status:** Approved milestone design and implementation task plan  
-**Last Modified:** September 14, 2026  
+**Last Modified:** September 15, 2026\
 **Milestone:** M3 --- Headless Simulator + Reliability  
 **Phase:** Phase 1 --- Initial Playable Basic Game  
 **Parent requirements:** `requirements.md` v1.14  
@@ -11,7 +11,7 @@
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
 **AI design:** `ai.md` v1.5  
-**Testing strategy:** `testing-simulation.md` v1.7
+**Testing strategy:** `testing-simulation.md` v1.8
 
 ---
 
@@ -47,6 +47,7 @@ M3 includes:
 - invariant checks at meaningful lifecycle boundaries;
 - stuck/nontermination safeguards;
 - structured simulation tracing;
+- reusable seeded gameplay trace command with explicit private developer logging;
 - compact normal-run summaries;
 - rich failure artifacts;
 - deterministic replay by seed/configuration;
@@ -277,6 +278,7 @@ M3 is COMPLETE only when:
 - [ ] Simulation failures are never silently skipped or dismissed as bad deals.
 - [ ] Confirmed bugs receive focused regression coverage and/or a retained deterministic reproduction fixture before being considered resolved.
 - [ ] Useful engineering metrics are reported.
+- [ ] M3-T11 provides a documented seeded trace command with readable console/file output, private-hand opt-in, and verified deterministic/information-safe behavior.
 - [ ] A documented reliability acceptance batch completes with zero unresolved failures.
 - [ ] M1 and M2 regression/integration tests pass.
 - [ ] Typecheck and applicable build/test commands pass.
@@ -309,8 +311,9 @@ A task is COMPLETE only when every task-specific Definition of Done item is sati
 | MM4 Batch harness | M3-T07–T08 | Multiple deterministic Sessions run with compact metrics/reporting |
 | MM5 Regression workflow | M3-T09 | Confirmed simulation bugs become retained regressions |
 | MM6 Acceptance | M3-T10 | M3 reliability criteria are verified end-to-end |
+| MM7 Developer trace command | M3-T11 | Readable seeded gameplay logs with safe defaults and private developer opt-in |
 
-**Total: 10 tasks.**
+**Total: 11 tasks.**
 
 ---
 
@@ -770,6 +773,49 @@ There is objective evidence that the production headless game survives repeated 
 
 ---
 
+## M3-T11 — Reusable Simulation Trace Command and Developer Logging
+
+### Goal
+
+Add a dedicated command to run a seeded headless Session and print readable gameplay logs without editing tests.
+
+### Must Read
+
+- `requirements.md`: M3 scope and architectural/information boundaries.
+- `domain-model.md`: Card, Combination, Move, and PlayerId contracts.
+- `engine.md`: Engine events, public views, and logging/simulation boundaries.
+- `orchestrator.md`: events/logging and simulation boundaries.
+- `ai.md`: permitted information and diagnostic instrumentation.
+- `testing-simulation.md`: trace, failure, replay, and information-safety requirements.
+
+### Scope
+
+- Log Round/action numbers, acting player, Play/Pass, played cards and combination type.
+- Show remaining card counts, players finishing and their placements, Trick resets, Round scores, and Session results.
+- Offer an explicit developer option to include private remaining hands.
+- Support console output and saving logs to a file.
+- Reuse production simulation and Engine events; keep the formatter reusable for future UI testing without implementing UI integration.
+
+### Acceptance Criteria / Definition of Done
+
+- [ ] One command runs an explicit seed and produces useful move-by-move output, including all scoped lifecycle/score information.
+- [ ] Console and file output are supported and documented.
+- [ ] Logging does not change gameplay or deterministic outcomes.
+- [ ] Private remaining hands require explicit developer opt-in; private diagnostic data never reaches AI inputs or normal player-facing output.
+- [ ] Failures retain seed, Round/action location, and diagnostic context.
+- [ ] Production simulation and Engine events are reused; formatting is reusable without UI integration or duplicated rules.
+- [ ] Focused tests, regression suite, and typecheck pass.
+
+### Tests
+
+Cover complete seeded Sessions, event order and accurate card counts, finishing and fourth-place results, Trick resets, all Round scores and Session results, output files, invalid command arguments, failure diagnostics, private-data exclusion/opt-in, and unchanged outcomes/replay/controller inputs with logging enabled.
+
+### Scope Boundary
+
+This is a follow-on developer-tooling task after M3-T10. It does not invalidate the recorded T10 acceptance results; M3 completion additionally requires T11 verification. Do not implement UI integration, gameplay/AI policy changes, general logging infrastructure, or deferred features.
+
+---
+
 # 14. Dependency Model and Recommended Order
 
 ```text
@@ -792,6 +838,8 @@ T08 Metrics/reporting
 T09 Regression-fixture workflow
  ↓
 T10 Acceptance
+ ↓
+T11 Reusable trace command and developer logging
 ```
 
 T03–T05 are intentionally separated so state correctness, diagnostics, and stuck detection can be reviewed independently. T06 precedes broad batching so reproducibility exists before M3 begins discovering many failures.
