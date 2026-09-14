@@ -5,6 +5,7 @@ import type { PlayerTurnRequest } from '../../orchestrator';
 import { buildCandidates } from '../candidates/buildCandidates';
 import type { MoveCandidate } from '../candidates/buildCandidates';
 import { createHandDecomposer } from '../decomposition/minPlays';
+import type { DecompositionMetrics } from '../decomposition/minPlays';
 
 export interface CandidateEvaluation extends MoveCandidate {
   readonly minPlays: number;
@@ -31,9 +32,9 @@ export interface CandidateEvaluation extends MoveCandidate {
  * Control is an immediate contest heuristic, never a prediction of winning it.
  * Returns preference order; exact ties retain the canonical candidate order.
  */
-export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset): readonly CandidateEvaluation[] {
+export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset, onDecomposition?: (metrics: DecompositionMetrics) => void): readonly CandidateEvaluation[] {
   const candidates = buildCandidates(request, ruleset);
-  const decomposer = createHandDecomposer(request.view.hand, ruleset);
+  const decomposer = createHandDecomposer(request.view.hand, ruleset, { collectMetrics: onDecomposition !== undefined });
   const responding = request.view.round!.trick!.kind === 'response';
   const opponentPressure = responding && request.view.round!.players.some((player) =>
     player.playerId !== request.playerId && !player.finished && player.cardCount > 0 && player.cardCount <= 2);
@@ -55,6 +56,7 @@ export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetC
     return { ...candidate, minPlays, twosSpent, singleTwoReserveCost, cardsShed: request.view.hand.length - remaining.length,
       passOpportunityCost: Number(move.kind === 'pass' && hasPlay), responseControl };
   });
+  if (onDecomposition) onDecomposition(decomposer.getMetrics()!);
   return evaluations.sort((a, b) => Number(b.immediateFinish) - Number(a.immediateFinish) ||
     (a.minPlays + a.singleTwoReserveCost) - (b.minPlays + b.singleTwoReserveCost) ||
     (opponentPressure ? a.passOpportunityCost - b.passOpportunityCost : 0) || a.twosSpent - b.twosSpent ||
@@ -63,6 +65,15 @@ export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetC
       Number(canBeat(b.responseControl, a.responseControl, ruleset)) : 0));
 }
 
-export function chooseBaselineMove(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset): Move {
-  return evaluateCandidates(request, ruleset)[0]!.move;
+export interface DecisionTrace {
+  readonly requestId: string;
+  readonly evaluations: readonly CandidateEvaluation[];
+  readonly selectedMove: Move;
+}
+
+export function chooseBaselineMove(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset, onDecision?: (trace: DecisionTrace) => void, onDecomposition?: (metrics: DecompositionMetrics) => void): Move {
+  const evaluations = evaluateCandidates(request, ruleset, onDecomposition);
+  const selectedMove = evaluations[0]!.move;
+  if (onDecision) onDecision(JSON.parse(JSON.stringify({ requestId: request.requestId, evaluations, selectedMove })) as DecisionTrace);
+  return selectedMove;
 }
