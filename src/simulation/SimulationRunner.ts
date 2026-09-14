@@ -6,7 +6,7 @@ import type { ControllerTurnResult } from '../orchestrator';
 import type { SimulationConfig } from './SimulationConfig';
 import { runHeadlessSession } from './runHeadlessSession';
 import { SimulationDiagnostics } from './SimulationFailure';
-import type { SimulationFailure } from './SimulationFailure';
+import type { SimulationFailure, SimulationTraceEntry } from './SimulationFailure';
 import { SimulationGuards } from './SimulationGuards';
 
 /** Runs one fresh production Session; returns its final transaction, including any rejection unchanged. */
@@ -15,16 +15,16 @@ export async function runSimulation(config: SimulationConfig): Promise<Controlle
 }
 
 export type RecordedSimulationResult =
-  | { readonly status: 'completed'; readonly config: SimulationConfig; readonly result: ControllerTurnResult }
+  | { readonly status: 'completed'; readonly config: SimulationConfig; readonly result: ControllerTurnResult; readonly trace?: readonly SimulationTraceEntry[] }
   | { readonly status: 'failed'; readonly failure: SimulationFailure };
 
-/** Diagnostic entry point: failures retain evidence; successful results omit the verbose trace. */
-export async function runRecordedSimulation(config: SimulationConfig, options: { readonly batchIndex?: number; readonly decisionTrace?: boolean } = {}): Promise<RecordedSimulationResult> {
+/** Diagnostic entry point: failures retain evidence; successful results omit the verbose trace by default. */
+export async function runRecordedSimulation(config: SimulationConfig, options: { readonly batchIndex?: number; readonly decisionTrace?: boolean; readonly trace?: boolean } = {}): Promise<RecordedSimulationResult> {
   const recordedConfig = JSON.parse(JSON.stringify(config)) as SimulationConfig;
   const diagnostics = new SimulationDiagnostics(recordedConfig, options.batchIndex);
   try {
     const result = await executeSimulation(recordedConfig, diagnostics, options.decisionTrace);
-    return result.accepted ? { status: 'completed', config: recordedConfig, result } :
+    return result.accepted ? { status: 'completed', config: recordedConfig, result, ...(options.trace ? { trace: diagnostics.getTrace() } : {}) } :
       { status: 'failed', failure: diagnostics.failure(result.error.code, result.error) };
   } catch (error) {
     return { status: 'failed', failure: diagnostics.failure(error) };
