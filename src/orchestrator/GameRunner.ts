@@ -1,5 +1,5 @@
 import type { Move, PlayerId } from '../domain';
-import { getPublicView, startRound, submitMove } from '../engine';
+import { assertEngineInvariants, assertMoveInvariants, getPublicView, startRound, submitMove } from '../engine';
 import type { EngineResult, MoveResult, PublicGameView, RNG, RulesetConfig } from '../engine';
 import type { PlayerController } from './controllers/PlayerController';
 import { createPlayerTurnRequest } from './requests/createPlayerTurnRequest';
@@ -25,7 +25,9 @@ export interface RoundResultCheckpoint {
   readonly view: PublicGameView;
 }
 
-/** Coordinates Turns and autonomous Rounds against an existing Engine Session. */
+/** Coordinates Turns and autonomous Rounds against an existing Engine Session.
+ * Optional Engine checks cover initialization, Round starts and every Move result, including completion/rejection.
+ */
 export class GameRunner {
   private state: EngineResult['state'];
   private readonly controllers: ReadonlyMap<PlayerId, PlayerController>;
@@ -34,7 +36,8 @@ export class GameRunner {
   private continuationPending = false;
   private activeRequest: PendingTurn | undefined;
 
-  constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>) {
+  constructor(state: EngineResult['state'], private readonly ruleset: RulesetConfig, controllers: ReadonlyMap<PlayerId, PlayerController>, private readonly checkInvariants = false) {
+    if (this.checkInvariants) assertEngineInvariants(state, this.ruleset);
     const playerIds = getPublicView(state).playerIds;
     const registered = new Map(controllers);
     for (const playerId of playerIds) {
@@ -68,7 +71,9 @@ export class GameRunner {
     if (this.getStatus() !== 'ROUND_RESULT') throw new Error('Continuation requires a Round Result checkpoint in an unfinished Session.');
     this.continuationPending = true;
     try {
+      if (this.checkInvariants) assertEngineInvariants(this.state, this.ruleset);
       const result = startRound(this.state, rng);
+      if (this.checkInvariants) assertEngineInvariants(result.state, this.ruleset);
       this.state = result.state;
       return result;
     } finally {
@@ -144,7 +149,10 @@ export class GameRunner {
     if (move.playerId !== pending.playerId) {
       throw new Error(`Controller response player mismatch for request ${pending.requestId}, player ${pending.playerId}.`);
     }
+    // Detached input preserves transition evidence even if an Engine defect mutates its input.
+    const previous = this.checkInvariants ? JSON.parse(JSON.stringify(this.state)) as EngineResult['state'] : undefined;
     const result = submitMove(this.state, move, this.ruleset);
+    if (previous) assertMoveInvariants(previous, move, result, this.ruleset);
     this.state = result.state;
     return result.accepted ? result : { ...result, context: { requestId: pending.requestId, playerId: pending.playerId } };
   }

@@ -1,5 +1,5 @@
 import { BaselineController } from '../ai';
-import { createSession, defaultRuleset, startRound } from '../engine';
+import { assertEngineInvariants, createSession, defaultRuleset, startRound } from '../engine';
 import type { RNG } from '../engine';
 import { GameRunner } from '../orchestrator';
 import type { ControllerTurnResult } from '../orchestrator';
@@ -22,8 +22,9 @@ export async function runSimulation(config: SimulationConfig): Promise<Controlle
     return seed / 0x100000000;
   } };
   const session = createSession(config.seats.map((seat) => seat.playerId));
+  assertEngineInvariants(session.state, defaultRuleset);
   const controllers = config.seats.map((seat) => new BaselineController(seat.playerId, defaultRuleset));
   const state = startRound(session.state, rng).state;
-  const runner = new GameRunner(state, defaultRuleset, new Map(controllers.map((controller) => [controller.playerId, controller])));
+  const runner = new GameRunner(state, defaultRuleset, new Map(controllers.map((controller) => [controller.playerId, controller])), true);
   return runHeadlessSession(runner, rng);
 }
