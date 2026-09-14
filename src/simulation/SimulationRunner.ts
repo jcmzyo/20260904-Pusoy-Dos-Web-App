@@ -7,6 +7,7 @@ import type { SimulationConfig } from './SimulationConfig';
 import { runHeadlessSession } from './runHeadlessSession';
 import { SimulationDiagnostics } from './SimulationFailure';
 import type { SimulationFailure } from './SimulationFailure';
+import { SimulationGuards } from './SimulationGuards';
 
 /** Runs one fresh production Session; returns its final transaction, including any rejection unchanged. */
 export async function runSimulation(config: SimulationConfig): Promise<ControllerTurnResult> {
@@ -47,10 +48,14 @@ async function executeSimulation(config: SimulationConfig, diagnostics?: Simulat
   const session = createSession(config.seats.map((seat) => seat.playerId));
   diagnostics?.observe(JSON.parse(JSON.stringify({ kind: 'transaction', result: session })));
   assertEngineInvariants(session.state, defaultRuleset);
-  const controllers = config.seats.map((seat) => new BaselineController(seat.playerId, defaultRuleset, decisionTrace ? diagnostics?.onDecision : undefined));
+  const guards = new SimulationGuards();
+  const controllers = config.seats.map((seat) => guards.controller(new BaselineController(seat.playerId, defaultRuleset, decisionTrace ? diagnostics?.onDecision : undefined)));
   diagnostics?.observe(JSON.parse(JSON.stringify({ kind: 'roundStart', state: session.state })));
   const started = startRound(session.state, rng);
   diagnostics?.observe(JSON.parse(JSON.stringify({ kind: 'transaction', result: started })));
-  const runner = new GameRunner(started.state, defaultRuleset, new Map(controllers.map((controller) => [controller.playerId, controller])), true, diagnostics?.observe);
+  const runner = new GameRunner(started.state, defaultRuleset, new Map(controllers.map((controller) => [controller.playerId, controller])), true, (entry) => {
+    diagnostics?.observe(entry);
+    guards.observe(entry);
+  });
   return runHeadlessSession(runner, rng);
 }
