@@ -63,6 +63,15 @@ export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetC
       Number(canBeat(b.responseControl, a.responseControl, ruleset)) : 0));
 }
 
-export function chooseBaselineMove(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset): Move {
-  return evaluateCandidates(request, ruleset)[0]!.move;
+export interface DecisionTrace {
+  readonly requestId: string;
+  readonly evaluations: readonly CandidateEvaluation[];
+  readonly selectedMove: Move;
+}
+
+export function chooseBaselineMove(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset, onDecision?: (trace: DecisionTrace) => void): Move {
+  const evaluations = evaluateCandidates(request, ruleset);
+  const selectedMove = evaluations[0]!.move;
+  if (onDecision) onDecision(JSON.parse(JSON.stringify({ requestId: request.requestId, evaluations, selectedMove })) as DecisionTrace);
+  return selectedMove;
 }
