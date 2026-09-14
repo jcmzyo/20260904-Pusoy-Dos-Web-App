@@ -11,7 +11,7 @@
 **AI design:** `ai.md` v1.5  
 **Module:** Testing & Simulation  
 **Primary POC target:** Fully headless five-Round game/session execution  
-**Language/tooling:** TypeScript + Vitest + headless Node.js execution
+**Language/tooling:** TypeScript + Vitest + React Testing Library + Playwright + headless Node.js execution
 
 ---
 
@@ -1864,7 +1864,56 @@ After the headless POC, consider:
 
 ---
 
-# 42. Cross-Document Synchronization Status
+
+# 42. Phase 1 UI Testing Strategy
+
+M4 adds UI-specific verification without weakening the existing headless gates. Use the smallest appropriate layer.
+
+## 42.1 Vitest + React Testing Library
+
+Use for component/application behavior: selection state, sorting, Engine-derived validation feedback, Play/Pass enablement, result-state rendering, controller/UI integration, and deterministic presentation-state reducers/helpers. Do not duplicate authoritative game rules in test-only UI logic.
+
+## 42.2 Playwright real-browser tests
+
+Playwright is an M4 development/test dependency and may be installed/configured by Codex when the assigned M4 task requires it. Keep the suite focused rather than duplicating every Vitest/Engine test. High-value coverage includes:
+
+- Start Game → production table startup;
+- representative supported landscape viewports and unsupported portrait/undersized states;
+- overlapped-card clickability where practical;
+- bounded mouse/touch-like drag/reorder and preservation of selected state;
+- Sort Rank/Suit after manual rearrangement;
+- Discard Pile/Event Log overlay open/close and progression pause;
+- leave confirmation;
+- Round-end reveal/result checkpoint behavior;
+- critical multi-Round/Session browser flow where deterministic fixtures make it practical.
+
+Viewport dimensions are frozen in the M4 responsive-contract task and reused across Playwright and manual QA. Browser tests must not assert fragile animation timing unless timing itself is the product contract; prefer eventual visible state and deterministic checkpoints.
+
+## 42.3 Human manual acceptance
+
+A real person performs manual acceptance. Codex may write the checklist and expected observable results but must not claim subjective/manual checks passed unless a human reports them. Manual tasks must be human-observable and must not require millisecond timing, internal state inspection, or implementation knowledge.
+
+Manual acceptance should cover:
+
+- understanding whose turn it is and what hand must be beaten;
+- selecting/deselecting overlapped cards and seeing selected cards rise;
+- manually rearranging cards within the bounded hand area without changing selection;
+- sorting by Rank/Suit while preserving selection;
+- understanding disabled Play reasons and strategic/no-valid-play Pass states;
+- opening/closing Discard Pile and Event Log and observing that hidden bot progression does not occur;
+- following bot Plays/Passes at a readable pace;
+- understanding the 4th-place hand reveal and Round Result score/reorder sequence;
+- using Next Round / View Session Results;
+- using Session Summary Play Again/Home;
+- leave confirmation and unsaved warning;
+- portrait rotate guidance and recovery;
+- usability on every frozen supported viewport class.
+
+Use both **scripted functional checks** (specific actions and expected visible results) and **task-based usability checks** (for example, ask a tester to play a Round without telling them which control to press) where practical.
+
+---
+
+# 43. Cross-Document Synchronization Status
 
 **Last synchronization:** September 14, 2026
 
@@ -1883,7 +1932,7 @@ No canonical gameplay rule was changed by this cleanup.
 
 ---
 
-# 43. Current Conflict Status
+# 44. Current Conflict Status
 
 There are **no known unresolved product/rule conflicts requiring approval** in the current M3 testing scope.
 
@@ -1891,7 +1940,7 @@ If implementation reveals a conflict with canonical requirements or an establish
 
 ---
 
-# 44. Recommended Immediate Implementation Order
+# 45. Recommended Immediate Implementation Order
 
 With M1 and M2 complete, the next testing/simulation work is:
 
@@ -1914,7 +1963,7 @@ Tests remain written alongside each task rather than postponed until final accep
 
 ---
 
-# 45. QA Summary
+# 46. QA Summary
 
 The current Phase 1 quality stack is:
 

@@ -3,118 +3,168 @@
 ## UI / UX Document (v1.2)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 11, 2026
-**Parent document:** `requirements.md` v1.14\
+**Last Modified:** September 15, 2026  
+**Parent document:** `requirements.md` v1.14  
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---
 
-> This document separates **Phase 1 requirements** from **deferred approved design**. Deferred sections preserve decisions but are not implementation commitments or a post-Phase-1 timeline.
-
 # 1. Product Experience Goal
 
-Phase 1 must make the already-tested production game system human-playable without creating a second rules authority in React. UI priorities are: **clarity → functionality → implementation simplicity → responsiveness → visual polish**.
+Phase 1 makes the proven production game human-playable without creating a second rules authority in React. UI priorities are **clarity → functionality → implementation simplicity → responsiveness → visual polish**.
 
 A player should always be able to answer: **Whose turn is it? What hand must be beaten? What can I do?**
 
 # 2. Architectural Boundary
 
-React owns presentation state such as selected cards, open overlays, sort order, and temporary messages. Engine/Orchestrator-owned state includes current player, trick, authoritative hands, scores, finished state, legal Moves, and winners.
+React owns presentation state such as selected cards, manual display order, opened overlays, animation/pacing state, and responsive layout state. Engine/Orchestrator-owned state includes current player, Trick, authoritative hands, scores, finished state, legal Moves, winners, and factual public events.
 
-Flow: **React intent → Orchestrator → Engine; Engine state/events → Orchestrator → safe UI state → React.** Combination recognition and Move legality remain Engine-owned even when the UI disables an invalid action for convenience.
+Flow: **React intent → HumanController/Orchestrator → Engine; Engine state/events → Orchestrator → safe UI state → React.** Combination recognition and Move legality remain Engine-owned.
 
-# 3. Phase 1 Screens
+Phase 1 Start Game immediately starts the fixed Basic Session, but startup must use a small configuration/application boundary so a future setup sub-screen can be inserted without replacing Session startup architecture.
 
-Phase 1 uses: **Home → minimal Game Setup → Game Table → Round Result → Next Round/Game Table → Session Summary**. No Resume, Stats, Settings, Rules/Tutorial, difficulty/personality configuration, or Competitive setup is required.
+# 3. Phase 1 Screen Flow
 
-# 4. Seating and Players
+**Home → Start Game → Game Table → Round Result overlay → Next Round/Game Table → ... → Round 5 Result overlay → Session Summary.**
 
-Fixed visual seats: Human South; bots West, North, East. Seats do not determine the opening player; the holder of 3♣ starts each Round. Play remains clockwise. Bots use simple placeholder names and remaining-card counts. Phase 1 bots are Baseline bots; no difficulty/personality labels or selectors are shown.
+There is no Phase 1 setup screen because there are no meaningful user-selectable game options yet. No Resume, Stats, Settings, Rules/Tutorial, difficulty/personality configuration, or Competitive setup is required.
 
-# 5. Game Table — Phase 1
+Session Summary offers **Play Again** and **Home**.
 
-The table must show current Round/mode context, current turn, current hand to beat with actual cards/type/player, opponent remaining-card counts, current/running scores, live PASS state, DONE/placement state, the human hand, and available human actions.
+# 4. Seating, Names, and Players
 
-## 5.1 Current trick
+Fixed visual seats: Human South; bots West, North, East. Seats do not determine the opener; the holder of 3♣ starts each Round. Bots use names randomly chosen from a user-provided name pool, with no difficulty/personality labels.
 
-The center retains the current hand-to-beat through Passes until it is beaten or the Engine officially resets the Trick. Free lead is explicitly labeled **FREE LEAD**. After a Basic finisher's final play, keep that final combination visible while the continuation rule resolves.
+Bot hands are rendered as overlapping face-down cards plus an explicit remaining-card count. The UI never reveals bot card faces during active play.
 
-## 5.2 PASS and DONE
+# 5. Game Table Layout
 
-PASS appears beside the relevant player panel for the current response cycle. A new successful Play or Trick reset clears prior PASS indicators. Historical Passes remain in Event Log. Finished/ineligible players never show PASS.
+The table must show current Round context, current turn, cumulative scores, player names/counts, PASS/DONE/placement status, the human hand, and human actions.
 
-Finished players remain visible and show persistent **DONE**. Basic Mode may show `DONE — 1st`, `DONE — 2nd`, etc.
+## 5.1 Center table
 
-## 5.3 Human hand
+The center contains:
 
-Tap/click toggles card selection; selected cards visibly raise/highlight. Phase 1 supports **Sort by Rank** and **Sort by Suit**. Arbitrary manual rearrangement is deferred. Horizontal hand scrolling is acceptable on mobile.
+- a **Discard Pile** button;
+- the current hand to beat with actual cards, recognized type/rank where useful, and the player who made that Play;
+- explicit **FREE LEAD** when appropriate.
 
-## 5.4 Selection and Play feedback
+The current hand to beat remains visible through Passes until beaten/reset. Every successfully played card immediately belongs to the public Discard Pile, including cards from the current Trick.
 
-The UI asks the Engine to inspect/validate selected cards. No selection, invalid combination, or a valid combination that cannot beat the current trick keeps the action disabled and shows **NOT VALID** with a useful explanation. A valid legal selection shows the recognized hand and enables **PLAY**.
+## 5.2 Bottom human area
 
-Phase 1 does not proactively highlight all legal cards/moves.
+The bottom relationship is:
 
-## 5.5 Pass and no-legal-move feedback
+- **left:** Event Log button and Leave Game;
+- **center/top:** human cards;
+- **center/bottom:** Sort by Rank and Sort by Suit;
+- **right:** large Play and Pass controls.
 
-Passing is available only while responding. Phase 1 does not auto-pass. If the Engine reports no legal Play, explicitly tell the player **No legal moves available** (or equivalent clear wording) and make the required Pass action obvious so a new player does not appear stuck.
+This is a responsive relationship, not fixed pixel positioning.
 
-# 6. Scores and Results
+# 6. Human Hand, Selection, Sorting, and Manual Arrangement
 
-During play, show current cumulative Session scores in a simple visible location; an overlay is not required for Phase 1.
+Human cards remain on one horizontal baseline. When space is constrained, cards overlap horizontally while enough of each card remains exposed for reliable click/tap and drag targeting.
 
-Round Result is a real checkpoint. It shows official Basic placements, points gained that Round, and the updated running Session total. The next Round starts only after explicit **Next Round** input.
+Tap/click toggles selection. Selected cards visibly rise to a higher horizontal level while preserving their position in hand order. Clicking empty table space does not clear selection.
 
-Session Summary shows winner, final ranking, all five Round results, final Session scores, and tiebreak information when relevant. It may offer Rematch/New Session/Home if those actions are straightforward and do not imply persistence.
+Phase 1 supports bounded manual rearrangement by mouse/touch drag within the hand region. Cards cannot be dragged indefinitely around the table. Reordering changes only display order; it does **not** select/deselect cards. A selected card remains selected when moved, and moving neighboring cards does not change selection.
 
-# 7. Played Cards and Event Log
+**Sort by Rank** and **Sort by Suit** are always visible and usable even when the hand already matches that order. Sorting preserves current selection and simply reapplies canonical display order; no separate Custom sort state is needed.
 
-Phase 1 includes a Played Cards view and Event Log because both aid gameplay comprehension and manual QA.
+- Sort by Rank: Rank 3 → ... → A → 2; ties Clubs → Spades → Hearts → Diamonds.
+- Sort by Suit: Clubs → Spades → Hearts → Diamonds; within suit Rank 3 → ... → A → 2.
 
-Played Cards shows exact publicly played cards from the current Round, grouped Clubs → Spades → Hearts → Diamonds and ordered 3 → ... → A → 2 within a suit. Pass adds no card.
+# 7. Play, Pass, and Validation Feedback
 
-Event Log shows chronological factual events such as player, exact played cards, recognized combination, Pass, finish, and Trick reset/free lead. Both derive from authoritative public Engine history/events rather than independent duplicate state.
+The large Play control carries selection feedback. No selection/invalid/non-beating selection keeps Play disabled/gray. Where practical, show a specific Engine-derived reason such as **Invalid combination**, **Wrong number of cards**, **Must include 3♣**, or **Doesn't beat Pair of 9s**. A valid legal selection shows the recognized combination and enables Play.
 
-Information overlays pause Orchestrator progression while open so bot turns do not advance unseen behind them.
+Pass is available only where canonical rules allow it. Strategic Pass remains available even when legal beating Plays exist. If no legal Play exists while responding, the Pass control explicitly includes **No valid plays** so the player understands the state. Phase 1 does not auto-pass.
 
-# 8. Leaving an Unsaved Session
+After a successful human Play, played cards leave the hand, selection clears, remaining cards close gaps, and the authoritative play becomes the current hand to beat and part of the Discard Pile.
 
-Phase 1 has no persistence. In-app Leave/Home actions during an unfinished Session must explicitly warn that progress will not be saved. Refresh/tab/window close should use the browser-supported unload warning where available; custom wording or interception is not guaranteed by browsers.
+# 8. Bot Turns and Pacing
 
-# 9. Phase 1 Visual Foundation
+Bots use the same production Orchestrator/controller path. A bot starts deciding only after the Orchestrator gives that bot the active Turn; bots do not precompute decisions during another player's Turn.
 
-Use a simple **Modern Casino Table** direction: green table cues translated into clean digital UI, not a photorealistic gambling environment. Prefer CSS/components over custom artwork.
+Actual Baseline computation is separate from presentation delay. Use a short readable presentation delay as a tunable UI value, initially around 0.6–1.0 seconds per bot action. Do not make exact millisecond timing a human acceptance requirement.
 
-Use related green shades for page, table, panels, interactions, and overlays; off-white cards; near-black primary card text; readable muted-light text on green. Exact color tokens are not frozen until the first functional table is evaluated.
+A bot Play updates the center cards, count, and Event Log. A bot Pass shows PASS beside that player. PASS remains for the current response cycle and clears on the next successful Play or Trick reset.
 
-Cards are programmatic React components with simple rounded rectangles and suit/rank symbols. Phase 1 default suit colors are **Hearts red, Diamonds orange, Clubs blue, Spades black**. There is no color-mode toggle in Phase 1. Suit symbols remain visible so meaning never depends on color alone.
+# 9. Discard Pile and Event Log
 
-Use one clean sans-serif/system font stack, a small consistent button system, simple placeholder bot avatars/initials, and a CSS/SVG card back. No custom portraits, 52 raster card images, sound files, or elaborate animation assets are required.
+## 9.1 Discard Pile
 
-Status must never rely on color alone: current turn has explicit text/highlight; PASS and DONE have labels; selected cards have position/treatment; invalid actions have text.
+The Discard Pile button opens an overlay containing **all cards successfully played so far in the current Round**, including the current Trick. Group Clubs → Spades → Hearts → Diamonds; within each suit order 3 → ... → A → 2. Pass contributes no card. Close/Exit returns to the table.
 
-# 10. Landscape-First Responsive Requirement
+## 9.2 Event Log
 
-Use one responsive component hierarchy rather than separate desktop/mobile game implementations. Phase 1 gameplay is **landscape-first**. Supported targets include desktop/laptop, non-fullscreen/windowed desktop browsers, tablet landscape, and supported phone landscape.
+The bottom Event Log button shows the most recent factual event as compact preview text where space permits. Opening it shows the chronological public Round history. It initially opens at the newest event; scrolling upward moves toward earlier events and the first event is at the top.
 
-Portrait gameplay is not required. In portrait, show a clear **Rotate your device to continue** state and prevent the game table from presenting itself as a cramped usable layout. If even landscape dimensions are below the documented minimum, show resize/unsupported-size guidance. Do not rely on browser orientation locking.
+Record useful public gameplay events such as Round start/opener, exact Play + recognized combination, Pass, Trick reset/free lead, and player finish/placement. It is a player-facing factual history, not a debug trace.
 
-The main game area should stay inside a documented landscape aspect-ratio/viewport envelope rather than stretching independently to fill arbitrary browser geometry. Safe margins/letterboxing are acceptable. The exact target ratio/range is finalized during M4 detailed design.
+Both overlays derive from authoritative public Engine history/events. While either overlay is open, Orchestrator progression is paused so bot actions do not occur unseen. Closing resumes from the same execution point.
 
-Cards must preserve one constant width:height ratio at every supported viewport. Text and critical controls must use bounded responsive sizing with documented minimum readable/touchable sizes. When space is constrained, prefer hand scrolling, controlled card overlap, panel reflow, drawers/tabs/overlays, or safe margins before distorting cards or shrinking core text/controls below usability thresholds.
+# 10. Leave Game
 
-Responsive design means preserving information hierarchy and usability, not uniformly shrinking the whole interface. On constrained landscape screens, Played Cards/Event Log and other secondary information may move into overlays while current turn, hand to beat/free lead, player counts, human hand, Play/Pass, and essential score/status remain easy to understand.
+Leave Game is a secondary left-side action. During an unfinished Session it opens an application confirmation overlay explaining that progress is not saved, with **Yes/Leave Game** and **Return/Stay** actions. The confirmation pauses progression. Browser refresh/tab/window close uses supported unload warnings where available; browser wording is not guaranteed.
 
-M4 QA must test representative large desktop, normal laptop, small/windowed desktop, tablet landscape, large phone landscape, small supported phone landscape, and unsupported portrait/undersized states.
+# 11. End-of-Round Reveal
 
-# 11. Deferred Approved UI Ideas — No Timeline
+When the 3rd-place player finishes, the Engine has completed the Basic Round and the 4th-place player is known. Normal interaction stops. Before the result overlay appears, reveal the 4th-place player's remaining cards in that player's normal table position, sorted by Rank. This information is exposed only after Round completion; active-play hidden-information boundaries remain intact.
 
-Preserved for later evaluation, not Phase 1 commitments: persistence/Resume UI; Stats; Settings; auto-pass; two-color/four-color suit preference; difficulty/personality configuration; Surprise Me; Mystery Bots with end-of-Session reveal; Competitive penalty breakdown and loser-hand reveal; arbitrary manual card rearrangement; richer animations/audio/branding/progression; additional accessibility controls.
+Show the reveal for roughly **1.5–2 seconds**. A click/tap may finish the reveal immediately. The same input must not accidentally activate the next result action.
 
-# 12. Possible Future Directions — Not Committed
+# 12. Round Result Overlay
 
-Online/multiplayer UI and other product expansions are not part of the committed roadmap. They must be separately planned if selected after Phase 1 evaluation.
+Round Result is a modal/overlay over the dimmed completed table, not a separate page. It is not dismissible by outside click/Escape; progression occurs through its explicit action.
 
-# 13. Phase 1 UI Acceptance
+The scoring presentation sequence is:
 
-M4/Phase 1 is complete when a human can start a Basic Session, understand the active turn and current trick, select/validate/play/pass, receive explicit no-legal-move guidance, observe PASS/DONE/public history/scores, complete five Rounds with explicit Round Result checkpoints, and reach a correct Session Summary using the production Engine/Orchestrator without duplicated game-rule logic in React. The same gameplay UI must remain coherent on the documented supported landscape viewport classes, including non-fullscreen windows; cards preserve aspect ratio, text/critical controls remain readable/usable, and portrait/undersized states fail gracefully with rotate/resize guidance.
+1. rows appear arranged by standings **before** the just-completed Round score;
+2. Round points (+5/+3/+2/+0) appear;
+3. Total values update;
+4. rows smoothly rearrange by the new cumulative total;
+5. the heading/column presentation settles on **Total** rather than permanently retaining a Previous Total column.
+
+The animation is short and skippable by click/tap; skipping completes the visual state but must not trigger Next Round. Ties during an unfinished Session retain stable previous relative order rather than inventing a final ranking.
+
+Rounds 1–4 show **Next Round**. Round 5 shows **View Session Results**.
+
+# 13. Session Summary
+
+After Round 5, Session Summary shows the official final ranking ordered by final Session result, final scores, all five Round results, and tiebreak explanation when relevant. Apply the official Basic tiebreak rules here.
+
+Give 1st/2nd/3rd restrained gold/silver/bronze background/border treatment while retaining explicit placement text so meaning is not color-only. Provide **Play Again** and **Home**.
+
+# 14. Responsive and Orientation Contract
+
+Gameplay is landscape-first and must support large desktop, normal laptop, smaller/windowed desktop, tablet landscape, large phone landscape, and a defined small supported phone landscape. Portrait is unsupported gameplay orientation: pause/prevent interaction and show **Rotate your device to continue**; returning to landscape restores coherent state. Too-small landscape shows resize/unsupported guidance rather than an unreadable table.
+
+Use a bounded ratio-controlled play area rather than assuming fullscreen or exact 16:9. Cards preserve a constant aspect ratio. Text uses bounded readable sizing and critical controls retain usable click/touch targets. Secondary UI compresses/reflows before core gameplay becomes unusable.
+
+Human cards remain on the same baseline; constrained layouts increase horizontal overlap rather than vertically staggering unselected cards. Selected cards alone rise.
+
+Exact representative CSS viewport dimensions and minimum supported dimensions are frozen during M4 implementation task T04 and reused for automated/manual QA.
+
+# 15. Visual Foundation
+
+Use a modern green casino-table direction, off-white cards, Hearts red, Diamonds orange, Clubs blue, Spades black, clean system/sans typography, component/CSS cards, and a simple CSS/SVG card back. Use labels in addition to color. Major sound, character art, and elaborate animation remain deferred.
+
+# 16. UI Testing Strategy
+
+Use complementary layers:
+
+- **Vitest + React Testing Library:** component/application behavior and integration boundaries.
+- **Playwright:** a small set of high-value real-browser tests for startup, responsive/orientation behavior, drag/reorder, overlay pause behavior, and critical end-to-end flows. Codex may create and run these tests as part of M4 tasks.
+- **Human manual acceptance:** observable usability and comprehension. Codex writes the checklist; a real person performs it. Do not ask humans to verify internal state or precise millisecond timing.
+
+Human checks should include whether the tester can understand whose turn it is, identify the hand to beat, click overlapped cards, see selected cards rise, rearrange without changing selection, use sorting, understand invalid Play reasons and No valid plays, inspect/exit overlays, follow bot actions, understand the 4th-hand reveal and result-score reordering, recover from portrait, and safely leave a Session.
+
+# 17. Deferred Approved UI Ideas
+
+Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; additional accessibility controls. Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
+
+# 18. Phase 1 UI Acceptance
+
+M4/Phase 1 is complete when a human can start a Basic Session immediately from Home, play a complete five-Round Session against three Baseline bots through production Engine/Orchestrator boundaries, use selection/sorting/manual arrangement and Play/Pass correctly, inspect public Discard/Event history without hidden-information leakage, understand Round/Session results, and use the same coherent landscape-first UI across the documented supported viewport matrix.

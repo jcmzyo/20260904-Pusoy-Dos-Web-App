@@ -1,6 +1,6 @@
 # Pusoy Dos --- September 11, 2026 Milestone Documentation Update
 
-**Last Modified:** September 11, 2026  
+**Last Modified:** September 15, 2026
 **Purpose:** Record the documentation changes made after approval of the M2 Baseline AI algorithm and M3/M4 milestone planning decisions.
 
 ## New milestone documents
@@ -48,3 +48,15 @@ No canonical Pusoy Dos house rule was changed.
 - README documents the runnable command, options, exit codes, and current headless implementation status.
 - Requirements v1.14 already authorize M3 diagnostic tracing; shared domain, Engine, Orchestrator, and AI contracts are unchanged. Earlier version references above record the September 11 update, not current versions.
 - The application package version remains 0.1.0; this update increments the affected design-document versions rather than declaring a product release.
+
+
+## September 15, 2026 — M4 detailed UI planning synchronization
+
+- Phase 1 Start Game now begins the fixed Basic Session immediately; a future setup screen remains an extension seam rather than a current screen.
+- Manual bounded hand rearrangement is now committed Phase 1 scope. Selection and hand order are independent; sorting/reordering preserves selection.
+- The table center uses current hand-to-beat plus a Discard Pile overlay; Event Log is a bottom-area popup with latest-event preview. Both pause progression.
+- Bot hands use overlapping card backs plus count; bots decide only when their authoritative Turn begins.
+- After 3rd place finishes, the 4th-place remaining hand is revealed briefly, sorted by Rank, before the Round Result overlay.
+- Round Result is a dimmed-table overlay with staged Round-score application and standings reordering; Session Summary uses official final ordering and gold/silver/bronze placement treatment.
+- M4 testing now explicitly uses Vitest/RTL + focused Playwright browser tests + human-observable manual acceptance. Codex may write/run automated tests and write the manual checklist, but humans execute subjective/manual checks.
+- `requirements.md`, `orchestrator.md`, `testing-simulation.md`, `ui-ux.md`, `m4-playable-ui.md`, and `AGENTS.md` were synchronized where required. `domain-model.md`, `engine.md`, `ai.md`, and completed M1-M3 task plans require no semantic change from these UI decisions.

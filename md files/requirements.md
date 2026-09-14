@@ -3,7 +3,7 @@
 ## Requirements & Planning Document (v1.14)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 14, 2026
+**Last Modified:** September 15, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -688,8 +688,8 @@ Competitive Mode **skips average placement entirely**. Only the Round winner has
     - identify the player holding 3♣;
     - that player opens with a valid combination containing 3♣.
 5. After each Round, calculate the official Basic Round result and update cumulative Session totals.
-6. Enter the **Round Result** checkpoint and show official placements, Round points, and updated cumulative Session totals.
-7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**.
+6. When the 3rd-place player finishes, the Round is complete. Before the result overlay appears, briefly reveal the 4th-place player's remaining hand on the table, sorted by Rank. After that presentation step, enter the **Round Result** checkpoint. The result appears as a modal/overlay over the dimmed completed table, initially ordered by the standings before the Round score is applied; Round points then appear, totals update, and rows rearrange by the new cumulative total.
+7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**. After Round 5, the equivalent action proceeds to the Session Summary rather than starting another Round.
 8. Headless execution/simulation may pass through the same checkpoint and continue immediately without an artificial wait.
 9. After Round 5, show the Session Summary and apply Basic Mode Session tiebreakers if necessary.
 10. Phase 1 does not select AI difficulty, persist unfinished Sessions, or update persistent player statistics.
@@ -720,10 +720,10 @@ If statistics enter a future committed scope, combination counts may include Sin
 - [ ] Headless execution through the production Orchestrator/controllers.
 - [ ] Reusable deterministic batch simulator with invariants and failure reproduction.
 - [ ] Minimal React/Vite playable UI described by `ui-ux.md`.
-- [ ] Human card selection, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists.
-- [ ] Current trick, turn, opponent card counts, PASS/DONE state, public played-card history/Event Log, and current running Session scores visible through the UI.
-- [ ] Round Result checkpoint after every Round showing official placement, Round points, and updated cumulative Session score; explicit Next Round.
-- [ ] Session Summary after Round 5 with final result and tiebreak information when applicable.
+- [ ] Human card selection, bounded drag/reorder manual hand arrangement, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists. Selection and visual hand order are independent: rearranging or sorting must not silently deselect selected cards.
+- [ ] Current trick, turn, opponent face-down hands/card counts, PASS/DONE state, current running Session scores, a Discard Pile view containing every card already played this Round, and an Event Log containing chronological factual public events are accessible through the UI.
+- [ ] End-of-Round presentation briefly reveals the 4th-place remaining hand after 3rd place finishes, then shows a dimmed-table Round Result overlay with previous standings, animated Round-score application, updated totals, and reordering by cumulative score; explicit Next Round, or View Session Results after Round 5.
+- [ ] Session Summary after Round 5 ordered by official final Session result, with final scores/tiebreak information and distinct gold/silver/bronze treatment for 1st/2nd/3rd plus Play Again and Home actions.
 - [ ] Four-color suits by default: Hearts red, Diamonds orange, Clubs blue, Spades black; no Phase 1 toggle.
 - [ ] Landscape-first responsive usability on documented desktop/laptop/tablet/phone landscape viewports, including non-fullscreen windows; cards preserve ratio, text/controls remain usable, and portrait/undersized states show rotate/resize guidance.
 - [ ] No save/Resume in Phase 1. In-app leaving an unfinished Session warns that progress will be lost; browser close/refresh warning is used where supported.
@@ -746,7 +746,6 @@ The following are intentionally not required for Phase 1 even where detailed des
 - Settings and auto-pass.
 - Easy/Normal/Hard difficulty system and deeper Optimizer/search behavior.
 - AI personalities, Mystery Bots, and Surprise Me.
-- manual arbitrary hand rearrangement.
 - two-color/four-color suit preference toggle.
 - richer animations, sounds, branding, progression, achievements, and other polish.
 
@@ -1113,7 +1112,7 @@ This separation is intended to prevent duplicate models, hidden-information leak
 
 `ui-ux.md` is the authoritative UI/UX design document. Phase 1 implements only its Phase 1 sections.
 
-The Phase 1 UI is intentionally small but complete: Home, minimal Game Setup, Game Table, Round Result, and Session Summary. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
+The Phase 1 UI is intentionally small but complete: Home, Game Table, Round Result overlay, and Session Summary. **Start Game** immediately starts the fixed Basic Session in Phase 1; startup must still pass through a clean application/configuration boundary so a future setup sub-screen can be inserted when real options such as game mode or difficulty enter scope. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
 
 Deferred UI concepts documented there preserve prior decisions but do not imply a post-Phase-1 timeline.
 
@@ -1458,9 +1457,14 @@ Test Phase 1 behaviors including:
 - supported tablet/phone landscape;
 - non-fullscreen/windowed browser layouts;
 - unsupported portrait and undersized guidance;
-- card selection and rapid repeated input;
-- Play/Pass validation;
-- Round Result and explicit Next Round;
+- card selection, raised selected-card state, and rapid repeated input;
+- bounded mouse/touch manual hand rearrangement while preserving selection;
+- Sort by Rank/Suit while preserving selection;
+- Play/Pass validation and understandable invalid reasons;
+- Discard Pile and Event Log overlays, including pause/resume behavior;
+- readable bot-turn pacing without requiring humans to measure milliseconds;
+- 4th-place remaining-hand reveal;
+- Round Result scoring/reordering animation and explicit Next Round;
 - full five-Round Session transition to Session Summary;
 - leave/reload behavior clearly communicating that unfinished progress is not saved;
 - offline gameplay after required application assets are available.
@@ -1565,7 +1569,7 @@ These have meaningful prior design decisions that should be preserved, but they 
 - Persistence/Resume, persistent statistics, and Settings.
 - Auto-pass convenience.
 - Two-color/four-color suit preference; Phase 1 uses four-color suits by default with no toggle.
-- Manual hand rearrangement and additional UI polish.
+- Additional UI polish beyond the committed manual rearrangement, responsive layout, and result-transition requirements.
 - Progression/achievement concepts already discussed.
 
 ## 15.2 Possible future directions — not committed

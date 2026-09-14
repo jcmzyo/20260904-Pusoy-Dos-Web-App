@@ -3,7 +3,7 @@
 ## Game Orchestrator / Runner Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 14, 2026
+**Last Modified:** September 15, 2026
 **Parent document:** `requirements.md` v1.14  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
@@ -304,6 +304,8 @@ AI evaluation behavior belongs in `ai.md`, not here.
 
 The AI Controller must never obtain unrevealed opponent hands from authoritative engine state.
 
+For human UI execution, an AI controller request begins only when that bot owns the authoritative Turn. The runner must not ask later bots to precompute Moves while another player is acting. UI presentation delay after/beside a completed AI decision is non-authoritative presentation behavior.
+
 ## 9.3 NetworkController — Possible Future Direction
 
 A future Network Controller may:
@@ -350,17 +352,13 @@ The registry is runtime coordination data, not authoritative game state.
 
 # 11. Session Startup
 
-The UI Game Setup screen gathers product configuration such as:
-
-- selected `GameMode`;
-- each bot's controller mapping/type; Phase 1 has no difficulty selection;
-- any supported Session settings/configuration.
+Phase 1 has no visible Game Setup screen because there are no meaningful user-selectable options. **Start Game** immediately requests the fixed Basic Session. Startup must still pass through a small application/configuration boundary so a future setup sub-screen can supply `GameMode`, difficulty, or other approved options without replacing runner startup.
 
 The high-level flow is:
 
 ```text
-Game Setup UI
-    ↓ configuration
+Home / future Game Setup UI
+    ↓ Session configuration
 Application / Orchestrator setup
     ↓
 Create controller mapping
@@ -688,9 +686,11 @@ Engine updates cumulative Session scores
     ↓
 Runner enters ROUND_RESULT state
     ↓
-UI displays:
-  • official Round scores/results
-  • updated cumulative Session scores
+UI presentation sequence:
+  • briefly reveal the 4th-place remaining hand after Round completion, using an information-safe post-Round projection
+  • show Round Result as an overlay over the completed table
+  • present official Round points and authoritative cumulative Session totals
+  • animate/reorder standings as presentation only
     ↓
 User chooses "Next Round"
     ↓
@@ -707,6 +707,7 @@ During the checkpoint:
 
 - no Player Controller should receive a normal Turn request;
 - the completed Round's authoritative result remains available for presentation;
+- post-Round public information may expose the 4th-place remaining hand only after the Engine has completed the Round; this must not broaden active-play PlayerView access;
 - the UI may present scoring explanations defined in the requirements;
 - presentation animations/timing remain UI responsibilities;
 - only an explicit continuation action should advance to the next Round.
