@@ -21,9 +21,9 @@ export type RecordedSimulationResult = { readonly metrics?: SimulationMetrics } 
   | { readonly status: 'failed'; readonly failure: SimulationFailure });
 
 /** Diagnostic entry point: failures retain evidence; successful results omit the verbose trace by default. */
-export async function runRecordedSimulation(config: SimulationConfig, options: { readonly batchIndex?: number; readonly decisionTrace?: boolean; readonly trace?: boolean; readonly metrics?: boolean; readonly decompositionMetrics?: boolean } = {}): Promise<RecordedSimulationResult> {
+export async function runRecordedSimulation(config: SimulationConfig, options: { readonly batchIndex?: number; readonly decisionTrace?: boolean; readonly trace?: boolean; readonly metrics?: boolean; readonly decompositionMetrics?: boolean; readonly includePrivateHands?: boolean } = {}): Promise<RecordedSimulationResult> {
   const recordedConfig = JSON.parse(JSON.stringify(config)) as SimulationConfig;
-  const diagnostics = new SimulationDiagnostics(recordedConfig, options.batchIndex);
+  const diagnostics = new SimulationDiagnostics(recordedConfig, options.batchIndex, options.includePrivateHands);
   const metrics = options.metrics || options.decompositionMetrics ? new SimulationMetricsCollector(options.decompositionMetrics) : undefined;
   try {
     const result = await executeSimulation(recordedConfig, diagnostics, options.decisionTrace, metrics, options.decompositionMetrics);

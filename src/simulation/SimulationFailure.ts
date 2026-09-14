@@ -1,5 +1,5 @@
 import type { DecisionTrace } from '../ai/evaluation/evaluateCandidates';
-import type { Move, PlayerId } from '../domain';
+import type { Card, Move, PlayerId } from '../domain';
 import { EngineInvariantError } from '../engine';
 import type { EngineResult, GameEvent, MoveResult, PlayerView } from '../engine';
 import type { PlayerTurnRequest } from '../orchestrator';
@@ -15,6 +15,8 @@ export interface SimulationTraceEntry {
   readonly request?: PlayerTurnRequest;
   readonly move?: Move;
   readonly decision?: DecisionTrace;
+  /** Opt-in developer evidence, never a public event or controller input. */
+  readonly developerHands?: readonly { readonly playerId: PlayerId; readonly hand: readonly Card[] }[];
 }
 
 export interface SimulationException {
@@ -64,7 +66,7 @@ export class SimulationDiagnostics {
   private stage: 'engine' | 'controller' = 'engine';
   private readonly trace: SimulationTraceEntry[] = [];
 
-  constructor(private readonly config: SimulationConfig, private readonly batchIndex?: number) {}
+  constructor(private readonly config: SimulationConfig, private readonly batchIndex?: number, private readonly includePrivateHands = false) {}
 
   readonly observe = (entry: RunnerDiagnostic): void => {
     if (entry.kind === 'turnStart' || entry.kind === 'roundStart') {
@@ -88,7 +90,10 @@ export class SimulationDiagnostics {
     } else {
       this.after = entry.result.state;
       this.roundNumber = entry.result.state.roundNumber;
-      this.append({ kind: 'transaction', events: entry.result.events });
+      const round = entry.result.state.round;
+      const players = round?.kind === 'inProgress' ? round.context.players : round?.players;
+      this.append({ kind: 'transaction', events: entry.result.events,
+        ...(this.includePrivateHands && players ? { developerHands: players.map(({ playerId, hand }) => ({ playerId, hand })) } : {}) });
     }
   };
 

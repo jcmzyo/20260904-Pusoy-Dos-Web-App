@@ -40,7 +40,22 @@ subsystem). This is currently documented via comments in each package's
 boundaries plugin or dependency-cruiser). That enforcement is deferred to a
 later foundational task — see task breakdown notes.
 
+## Seeded gameplay trace
+
+Run a complete production Basic Session without editing tests:
+
+```bash
+npm run simulate:trace -- --seed 1713
+npm run simulate:trace -- --seed 1713 --output session-1713.log
+npm run simulate:trace -- --seed 1713 --include-private-hands --output private-1713.log
+```
+
+The seed is required and must be a decimal integer from 0 to 4294967295. The four Baseline seats are south, west, north, east. Logs show Round/action numbers, Play/Pass and cards/combination type, remaining counts, finish placements, Trick resets, Round scores, and Session results. Action numbers run across the Session, starting at 1 (0 before the first turn).
+
+`--output` saves the same console text as UTF-8 and refuses to overwrite existing files. Its parent directory must exist. `--include-private-hands` enables developer-only remaining hands and full failure diagnostics, which must not be shared as normal player output or fed into AI inputs. Default failure output keeps public event context and seed/location/type/code without printing private snapshots or arbitrary exception text. Use `--help` for usage. Exit codes: 0 success/help, 1 simulation/file failure, 2 invalid arguments.
+
+The command loads the existing production TypeScript source using the installed compiler and Node module hooks; it needs no additional dependencies or generated build files. The reusable formatter has no console/file or UI dependency. See `md files/m3-simulation-reliability-task-breakdown.md` v1.2 and `md files/testing-simulation.md` v1.8.
+
 ## Status
 
-This repository currently contains only the M1 (Basic Engine Core) project
-scaffold. No AI, orchestrator, or UI are implemented yet.
+The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, and M3 deterministic simulation and developer trace tooling. M4 playable UI remains separate work.

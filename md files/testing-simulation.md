@@ -1,9 +1,9 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.7)
+## Testing & Simulation Document (v1.8)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 14, 2026
+**Last Modified:** September 15, 2026
 **Parent document:** `requirements.md` v1.14  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
@@ -641,7 +641,7 @@ For each important state transition verify:
 - rejected Move does not emit a false successful-play event;
 - scoring/result events match authoritative score state.
 
-Exact formatting is not tested here; formatting belongs to future `events-logging.md`.
+Engine event tests do not own presentation formatting. M3-T11 separately tests its reusable gameplay formatter as a simulation consumer; broader event/history/UI infrastructure remains deferred.
 
 ---
 
@@ -1418,6 +1418,16 @@ A future large batch mode may optionally collect multiple independent failures, 
 
 ---
 
+## 24.1 Readable Seeded Trace Command (M3-T11)
+
+`npm run simulate:trace -- --seed 1713` runs one production five-Round Basic Session with four Baseline controllers. `--output <file>` additionally saves the same UTF-8 log, refusing to overwrite an existing file. `--include-private-hands` explicitly enables developer-only remaining hands after deals/actions and full structured failure evidence. These logs must not be used as AI input or normal player-facing output.
+
+Default formatting consumes public Engine events only and excludes requests, proposals, AI decisions, private snapshots, and arbitrary exception text that could contain hidden cards. It reports seed/configuration, Round and Session-wide action index, acting players, Play/Pass/cards/combination type, remaining counts, placements, Trick ends/resets, Round scores, and Session results. Action 0 precedes the first turn; Round-start transactions after Round 1 retain the last Session action index.
+
+Failures retain their original structured artifact in the runner. Public output includes the known seed, Round/action, failure type/code, current player, and preceding public event context. The explicit private flag includes the complete diagnostic artifact, including exception/cause and snapshots when available. Exit codes are 0 for success/help, 1 for simulation or file-write failure, and 2 for invalid arguments.
+
+Formatting is independent of console/file I/O and must not change Engine events, controller inputs, RNG use, authoritative outcomes, or deterministic replay. Optional private hand evidence is ignored by authoritative replay comparison. No UI integration is part of M3-T11.
+
 # 25. Infinite-Loop / Progress Protection
 
 The real rules should terminate naturally, but a software defect or faulty controller could stall execution.
@@ -1896,7 +1906,8 @@ With M1 and M2 complete, the next testing/simulation work is:
 8. Add compact reliability/performance metrics.
 9. Establish failed-seed regression-fixture workflow.
 10. Run M3 acceptance and full M1–M2 regressions.
-11. Proceed to M4 only after M3 acceptance is satisfied.
+11. Add the reusable seeded trace command and explicit developer logging (M3-T11).
+12. Proceed to M4 only after M3 acceptance and M3-T11 verification are satisfied.
 ```
 
 Tests remain written alongside each task rather than postponed until final acceptance.
