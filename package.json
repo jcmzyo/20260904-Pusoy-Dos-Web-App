@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:acceptance:m3": "vitest run --config tests/acceptance/m3.config.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
