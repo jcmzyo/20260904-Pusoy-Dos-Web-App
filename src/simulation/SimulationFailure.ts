@@ -101,6 +101,10 @@ export class SimulationDiagnostics {
     this.trace.push({ ...entry, index: this.trace.length, roundNumber: this.roundNumber, actionIndex: this.actionIndex });
   }
 
+  getTrace(): readonly SimulationTraceEntry[] {
+    return JSON.parse(JSON.stringify(this.trace)) as SimulationTraceEntry[];
+  }
+
   failure(error: unknown, rejection?: Extract<MoveResult, { accepted: false }>['error']): SimulationFailure {
     const exception = exceptionDetails(error);
     const round = (this.after ?? this.before)?.round;
