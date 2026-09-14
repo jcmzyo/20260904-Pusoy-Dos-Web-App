@@ -23,7 +23,7 @@ describe('configurable seeded batch', () => {
     const first = await runSimulationBatch(config);
     expect(first).toMatchObject({ status: 'completed', attempted: 2, completed: 2, failed: 0, remaining: 0, config: { failFast: true } });
     expect(run.mock.calls).toEqual(config.seeds.map((engineSeed, batchIndex) => [
-      { ...config.session, engineSeed, runId: `smoke:${batchIndex}` }, { batchIndex },
+      { ...config.session, engineSeed, runId: `smoke:${batchIndex}` }, { batchIndex, metrics: true },
     ]));
     expect(create).toHaveBeenCalledTimes(2);
     expect(first.runs.map((entry) => entry.batchIndex)).toEqual([0, 1]);
@@ -33,7 +33,11 @@ describe('configurable seeded batch', () => {
       expect(outcome.result.state.completedRounds).toHaveLength(5);
       expect(outcome.trace).toBeUndefined();
     }
-    expect(await runSimulationBatch(JSON.parse(before))).toEqual(first);
+    const repeated = await runSimulationBatch(JSON.parse(before));
+    const { metrics: firstMetrics, runs: firstRuns, ...firstSummary } = first;
+    const { metrics: repeatedMetrics, runs: repeatedRuns, ...repeatedSummary } = repeated;
+    expect(repeatedSummary).toEqual(firstSummary);
+    expect(repeated.runs.map(({ outcome: { metrics, ...outcome } }) => outcome)).toEqual(first.runs.map(({ outcome: { metrics, ...outcome } }) => outcome));
     expect(JSON.stringify(config)).toBe(before);
   });
 
@@ -54,6 +58,9 @@ describe('configurable seeded batch', () => {
     const continuing = failFast === false;
     expect(result).toMatchObject({ status: 'failed', attempted: continuing ? 3 : 2,
       completed: continuing ? 2 : 1, failed: 1, remaining: continuing ? 0 : 1 });
+    expect(result.metrics.roundsCompleted).toBe(continuing ? 10 : 5);
+    expect(result.metrics.invariantCodes).toEqual({ TURN_OWNER: 1 });
+    expect(result.metrics.failures).toEqual([{ batchIndex: 1, runId: 'smoke:1', engineSeed: 0, failureType: 'invariant' }]);
     expect(run).toHaveBeenCalledTimes(result.attempted);
     expect(result.runs[1]).toMatchObject({ batchIndex: 1, outcome: { status: 'failed', failure: {
       failureType: 'invariant', invariantCode: 'TURN_OWNER', batchIndex: 1,
@@ -101,7 +108,7 @@ describe('configurable seeded batch', () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it.each([{ batchId: '' }, { batchId: '  ' }, { failFast: 'false' }])('rejects ambiguous batch settings: %j', async (override) => {
+  it.each([{ batchId: '' }, { batchId: '  ' }, { failFast: 'false' }, { decompositionMetrics: 'false' }])('rejects ambiguous batch settings: %j', async (override) => {
     const run = vi.spyOn(simulation, 'runRecordedSimulation');
     await expect(runSimulationBatch({ ...config, ...override } as SimulationBatchConfig)).rejects.toThrow();
     expect(run).not.toHaveBeenCalled();
