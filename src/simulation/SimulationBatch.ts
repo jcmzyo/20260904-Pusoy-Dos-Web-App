@@ -1,6 +1,9 @@
 import type { SimulationConfig } from './SimulationConfig';
 import { runRecordedSimulation } from './SimulationRunner';
 import type { RecordedSimulationResult } from './SimulationRunner';
+import { simulationTime } from './SimulationMetrics';
+import { aggregateSimulationMetrics } from './SimulationReport';
+import type { SimulationBatchMetrics } from './SimulationReport';
 
 export interface SimulationBatchConfig {
   readonly batchId: string;
@@ -9,6 +12,7 @@ export interface SimulationBatchConfig {
   readonly session: Omit<SimulationConfig, 'runId' | 'engineSeed'>;
   /** Defaults to true for every failure, including invariant corruption. */
   readonly failFast?: boolean;
+  readonly decompositionMetrics?: boolean;
 }
 
 export interface SimulationBatchResult {
@@ -19,6 +23,7 @@ export interface SimulationBatchResult {
   readonly failed: number;
   /** Unattempted suffix when fail-fast stops execution; never counted as successful. */
   readonly remaining: number;
+  readonly metrics: SimulationBatchMetrics;
   /** batchIndex is zero-based and is also retained in failure artifacts. */
   readonly runs: readonly { readonly batchIndex: number; readonly outcome: RecordedSimulationResult }[];
 }
@@ -30,6 +35,9 @@ export async function runSimulationBatch(config: SimulationBatchConfig): Promise
   }
   if (config.failFast !== undefined && typeof config.failFast !== 'boolean') {
     throw new Error('Simulation failFast must be a boolean.');
+  }
+  if (config.decompositionMetrics !== undefined && typeof config.decompositionMetrics !== 'boolean') {
+    throw new Error('Simulation decompositionMetrics must be a boolean.');
   }
   if (!Array.isArray(config.seeds) || config.seeds.length === 0) {
     throw new Error('Simulation batch requires a nonempty seed list.');
@@ -43,14 +51,16 @@ export async function runSimulationBatch(config: SimulationBatchConfig): Promise
     batchId: config.batchId, seeds: [...config.seeds],
     session: JSON.parse(JSON.stringify(config.session)) as SimulationBatchConfig['session'],
     failFast: config.failFast ?? true,
+    ...(config.decompositionMetrics === undefined ? {} : { decompositionMetrics: config.decompositionMetrics }),
   };
+  const started = simulationTime();
   const runs: { batchIndex: number; outcome: RecordedSimulationResult }[] = [];
   let completed = 0;
   let failed = 0;
   for (const [batchIndex, engineSeed] of recordedConfig.seeds.entries()) {
     const outcome = await runRecordedSimulation({ ...recordedConfig.session,
       runId: `${recordedConfig.batchId}:${batchIndex}`, engineSeed,
-    }, { batchIndex });
+    }, { batchIndex, metrics: true, ...(recordedConfig.decompositionMetrics === undefined ? {} : { decompositionMetrics: recordedConfig.decompositionMetrics }) });
     runs.push({ batchIndex, outcome });
     if (outcome.status === 'completed') completed++;
     else {
@@ -59,5 +69,6 @@ export async function runSimulationBatch(config: SimulationBatchConfig): Promise
     }
   }
   return { status: failed === 0 ? 'completed' : 'failed', config: recordedConfig,
-    attempted: runs.length, completed, failed, remaining: recordedConfig.seeds.length - runs.length, runs };
+    attempted: runs.length, completed, failed, remaining: recordedConfig.seeds.length - runs.length, runs,
+    metrics: aggregateSimulationMetrics(runs, simulationTime() - started) };
 }
