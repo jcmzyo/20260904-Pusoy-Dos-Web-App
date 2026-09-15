@@ -14,10 +14,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:browser": "playwright test --config tests/browser/playwright.config.ts",
     "test:acceptance:m3": "vitest run --config tests/acceptance/m3.config.ts",
     "simulate:trace": "node scripts/simulation-trace.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
