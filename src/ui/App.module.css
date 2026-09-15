@@ -74,19 +74,111 @@
 }
 
 .table {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(220px, 2fr) minmax(96px, 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    ".    north .   "
+    "west center east"
+    ".    south .   ";
+  align-items: center;
+  justify-items: center;
+  gap: clamp(12px, 2vw, 32px);
   margin-top: 24px;
   padding: clamp(24px, 5vw, 64px);
   border: 2px solid #66866b;
   border-radius: 48px;
   background: #164b39;
-  text-align: center;
+  min-height: 420px;
 }
 
-.players {
+.seat {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.seatNorth {
+  grid-area: north;
+}
+
+.seatWest {
+  grid-area: west;
+}
+
+.seatEast {
+  grid-area: east;
+}
+
+.seatSouth {
+  grid-area: south;
+}
+
+.botHand {
+  display: flex;
+}
+
+.botHand > *:not(:first-child) {
+  margin-left: -20px;
+}
+
+.center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+}
+
+.discardButton {
+  padding: 8px 16px;
+  border: 1px solid #ead8a7;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.discardButton:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+.currentHand {
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 24px;
-  padding: 0;
-  list-style: none;
+  gap: 8px;
+}
+
+.freeLead,
+.opening {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ead8a7;
+}
+
+.handInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.handMeta {
+  margin: 0;
+  font-size: 14px;
+  color: #c8d8cd;
+}
+
+.handCards {
+  display: flex;
+  gap: 6px;
 }

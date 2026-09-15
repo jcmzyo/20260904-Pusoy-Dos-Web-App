@@ -47,8 +47,10 @@ describe('Home and immediate Session startup', () => {
     expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
     expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
     expect(start).toHaveBeenCalledExactlyOnceWith({ mode: 'basic', botNames: ['West', 'North', 'East'] });
-    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['You', 'West', 'North', 'East']);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    for (const name of ['You', 'West', 'North', 'East']) {
+      expect(screen.getByRole('region', { name: `${name} panel` })).toBeTruthy();
+    }
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Discard Pile']);
   });
 
   it('guards pending asynchronous startup and samples names only once', async () => {

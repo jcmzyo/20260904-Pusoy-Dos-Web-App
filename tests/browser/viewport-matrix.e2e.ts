@@ -17,6 +17,25 @@ for (const viewport of VIEWPORT_MATRIX) {
   });
 }
 
+// Pixel-level overlap/clipping verification across this matrix is M4-T14 (Full Responsive
+// Hardening). This check only confirms the M4-T06 table hierarchy's core elements (all four
+// seats and the Discard Pile button) are actually visible, not just present, at every viewport
+// this milestone currently supports.
+for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
+  test(`Game Table core elements are visible at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start Game', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'You panel' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /^(West|North|East) panel$/ })).toHaveCount(3);
+    for (const name of ['West', 'North', 'East']) {
+      await expect(page.getByRole('region', { name: `${name} panel` })).toBeVisible();
+    }
+    await expect(page.getByRole('button', { name: 'Discard Pile', exact: true })).toBeVisible();
+  });
+}
+
 // Rotate/resize guidance does not exist yet; M4-T11 (Leave Confirmation and
 // Unsupported-Layout Pause) implements it. These assertions are registered now,
 // as fixme, so the M4-T04 responsive contract records the required behavior
