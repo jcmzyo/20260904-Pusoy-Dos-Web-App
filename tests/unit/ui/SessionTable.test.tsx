@@ -32,7 +32,7 @@ function fixture(choose = singleFirst) {
 afterEach(cleanup);
 
 describe('SessionTable seats and center (M4-T06)', () => {
-  it('renders every fixed seat with a readable panel, hides bot hands behind overlapping face-down counts, and offers Discard Pile', () => {
+  it('renders every fixed seat with a readable panel, hides bot hands behind overlapping face-down counts, and offers Discard Pile, Event Log, and Leave Game', () => {
     const presentation = fixture();
     render(<SessionTable presentation={presentation} />);
     const snapshot = presentation.getSnapshot();
@@ -50,6 +50,10 @@ describe('SessionTable seats and center (M4-T06)', () => {
       expect(within(seatContainer).queryAllByRole('img', { name: /of (Clubs|Spades|Hearts|Diamonds)/, hidden: true })).toHaveLength(0);
     }
     expect(screen.getByRole('button', { name: 'Discard Pile' })).toBeTruthy();
+    // Inert placeholders (round-4 follow-up), the same way Discard Pile itself has been since M4-T06:
+    // their actual overlay/confirmation behavior remains M4-T10/T11 scope.
+    expect(screen.getByRole('button', { name: 'Event Log' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Leave Game' })).toBeTruthy();
   });
 
   it('highlights the current Turn and shows the Opening state before any Play', () => {
@@ -76,7 +80,10 @@ describe('SessionTable seats and center (M4-T06)', () => {
     const player = snapshot.seats.find((seat) => seat.playerId === center.playerId)!;
     expect(screen.getByText(`${player.name} played Single`)).toBeTruthy();
     const [card] = center.combination.cards;
-    expect(screen.getByRole('img', { name: `${card!.rank} of ${card!.suit[0]!.toUpperCase()}${card!.suit.slice(1)}` })).toBeTruthy();
+    // Scoped to the center region specifically: the same card also renders at the player's own seat
+    // (M4-T08's per-seat Play trail, ui-ux.md §5.4), so an unscoped query would match twice.
+    const centerRegion = screen.getByRole('region', { name: 'Current hand to beat' });
+    expect(within(centerRegion).getByRole('img', { name: `${card!.rank} of ${card!.suit[0]!.toUpperCase()}${card!.suit.slice(1)}` })).toBeTruthy();
   });
 
   it('preserves the current hand through a Pass, then shows FREE LEAD once every other active player passes', async () => {
@@ -99,5 +106,28 @@ describe('SessionTable seats and center (M4-T06)', () => {
     expect(presentation.getSnapshot().center).toEqual({ kind: 'freeLead' });
     expect(screen.getByText('FREE LEAD')).toBeTruthy();
     expect(screen.queryByText(/played Single/)).toBeNull();
+  });
+
+  it('shows a Play at the player\'s own seat too, grays it once beaten, and clears it on free lead (M4-T08 follow-up; ui-ux.md §5.4)', async () => {
+    // Prefers any legal Play over Pass, so a beat is exercised whenever the dealt hands allow one.
+    const presentation = fixture((request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!);
+    render(<SessionTable presentation={presentation} />);
+    const opener = presentation.getSnapshot().currentPlayerId!;
+    await act(async () => { await presentation.runTurn(); });
+    const openerName = presentation.getSnapshot().seats.find((seat) => seat.playerId === opener)!.name;
+    // The trail renders inside the panel's own container (PlayerPanel's `playTrail` slot), not beside
+    // it, per the person's own follow-up request.
+    const openerPanel = screen.getByRole('region', { name: `${openerName} panel` });
+    expect(within(openerPanel).getByRole('group', { name: 'Current Play' })).toBeTruthy();
+
+    let turns = 0;
+    while (presentation.getSnapshot().center.kind !== 'freeLead' && turns++ < 20) {
+      await act(async () => { await presentation.runTurn(); });
+    }
+    expect(presentation.getSnapshot().center.kind).toBe('freeLead');
+    // Every per-seat Play trail is cleared once the cycle resets to a free lead - none of the four
+    // seats retains either a "Current Play" or "Previous Play, now beaten" landmark.
+    expect(screen.queryAllByRole('group', { name: 'Current Play' })).toHaveLength(0);
+    expect(screen.queryAllByRole('group', { name: 'Previous Play, now beaten' })).toHaveLength(0);
   });
 });

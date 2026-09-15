@@ -10,6 +10,16 @@ export interface HumanHandProps {
    *  this component owns display order, selection, and manual arrangement as presentation-only state
    *  (ui-ux.md §2, §6) — it never decides legality. */
   readonly cards: readonly Card[];
+  /** The most cards the active Trick could ever accept: the current hand-to-beat's own card count while
+   *  responding, or up to 5 for a free Play (opening/free lead) (M4-T08). A selection convenience only —
+   *  it narrows what can be *selected*, not a legality replica; the Engine still authoritatively decides
+   *  whether an at-or-under-cap selection actually beats/opens legally. Selecting a card beyond the cap
+   *  is a no-op, and an existing over-cap selection (the cap can shrink between the player's own Turns as
+   *  other players act) is trimmed down to the cap, keeping this hand's own display order. */
+  readonly maxSelectable: number;
+  /** Reports the current selection as authoritative Card values, in this hand's own display order,
+   *  whenever it changes (M4-T08's Play/Pass control inspects this; T07 itself never decides legality). */
+  readonly onSelectionChange?: (cards: readonly Card[]) => void;
 }
 
 /** Pointer movement (px) beyond which a gesture counts as a drag rather than a tap (ui-ux.md §6:
@@ -38,7 +48,7 @@ function clamp(value: number, min: number, max: number): number {
  * container-level click-away handler — so clicking empty table space never
  * clears selection (ui-ux.md §6).
  */
-export function HumanHand({ cards }: HumanHandProps) {
+export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHandProps) {
   const cardsByKey = useMemo(() => new Map(cards.map((card) => [cardKey(card), card])), [cards]);
   const [order, setOrder] = useState<readonly string[]>(() => cards.map(cardKey));
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
@@ -69,10 +79,33 @@ export function HumanHand({ cards }: HumanHandProps) {
     }
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        // Selecting beyond the active Trick's cap is a no-op rather than an error/replacement — the
+        // player can still deselect something else first (M4-T08).
+        if (next.size >= maxSelectable) return prev;
+        next.add(key);
+      }
       return next;
     });
   }
+
+  // The cap can shrink between the human's own Turns as other players act (e.g. a response Trick
+  // narrows from a free Play's up-to-5 cap to the current hand's exact size); trim any now-over-cap
+  // selection down to the cap, keeping this hand's own display order (M4-T08).
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size <= maxSelectable) return prev;
+      return new Set(order.filter((key) => prev.has(key)).slice(0, maxSelectable));
+    });
+  }, [maxSelectable, order]);
+
+  // Reports the current selection, as authoritative Card values in display order, to the caller (T08's
+  // Play/Pass control) whenever selection or the authoritative card set itself changes.
+  useEffect(() => {
+    onSelectionChange?.(order.filter((key) => selected.has(key)).map((key) => cardsByKey.get(key)!));
+  }, [order, selected, cardsByKey, onSelectionChange]);
 
   function computeDropIndex(draggedKey: string, clientX: number): number {
     const others = order.filter((key) => key !== draggedKey);
@@ -158,7 +191,10 @@ export function HumanHand({ cards }: HumanHandProps) {
               onClick={() => toggleSelected(key)}
             >
               <div className={`${styles.lift} ${isSelected ? styles.selected : ''}`}>
-                <PlayingCard card={card} />
+                {/* The player's own held cards draw the center suit pip too (round-4 follow-up: without
+                 *  it, larger/less-crowded held cards read as visually "barren"), unlike the smaller,
+                 *  more-crowded center hand-to-beat which stays corner-only (Card.tsx). */}
+                <PlayingCard card={card} showCenterPip />
               </div>
             </div>
           );

@@ -1,14 +1,24 @@
+/* This is the bottom bar's own "middle" container (App.module.css's `.bottomBar`, round-4 follow-up):
+ * cards on top, Sort Rank/Sort Suit stacked below, both centered. Its own WIDTH is reserved for the
+ * maximum possible 13-card hand (a hard Pusoy Dos hand-size ceiling) and held constant as cards are
+ * played away during a Round (the person's own round-5 follow-up request: "do not adjust the width of
+ * the middle container when held cards decrease") - the same first-card-full-width-plus-70%-exposed-
+ * per-card overlap math as `.cardSlot` below, at that same responsive card width. A hand with fewer
+ * cards simply centers within this reserved width rather than narrowing it. Height still sizes to
+ * content (cards plus the Sort row) rather than a fixed value. */
 .handArea {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-top: 24px;
+  justify-content: center;
+  gap: 8px;
+  width: calc(clamp(40px, 8vw, 88px) * 9.4);
 }
 
 .handRow {
   display: flex;
   align-items: flex-end;
+  justify-content: center;
   padding: 28px 16px 6px;
   min-height: 120px;
 }
@@ -48,18 +58,26 @@
   transform: translateY(-18px);
 }
 
+/* Sort Rank/Sort Suit side by side, centered, below the hand within the same middle container
+ * (`.handArea` above) - the person's own round-4 follow-up request. */
 .sortControls {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
+/* Deliberately smaller/quieter than Play/Pass (App.module.css's `.bottomBar`/PlayPassControls) so the
+ * large action controls read as primary and Sort as a secondary convenience, per the person's own T08
+ * follow-up request. */
 .sortButton {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: 1px solid #ead8a7;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(234, 216, 167, 0.15);
   color: #f7f4e9;
   font: inherit;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }

@@ -57,9 +57,31 @@
   font-size: 0.85em;
 }
 
+/* Large center suit symbol, shown only where `PlayingCard`'s `showCenterPip` opts in (the human's own
+ * held hand, round-4 follow-up) - centered automatically since it's the only non-absolutely-positioned
+ * child of `.card`'s own flex centering; the corners remain absolutely positioned above/below it. */
 .pip {
-  font-size: clamp(18px, 4vw, 34px);
-  opacity: 0.9;
+  font-size: clamp(18px, 4.5vw, 36px);
+  line-height: 1;
+}
+
+/* Compact corner-index badge (`CardIndex`): rank over suit symbol, no card face/border - for contexts
+ * where a shrunk-down full `PlayingCard` would be illegible (the per-seat Play trail, ui-ux.md §5.4). */
+.index {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #faf7ee;
+  min-width: 14px;
+}
+
+.indexSuit {
+  font-size: 0.85em;
 }
 
 .back {

@@ -123,8 +123,17 @@
   grid-area: south;
 }
 
+/* `min-width`/`min-height` below each reserve this seat's own worst-case (13-card, the hard Pusoy Dos
+ * hand-size ceiling) footprint, so it stays constant instead of shrinking as that hand is played down
+ * during a Round - previously this shrank the whole seat, which in turn shrank the table's own border
+ * (the person's own follow-up report: "the main table border also changes size...kinda trippy"). Since
+ * 13 cards is already the hand size every seat starts a Round with, this reserves no more room than
+ * what's already rendered (and already verified within the table border, viewport-matrix.e2e.ts) at the
+ * very start of every Round - it simply stops that reservation from shrinking later. */
 .botHand {
   display: flex;
+  min-width: 280px;
+  justify-content: center;
 }
 
 .botHand > *:not(:first-child) {
@@ -134,8 +143,12 @@
 .seatWest .botHand,
 .seatEast .botHand {
   flex-direction: column;
+  min-width: auto;
+  min-height: 280px;
 }
 
+/* West/East cards are always rendered rotated (App.tsx's `BotHand` `rotated` prop; the `.rotatedCard`
+ * wrapper's own overlap margin is set below), so this only ever matters if that ever changes. */
 .seatWest .botHand > *:not(:first-child),
 .seatEast .botHand > *:not(:first-child) {
   margin-left: 0;
@@ -166,8 +179,14 @@
   background: rgba(234, 216, 167, 0.28);
 }
 
+/* Fixed (not min-) height, generously sized for its tallest real state (a full hand-to-beat's meta
+ * line plus its card row) and held constant across every other state (OPENING/FREE LEAD/empty single
+ * line) - part of the same table-dimension stability fix as `.botHand` above (the person's own
+ * follow-up report). `overflow: hidden` is a safety net only; it is not expected to ever actually clip
+ * real content at this size. */
 .currentHand {
-  min-height: 96px;
+  height: 112px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -199,4 +218,94 @@
 .handCards {
   display: flex;
   gap: 6px;
+}
+
+/* Three horizontal containers - left, middle (HumanHand's own root), right (PlayPassControls' own
+ * root) - the person's own round-4 follow-up request ("Three horizontal containers, left, middle,
+ * right, all aligning"). `align-items: stretch` (the flex default) makes all three share the row's
+ * own height, which in practice is set by whichever container's own content is tallest; each
+ * container centers its own content vertically (`justify-content: center`) so they read as one
+ * coherent, evenly-aligned band regardless of which one happens to be tallest. */
+.bottomBar {
+  display: flex;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 32px);
+  margin-top: 24px;
+}
+
+/* Event Log/Leave Game (ui-ux.md §4, §5.2), stacked vertically and centered - the person's own round-4
+ * follow-up request. Rendered as inert placeholder buttons, the same way the center table's own
+ * Discard Pile button (App.tsx's `CenterTable`) has been since M4-T06: their actual overlay/confirmation
+ * behavior remains M4-T10 (Event Log) and M4-T11 (Leave Game) scope respectively - only the button
+ * itself and its position are built here. */
+.bottomLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 96px;
+}
+
+/* Fixed (not content-based) width so Event Log and Leave Game are the same length regardless of their
+ * own label length (the person's own round-5 follow-up request) - comfortably fits "Leave Game", the
+ * longer of the two labels. */
+.sideButton {
+  width: 112px;
+  padding: 8px 16px;
+  border: 1px solid #ead8a7;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sideButton:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+.sideButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
+/* West/East hold their cards rotated 90° (App.tsx's `BotHand`); this wrapper reserves the rotated
+ * visual footprint a same-size 40x56 card produces once rotated (~56 wide x 40 tall), so West/East
+ * cards render at the same physical size as North/South's (the person's own follow-up report). */
+.rotatedCard {
+  width: 56px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rotatedCard > * {
+  transform: rotate(90deg);
+}
+
+.seatWest .botHand > .rotatedCard:not(:first-child),
+.seatEast .botHand > .rotatedCard:not(:first-child) {
+  margin-top: -20px;
+}
+
+/* Per-seat Play trail (ui-ux.md §5.4): this seat's own last Play in the active response cycle, dimmed
+ * once a later Play beats it, cleared once the cycle itself resets (SessionPresentation's `lastPlay`).
+ * Renders inside PlayerPanel's own container (its `playTrail` slot); wraps and stays bounded to that
+ * panel's own width so a 5-card combination never grows out into the center table's own space. */
+.lastPlay {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.lastPlayBeaten {
+  opacity: 0.4;
+  filter: grayscale(55%);
 }

@@ -50,6 +50,21 @@ describe('PlayingCard and CardBack visual primitives', () => {
     decorative.forEach((node) => expect(node.getAttribute('aria-label')).toBeNull());
   });
 
+  it('draws an additional center suit pip only when showCenterPip is set (round-4 follow-up: the player\'s own held cards look "barren" without it)', () => {
+    render(
+      <>
+        <PlayingCard card={{ rank: '5', suit: 'clubs' }} />
+        <PlayingCard card={{ rank: '5', suit: 'clubs' }} showCenterPip />
+      </>,
+    );
+    const [plain, withPip] = screen.getAllByRole('img', { name: '5 of Clubs' });
+    const suitLeafCount = (card: HTMLElement) =>
+      Array.from(card.querySelectorAll('span')).filter((span) => span.textContent === '♣' && span.children.length === 0).length;
+    // Corner top + corner bottom = 2 suit glyphs by default; showCenterPip adds a third (the center pip).
+    expect(suitLeafCount(plain!)).toBe(2);
+    expect(suitLeafCount(withPip!)).toBe(3);
+  });
+
   it('applies a width override while the aspect ratio remains fixed in CSS', () => {
     render(<PlayingCard card={{ rank: '7', suit: 'clubs' }} widthPx={40} />);
     const card = screen.getByRole('img', { name: '7 of Clubs' });
