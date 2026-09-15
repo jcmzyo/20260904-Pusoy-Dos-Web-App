@@ -1,8 +1,12 @@
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { SessionPresentation } from '../application/SessionPresentation';
+import type { PresentedSeat, SessionPresentationSnapshot } from '../application/SessionPresentation';
 import { createSessionConfiguration, startSession } from '../application/startSession';
 import type { SessionConfiguration, StartedSession } from '../application/startSession';
 import type { BotNameProvider } from '../application/botNames';
+import type { Combination } from '../domain';
+import { CardBack, PlayingCard } from './primitives/Card';
+import { PlayerPanel } from './primitives/PlayerPanel';
 import styles from './App.module.css';
 
 interface AppProps {
@@ -48,6 +52,67 @@ export function App({ start = startSession, botNames }: AppProps) {
   );
 }
 
+/** Human-readable labels for the canonical combination categories (requirements.md §2.3, domain-model.md §8). */
+const COMBINATION_LABELS: Record<Combination['type'], string> = {
+  single: 'Single', pair: 'Pair', triple: 'Triple', straight: 'Straight',
+  flush: 'Flush', fullHouse: 'Full House', fourOfAKind: 'Four of a Kind', straightFlush: 'Straight Flush',
+};
+
+/** Typed `string | undefined` for the same ambient `*.module.css` index-signature reason documented in
+ *  the primitives (Card.tsx, PlayerPanel.tsx): every seat/status class below is always defined in App.module.css. */
+const SEAT_POSITION_CLASS: Record<PresentedSeat['seat'], string | undefined> = {
+  north: styles.seatNorth, west: styles.seatWest, east: styles.seatEast, south: styles.seatSouth,
+};
+
+/** Bot hands render as overlapping face-down cards plus the PlayerPanel's numeric count; per ui-ux.md §4
+ *  the UI never reveals bot card faces during active play, so only `CardBack` is used here. */
+function BotHand({ cardCount }: { readonly cardCount: number }) {
+  return (
+    <div className={styles.botHand} aria-hidden="true">
+      {Array.from({ length: cardCount }, (_, index) => <CardBack key={index} widthPx={40} />)}
+    </div>
+  );
+}
+
+function Seat({ seat }: { readonly seat: PresentedSeat }) {
+  return (
+    <div className={`${styles.seat} ${SEAT_POSITION_CLASS[seat.seat]}`}>
+      {seat.seat !== 'south' && <BotHand cardCount={seat.cardCount} />}
+      <PlayerPanel
+        name={seat.name} cardCount={seat.cardCount} score={seat.totalScore}
+        isCurrentTurn={seat.isCurrentTurn} passed={seat.passed} done={seat.done} placement={seat.placement}
+      />
+    </div>
+  );
+}
+
+/** Center table per ui-ux.md §5.1: a Discard Pile button (the overlay itself is M4-T10) plus the current
+ *  hand to beat (cards/type/player), an explicit FREE LEAD, or the Opening Move's distinct 3♣ requirement.
+ *  The current hand remains visible through Passes until authoritative beat/reset (SessionPresentation, T03). */
+function CenterTable({ center, seats }: { readonly center: SessionPresentationSnapshot['center']; readonly seats: readonly PresentedSeat[] }) {
+  return (
+    <div className={styles.center}>
+      <button type="button" className={styles.discardButton}>Discard Pile</button>
+      <div className={styles.currentHand}>
+        {center.kind === 'freeLead' && <p className={styles.freeLead}>FREE LEAD</p>}
+        {center.kind === 'opening' && <p className={styles.opening}>OPENING · 3♣ required</p>}
+        {center.kind === 'hand' && (() => {
+          const player = seats.find((seat) => seat.playerId === center.playerId);
+          if (!player) throw new Error(`Current hand presentation references an unknown seat ${center.playerId}.`);
+          return (
+            <div className={styles.handInfo}>
+              <p className={styles.handMeta}>{player.name} played {COMBINATION_LABELS[center.combination.type]}</p>
+              <div className={styles.handCards}>
+                {center.combination.cards.map((card) => <PlayingCard key={`${card.rank}-${card.suit}`} card={card} widthPx={48} />)}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 export function SessionTable({ presentation }: { readonly presentation: SessionPresentation }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   return (
@@ -57,11 +122,8 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
         <p>Basic · Round {snapshot.roundNumber} of 5</p>
       </header>
       <section className={styles.table} aria-label="Game Table">
-        <h2>Session started</h2>
-        <p>Four players. Five rounds.</p>
-        <ul className={styles.players}>
-          {snapshot.seats.map((seat) => <li key={seat.playerId}>{seat.name}</li>)}
-        </ul>
+        {snapshot.seats.map((seat) => <Seat key={seat.playerId} seat={seat} />)}
+        <CenterTable center={snapshot.center} seats={snapshot.seats} />
       </section>
     </main>
   );
