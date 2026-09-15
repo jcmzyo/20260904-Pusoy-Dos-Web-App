@@ -1,5 +1,5 @@
 import type { Move, PlayerId } from '../domain';
-import { assertEngineInvariants, assertMoveInvariants, getPublicView, startRound, submitMove } from '../engine';
+import { assertEngineInvariants, assertMoveInvariants, getCompletedRoundReveal, getPlayerView, getPublicView, startRound, submitMove } from '../engine';
 import type { EngineResult, MoveResult, PublicGameView, RNG, RulesetConfig } from '../engine';
 import type { PlayerController } from './controllers/PlayerController';
 import { createPlayerTurnRequest } from './requests/createPlayerTurnRequest';
@@ -62,6 +62,14 @@ export class GameRunner {
     if (view.status === 'completed') return 'SESSION_COMPLETE';
     if (view.round?.status === 'completed') return 'ROUND_RESULT';
     return view.round === null ? 'READY' : 'ROUND_ACTIVE';
+  }
+
+  getPlayerView(playerId: PlayerId) {
+    return getPlayerView(this.state, playerId);
+  }
+
+  getCompletedRoundReveal() {
+    return getCompletedRoundReveal(this.state);
   }
 
   /** The final Round checkpoint remains available alongside the official Session result. */

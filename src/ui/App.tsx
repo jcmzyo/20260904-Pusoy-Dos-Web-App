@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import { SessionPresentation } from '../application/SessionPresentation';
 import { createSessionConfiguration, startSession } from '../application/startSession';
 import type { SessionConfiguration, StartedSession } from '../application/startSession';
 import type { BotNameProvider } from '../application/botNames';
@@ -11,7 +12,7 @@ interface AppProps {
 
 export function App({ start = startSession, botNames }: AppProps) {
   const started = useRef(false);
-  const [session, setSession] = useState<StartedSession | null>(null);
+  const [session, setSession] = useState<SessionPresentation | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export function App({ start = startSession, botNames }: AppProps) {
     setStarting(true);
     setError(null);
     try {
-      setSession(await start(createSessionConfiguration(botNames)));
+      setSession(new SessionPresentation(await start(createSessionConfiguration(botNames))));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       started.current = false;
@@ -31,21 +32,7 @@ export function App({ start = startSession, botNames }: AppProps) {
   }
 
   if (session) {
-    return (
-      <main className={styles.shell}>
-        <header className={styles.header}>
-          <h1>Pusoy Dos</h1>
-          <p>Basic · Round {session.initialView.roundNumber} of 5</p>
-        </header>
-        <section className={styles.table} aria-label="Game Table">
-          <h2>Session started</h2>
-          <p>Four players. Five rounds.</p>
-          <ul className={styles.players}>
-            {session.initialView.playerIds.map((id) => <li key={id}>{session.names[id]}</li>)}
-          </ul>
-        </section>
-      </main>
-    );
+    return <SessionTable presentation={session} />;
   }
 
   return (
@@ -57,6 +44,25 @@ export function App({ start = startSession, botNames }: AppProps) {
         {starting ? 'Starting…' : 'Start Game'}
       </button>
       {error !== null && <p role="alert">Could not start the Session: {error}</p>}
+    </main>
+  );
+}
+
+export function SessionTable({ presentation }: { readonly presentation: SessionPresentation }) {
+  const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
+  return (
+    <main className={styles.shell}>
+      <header className={styles.header}>
+        <h1>Pusoy Dos</h1>
+        <p>Basic · Round {snapshot.roundNumber} of 5</p>
+      </header>
+      <section className={styles.table} aria-label="Game Table">
+        <h2>Session started</h2>
+        <p>Four players. Five rounds.</p>
+        <ul className={styles.players}>
+          {snapshot.seats.map((seat) => <li key={seat.playerId}>{seat.name}</li>)}
+        </ul>
+      </section>
     </main>
   );
 }
