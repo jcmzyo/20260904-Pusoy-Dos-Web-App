@@ -11,7 +11,7 @@
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
 **AI design:** `ai.md` v1.5  
-**UI/UX design:** `ui-ux.md` v1.2  
+**UI/UX design:** `ui-ux.md` v1.3  
 **Testing strategy:** `testing-simulation.md` v1.8
 
 ---
