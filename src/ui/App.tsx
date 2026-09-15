@@ -6,6 +6,7 @@ import type { SessionConfiguration, StartedSession } from '../application/startS
 import type { BotNameProvider } from '../application/botNames';
 import type { Combination } from '../domain';
 import { CardBack, PlayingCard } from './primitives/Card';
+import { HumanHand } from './primitives/HumanHand';
 import { PlayerPanel } from './primitives/PlayerPanel';
 import styles from './App.module.css';
 
@@ -125,6 +126,9 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
         {snapshot.seats.map((seat) => <Seat key={seat.playerId} seat={seat} />)}
         <CenterTable center={snapshot.center} seats={snapshot.seats} />
       </section>
+      {/* Human hand selection/sorting/overlap/manual reorder (M4-T07; ui-ux.md §5.2, §6). Play/Pass
+       *  submission from the selected cards is M4-T08's job, not this task's. */}
+      <HumanHand cards={snapshot.humanHand} />
     </main>
   );
 }

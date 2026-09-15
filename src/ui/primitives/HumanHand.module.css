@@ -1,0 +1,74 @@
+.handArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.handRow {
+  display: flex;
+  align-items: flex-end;
+  padding: 28px 16px 6px;
+  min-height: 120px;
+}
+
+.cardSlot {
+  position: relative;
+  flex: 0 0 auto;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Overlap is 30% of the card's own current width (Card.module.css's `.card`
+ * width: clamp(40px, 8vw, 88px)), so the exposed portion of every card is
+ * always >= 70% of that width. At the clamp's 40px floor that leaves 28px
+ * exposed, matching MINIMUM_EXPOSED_CARD_WIDTH_PX (tests/browser/viewportMatrix.ts)
+ * for reliable click/tap targeting even at the smallest supported viewport
+ * (ui-ux.md §6: "enough of each card remains exposed for reliable click/tap
+ * and drag targeting"). This duplicates Card.module.css's width expression
+ * rather than sharing a custom property, to avoid touching the T05 Card
+ * primitive for a T07 layout concern; keep the two in sync if either changes. */
+.cardSlot:not(:first-child) {
+  margin-left: calc(clamp(40px, 8vw, 88px) * -0.3);
+}
+
+.cardSlot.dragging {
+  z-index: 20;
+  cursor: grabbing;
+}
+
+.lift {
+  transition: transform 120ms ease;
+}
+
+.lift.selected {
+  transform: translateY(-18px);
+}
+
+.sortControls {
+  display: flex;
+  gap: 12px;
+}
+
+.sortButton {
+  padding: 8px 16px;
+  border: 1px solid #ead8a7;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+.sortButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
