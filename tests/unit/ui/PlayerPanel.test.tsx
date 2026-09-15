@@ -62,4 +62,36 @@ describe('PlayerPanel status variants', () => {
     expect(screen.getByText('PASS')).toBeTruthy();
     expect(screen.queryByText('Turn')).toBeNull();
   });
+
+  it('shows a "deciding" indicator only when thinking is explicitly passed (M4-T09 slice)', () => {
+    render(<PlayerPanel name="West" cardCount={11} score={0} isCurrentTurn passed={false} done={false} placement={null} />);
+    expect(screen.queryByRole('status')).toBeNull();
+    cleanup();
+    render(<PlayerPanel name="West" cardCount={11} score={0} isCurrentTurn passed={false} done={false} placement={null} thinking />);
+    expect(screen.getByRole('status', { name: 'West is deciding' })).toBeTruthy();
+  });
+
+  it('gives the panel a distinct glow for the current Turn and for each of 1st/2nd/3rd place, but not for an unplaced 4th finish (the person\'s own follow-up request)', () => {
+    function classFor(overrides: { readonly isCurrentTurn?: boolean; readonly done?: boolean; readonly placement?: 1 | 2 | 3 | 4 | null }): string {
+      render(
+        <PlayerPanel
+          name="X" cardCount={5} score={0} passed={false}
+          isCurrentTurn={overrides.isCurrentTurn ?? false} done={overrides.done ?? false} placement={overrides.placement ?? null}
+        />,
+      );
+      const panelClass = screen.getByRole('region', { name: 'X panel' }).className;
+      cleanup();
+      return panelClass;
+    }
+    const idle = classFor({});
+    const turn = classFor({ isCurrentTurn: true });
+    const gold = classFor({ done: true, placement: 1 });
+    const silver = classFor({ done: true, placement: 2 });
+    const bronze = classFor({ done: true, placement: 3 });
+    const fourth = classFor({ done: true, placement: 4 });
+    // Five genuinely distinct visual states...
+    expect(new Set([idle, turn, gold, silver, bronze]).size).toBe(5);
+    // ...and an unplaced/4th finish gets no special glow (same look as idle).
+    expect(fourth).toBe(idle);
+  });
 });

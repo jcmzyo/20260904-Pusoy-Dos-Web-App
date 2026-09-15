@@ -5,7 +5,7 @@ import type { StartedSession } from '../../../src/application/startSession';
 import { createSessionConfiguration, startSession } from '../../../src/application/startSession';
 import { createSession, defaultRuleset, getCompletedRoundReveal, getPlayerView, getPublicView, startRound } from '../../../src/engine';
 import type { GameEvent } from '../../../src/engine';
-import { GameRunner } from '../../../src/orchestrator';
+import { GameRunner, HumanController } from '../../../src/orchestrator';
 import type { PlayerController, PlayerTurnRequest } from '../../../src/orchestrator';
 
 const ids = ['south', 'west', 'north', 'east'];
@@ -43,6 +43,7 @@ describe('production Session presentation', () => {
     expect(snapshot.seats).toEqual(ids.map((playerId) => ({
       seat: playerId, playerId, name: session.names[playerId], cardCount: 13, totalScore: 0,
       isCurrentTurn: playerId === snapshot.currentPlayerId, passed: false, done: false, placement: null,
+      lastPlay: null,
     })));
     expect(snapshot.humanHand).toEqual(getPlayerView(state, 'south').hand);
     expect(visibleCards(snapshot)).toEqual(snapshot.humanHand.map(identity));
@@ -189,5 +190,170 @@ describe('production Session presentation', () => {
 
   it('does not offer a reveal before a deal', () => {
     expect(getCompletedRoundReveal(createSession(ids).state)).toBeNull();
+  });
+
+  it('returns null/false, without throwing, for a Controller that offers no pending-request/resolve-move contract (M4-T08)', () => {
+    const { presentation } = fixture();
+    expect(presentation.getPendingHumanRequest()).toBeNull();
+    expect(presentation.resolveHumanMove('anything', { kind: 'pass', playerId: 'south' })).toBe(false);
+  });
+
+  it('exposes a real HumanController\'s pending request, resolves it, and self-drives Turns via startAutoPlay (M4-T08)', async () => {
+    let seed = 11;
+    const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+    const created = createSession(ids);
+    const started = startRound(created.state, engineRng);
+    const human = new HumanController('south');
+    const bots: readonly PlayerController[] = ids
+      .filter((id) => id !== 'south')
+      .map((playerId) => ({ playerId, chooseMove: async (request: PlayerTurnRequest) => request.legalMoves[0]! }));
+    const controllers = new Map<string, PlayerController>([human, ...bots].map((controller) => [controller.playerId, controller]));
+    const session: StartedSession = {
+      runner: new GameRunner(started.state, defaultRuleset, controllers, true),
+      humanController: human, engineRng, initialView: getPublicView(started.state),
+      startupEvents: [...created.events], names: { south: 'You', west: 'W', north: 'N', east: 'E' },
+    };
+    const presentation = new SessionPresentation(session);
+
+    expect(presentation.getPendingHumanRequest()).toBeNull();
+    // Zero delay keeps this deterministic/fast; the delay itself is covered by its own test below.
+    presentation.startAutoPlay(0);
+    await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+    const request = presentation.getPendingHumanRequest()!;
+    const eventsBefore = presentation.getSnapshot().events.length;
+    expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
+    // A stale/duplicate resolution of the same (now-consumed) request is rejected, matching
+    // HumanController.resolveMove's own contract.
+    expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(false);
+    // Proves startAutoPlay is actually driving Turns end-to-end through the real GameRunner,
+    // without asserting who is on the clock next — bots may legally pass all the way back around
+    // to South, so which seat plays next is not deterministic and must not be asserted here.
+    await vi.waitFor(() => expect(presentation.getSnapshot().events.length).toBeGreaterThan(eventsBefore));
+    // A second call is an idempotent no-op rather than a competing driver Turn loop.
+    presentation.startAutoPlay();
+  });
+
+  it('waits botTurnDelayMs before each bot Turn but never delays the start of the human\'s own Turn (M4-T09 slice)', async () => {
+    const { presentation } = fixture();
+    // Reach South's Turn with plain manual runTurn() calls first (no delay involved at all, whoever
+    // this fixture's Engine seed happens to make the opener) so the fake-timer assertions below only
+    // ever have to reason about the one Turn boundary this test actually cares about: South's own Turn
+    // (this fixture's `humanController`, `session.humanController.playerId === 'south'`) into the very
+    // next (necessarily non-South) bot Turn.
+    let guard = 0;
+    while (presentation.getSnapshot().currentPlayerId !== 'south' && guard++ < 10) await presentation.runTurn();
+    expect(presentation.getSnapshot().currentPlayerId).toBe('south');
+
+    vi.useFakeTimers();
+    try {
+      presentation.startAutoPlay(500);
+      // South's own Turn incurs no delay (a bare Controller fixture resolves synchronously), so it has
+      // already resolved and the loop has moved on to gating the next (bot) Turn behind the delay.
+      await vi.advanceTimersByTimeAsync(0);
+      const afterSouth = presentation.getSnapshot();
+      expect(afterSouth.currentPlayerId).not.toBe('south');
+      // The next (bot) Turn has not advanced yet - it is waiting out the 500ms presentation delay.
+      await vi.advanceTimersByTimeAsync(499);
+      expect(presentation.getSnapshot()).toEqual(afterSouth);
+      await vi.advanceTimersByTimeAsync(1);
+      await vi.waitFor(() => expect(presentation.getSnapshot()).not.toEqual(afterSouth));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('tracks each seat\'s own last Play through the response cycle, graying it once beaten, and clears it on free lead (ui-ux.md §5.4)', async () => {
+    // Prefers any legal Play over Pass, so a beat is exercised whenever the dealt hands allow one -
+    // virtually certain here since an opening Single 3♣ (the lowest possible card) is beaten by almost
+    // any other Single.
+    const { presentation } = fixture((request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!);
+    const opener = presentation.getSnapshot().currentPlayerId!;
+    await presentation.runTurn();
+    const afterOpen = presentation.getSnapshot();
+    const openCenter = afterOpen.center;
+    if (openCenter.kind !== 'hand') throw new Error('Expected the opening Play to produce a current hand.');
+    const openerSeat = afterOpen.seats.find((seat) => seat.playerId === opener)!;
+    expect(openerSeat.lastPlay).toEqual({ combination: openCenter.combination, beaten: false });
+    for (const seat of afterOpen.seats) {
+      if (seat.playerId !== opener) expect(seat.lastPlay).toBeNull();
+    }
+
+    let sawBeaten = false;
+    let turns = 0;
+    while (presentation.getSnapshot().center.kind !== 'freeLead' && turns++ < 20) {
+      await presentation.runTurn();
+      const snapshot = presentation.getSnapshot();
+      const center = snapshot.center;
+      for (const seat of snapshot.seats) {
+        if (!seat.lastPlay) continue;
+        // A seat's own trailing Play is beaten exactly when it is no longer the authoritative center hand.
+        const isCurrentCenter = center.kind === 'hand' && center.playerId === seat.playerId;
+        expect(seat.lastPlay.beaten).toBe(!isCurrentCenter);
+        if (seat.lastPlay.beaten) sawBeaten = true;
+      }
+    }
+    expect(presentation.getSnapshot().center.kind).toBe('freeLead');
+    expect(sawBeaten).toBe(true);
+    // Every per-seat Play trail is cleared once the cycle actually resets to a free lead.
+    expect(presentation.getSnapshot().seats.every((seat) => seat.lastPlay === null)).toBe(true);
+  });
+
+  it('clears a seat\'s own Play trail the moment that seat itself Passes, replacing it with PASS rather than showing both (ui-ux.md §5.4)', async () => {
+    // Once a seat has Played at all, every later request from that same seat prefers Pass (when legal)
+    // over playing again - a strategic Pass on a seat that had already Played earlier in the same
+    // response cycle, exactly the scenario the person's own follow-up report described.
+    const playedOnce = new Set<string>();
+    const { presentation } = fixture((request) => {
+      if (playedOnce.has(request.playerId)) {
+        const passMove = request.legalMoves.find((move) => move.kind === 'pass');
+        if (passMove) return passMove;
+      }
+      const playMove = request.legalMoves.find((move) => move.kind === 'play');
+      if (playMove) {
+        playedOnce.add(request.playerId);
+        return playMove;
+      }
+      return request.legalMoves.find((move) => move.kind === 'pass')!;
+    });
+
+    let turns = 0;
+    let sawPlayThenPass = false;
+    while (presentation.getSnapshot().center.kind !== 'freeLead' && turns++ < 30) {
+      await presentation.runTurn();
+      for (const seat of presentation.getSnapshot().seats) {
+        // Invariant: a seat that has itself Passed this cycle never also shows a Play trail - its own
+        // Pass replaces (rather than joins) any earlier Play indicator from that same cycle.
+        if (seat.passed) expect(seat.lastPlay).toBeNull();
+        if (seat.passed && playedOnce.has(seat.playerId)) sawPlayThenPass = true;
+      }
+    }
+    // Confirms the scenario actually occurred at least once (a seat that had Played was later seen
+    // Passing with its trail already cleared), so the assertion above is not vacuously true.
+    expect(sawPlayThenPass).toBe(true);
+  });
+
+  it('keeps every seat\'s own Play/Pass trail visible through Round completion itself, only clearing on the next actual Round (round-5 follow-up)', async () => {
+    // The Trick that ends the Round (the 3rd-place finisher's own final Play) also always emits a
+    // TRICK_ENDED (GameEngine.submitMove), which used to wipe every seat's trail an instant before the
+    // person could ever see it - reported as "the last hand played by someone who finished" disappearing
+    // right away.
+    const { presentation } = fixture((request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!);
+    let turns = 0;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && turns++ < 400) {
+      await presentation.runTurn();
+    }
+    expect(presentation.getSnapshot().status).toBe('ROUND_RESULT');
+    const final = presentation.getSnapshot();
+    const center = final.center;
+    expect(center.kind).toBe('hand');
+    if (center.kind !== 'hand') throw new Error('Expected the Round-ending Play to remain the current hand.');
+    const finisherSeat = final.seats.find((seat) => seat.playerId === center.playerId)!;
+    // The Round-ending Play itself is still visible at its own seat, not beaten (it's still the
+    // authoritative center hand), rather than wiped to null.
+    expect(finisherSeat.lastPlay).not.toBeNull();
+    expect(finisherSeat.lastPlay!.beaten).toBe(false);
+    // Continuing to the next Round is the actual, deliberate reset boundary.
+    presentation.continueToNextRound();
+    expect(presentation.getSnapshot().seats.every((seat) => seat.lastPlay === null && !seat.passed)).toBe(true);
   });
 });

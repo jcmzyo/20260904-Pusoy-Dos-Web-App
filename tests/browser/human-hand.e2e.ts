@@ -109,8 +109,14 @@ test(`overlapped cards stay independently targetable at the small supported land
   const cards = hand.getByRole('img');
   const slots = hand.locator('[data-card-key]');
   await expect(cards).toHaveCount(13);
+  // Every card must be independently hit-testable/targetable regardless of overlap (ui-ux.md §6) — a
+  // click landing on the wrong (neighboring) card would still show up as a selection mismatch below.
+  // Only the first 5 clicks can actually select anything: at Session start the Trick is the Opening
+  // Move, so the Play selection cap is 5 (M4-T08's "up to 5 cards if free play"); the remaining clicks
+  // still prove their own card was correctly targeted by staying reliably deselected.
+  const FREE_PLAY_CAP = 5;
   for (let index = 0; index < 13; index++) {
     await cards.nth(index).click();
-    await expect(slots.nth(index)).toHaveAttribute('data-selected', 'true');
+    await expect(slots.nth(index)).toHaveAttribute('data-selected', index < FREE_PLAY_CAP ? 'true' : 'false');
   }
 });

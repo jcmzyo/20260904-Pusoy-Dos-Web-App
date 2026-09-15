@@ -1,6 +1,6 @@
 # Pusoy Dos --- M4 Minimal Playable UI
 
-## Milestone Design + Task Breakdown (v1.1)
+## Milestone Design + Task Breakdown (v1.2)
 
 **Status:** Approved milestone design and implementation task plan  
 **Last Modified:** September 15, 2026  
@@ -11,7 +11,7 @@
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
 **AI design:** `ai.md` v1.5  
-**UI/UX design:** `ui-ux.md` v1.3  
+**UI/UX design:** `ui-ux.md` v1.4  
 **Testing strategy:** `testing-simulation.md` v1.8
 
 ---

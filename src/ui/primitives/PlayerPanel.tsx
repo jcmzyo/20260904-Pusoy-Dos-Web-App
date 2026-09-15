@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import styles from './PlayerPanel.module.css';
 
 const PLACEMENT_LABELS: Record<1 | 2 | 3 | 4, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
@@ -10,6 +11,16 @@ export interface PlayerPanelProps {
   readonly passed: boolean;
   readonly done: boolean;
   readonly placement: 1 | 2 | 3 | 4 | null;
+  /** Shows a small "deciding" spinner alongside the Turn status (M4-T09 slice; ui-ux.md §8's bot
+   *  presentation delay). Reserved for a bot's own Turn — the caller is expected to never pass this
+   *  true for the human's own seat, since the human already has its own Play/Pass controls rather than
+   *  anything actually loading. Purely presentational: never reflects real AI compute time. */
+  readonly thinking?: boolean;
+  /** This seat's own Play/Pass trail (ui-ux.md §5.4), rendered inside this same panel container
+   *  (alongside the status badge/spinner) rather than as a separate element beside it — the person's
+   *  own follow-up request. `PlayerPanel` stays agnostic of cards/combinations: the caller renders the
+   *  actual trail content (e.g. `App.tsx`'s `SeatPlayTrail`) and passes it through as a slot. */
+  readonly playTrail?: ReactNode;
 }
 
 interface StatusVariant {
@@ -36,6 +47,20 @@ function resolveStatus({ isCurrentTurn, passed, done, placement }: PlayerPanelPr
 }
 
 /**
+ * The panel's own glow (border/box-shadow), separate from the text status above: 1st/2nd/3rd finish
+ * each get their own medal-colored glow, and the current Turn gets a white glow — kept visually
+ * distinct from the gold "finished 1st" glow so the two are never confused at a glance (the person's
+ * own follow-up request). A 4th-place finish and an idle seat get no glow.
+ */
+function resolveGlowClass({ isCurrentTurn, done, placement }: PlayerPanelProps): string | undefined {
+  if (done && placement === 1) return styles.glowGold;
+  if (done && placement === 2) return styles.glowSilver;
+  if (done && placement === 3) return styles.glowBronze;
+  if (isCurrentTurn) return styles.glowTurn;
+  return undefined;
+}
+
+/**
  * Reusable player panel: name, remaining-card count, cumulative score, a
  * turn highlight, and PASS/DONE+placement status. Positioning at a table
  * seat is a layout concern owned by later tasks (M4-T06).
@@ -45,17 +70,29 @@ function resolveStatus({ isCurrentTurn, passed, done, placement }: PlayerPanelPr
  * alone, per ui-ux.md's accessibility expectations.
  */
 export function PlayerPanel(props: PlayerPanelProps) {
-  const { name, cardCount, score, isCurrentTurn } = props;
+  const { name, cardCount, score, isCurrentTurn, thinking = false, playTrail } = props;
   const status = resolveStatus(props);
+  const glowClass = resolveGlowClass(props);
   return (
     <section
-      className={`${styles.panel} ${isCurrentTurn ? styles.active : ''}`}
+      className={`${styles.panel} ${glowClass ?? ''}`}
       aria-label={`${name} panel`}
       aria-current={isCurrentTurn ? 'true' : undefined}
     >
       <p className={styles.name}>{name}</p>
       <p className={styles.meta}>{cardCount} card{cardCount === 1 ? '' : 's'} · {score} pts</p>
-      {status !== null && <p className={`${styles.status} ${status.className}`}>{status.text}</p>}
+      {/* Always-rendered, fixed-height slots (below) so an idle seat's missing status badge, or a seat
+       *  with no spinner/trail to show, leaves behind an empty box rather than removing that row
+       *  entirely — otherwise the remaining rows would shift position/re-center every time PASS/DONE/
+       *  Turn or the Play trail appeared or disappeared during a Round (the person's own follow-up
+       *  report). */}
+      <div className={styles.statusSlot}>
+        {status !== null && <p className={`${styles.status} ${status.className}`}>{status.text}</p>}
+      </div>
+      <div className={styles.trailSlot}>
+        {thinking && <span className={styles.spinner} role="status" aria-label={`${name} is deciding`} />}
+        {!thinking && playTrail}
+      </div>
     </section>
   );
 }

@@ -50,7 +50,7 @@ describe('Home and immediate Session startup', () => {
     for (const name of ['You', 'West', 'North', 'East']) {
       expect(screen.getByRole('region', { name: `${name} panel` })).toBeTruthy();
     }
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Discard Pile', 'Sort Rank', 'Sort Suit']);
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Discard Pile', 'Event Log', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Play', 'Pass']);
   });
 
   it('guards pending asynchronous startup and samples names only once', async () => {

@@ -27,13 +27,25 @@ export interface PlayingCardProps {
   readonly card: CardValue;
   /** Overrides the default responsive width. Height follows automatically via the fixed aspect ratio. */
   readonly widthPx?: number;
+  /**
+   * Also draws a large center suit symbol, in addition to the two corner indices. Round 3 removed the
+   * center pip everywhere because it collided with the corners at the smaller/more-crowded widths used
+   * around the table (the center hand-to-beat); the person's own round-4 follow-up reported the human's
+   * own held hand — larger, less crowded cards — now looks "barren" without it, so this restores it
+   * there specifically. Defaults to `false` so every other existing caller (center hand-to-beat) keeps
+   * the corner-only look that fixed its own readability bug.
+   */
+  readonly showCenterPip?: boolean;
 }
 
 /**
  * A face-up card: off-white face, four-color suit, constant aspect ratio.
  * Rendered entirely from CSS/text; no raster 52-card image asset is required.
+ *
+ * Always draws the two corner indices; `showCenterPip` additionally draws a large center suit symbol
+ * for contexts with room to spare (ui-ux.md §5.2 amendment, round 4).
  */
-export function PlayingCard({ card, widthPx }: PlayingCardProps) {
+export function PlayingCard({ card, widthPx, showCenterPip = false }: PlayingCardProps) {
   const visual = SUIT_VISUALS[card.suit];
   return (
     <div
@@ -46,12 +58,32 @@ export function PlayingCard({ card, widthPx }: PlayingCardProps) {
         <span>{card.rank}</span>
         <span className={styles.cornerSuit}>{visual.symbol}</span>
       </span>
-      <span className={styles.pip} aria-hidden="true">{visual.symbol}</span>
+      {showCenterPip && <span className={styles.pip} aria-hidden="true">{visual.symbol}</span>}
       <span className={`${styles.corner} ${styles.cornerBottom}`} aria-hidden="true">
         <span>{card.rank}</span>
         <span className={styles.cornerSuit}>{visual.symbol}</span>
       </span>
     </div>
+  );
+}
+
+export interface CardIndexProps {
+  readonly card: CardValue;
+}
+
+/**
+ * A compact "corner index" badge: just rank + suit (no full card face/border/pip), reusing the same
+ * four-color suit convention as `PlayingCard`. A full-size `PlayingCard` scaled down to fit a seat's
+ * own Play trail (ui-ux.md §5.4) reads as illegibly "shrunk"; this is sized for that compact context
+ * instead, mirroring the corner index already drawn on `PlayingCard` itself.
+ */
+export function CardIndex({ card }: CardIndexProps) {
+  const visual = SUIT_VISUALS[card.suit];
+  return (
+    <span className={`${styles.index} ${visual.colorClass}`} role="img" aria-label={`${card.rank} of ${visual.label}`}>
+      <span>{card.rank}</span>
+      <span className={styles.indexSuit}>{visual.symbol}</span>
+    </span>
   );
 }
 
