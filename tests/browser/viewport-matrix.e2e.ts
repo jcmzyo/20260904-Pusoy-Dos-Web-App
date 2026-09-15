@@ -36,6 +36,29 @@ for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'sup
   });
 }
 
+// Regression for a reported UI bug: West/East bot hands previously overlapped horizontally and
+// spilled past the table's left/right border at narrower supported viewports. Cards now stack
+// lengthwise (vertically) on the outer edge with player details toward center (ui-ux.md §5), so
+// this verifies the card stack's own layout box stays within the table's horizontal bounds.
+for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
+  test(`West/East card stacks stay within the table border at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Start Game', exact: true }).click();
+    const table = page.getByRole('region', { name: 'Game Table' });
+    const tableBox = await table.boundingBox();
+    if (!tableBox) throw new Error('Game Table region has no layout box.');
+    for (const name of ['West', 'East']) {
+      const seat = page.getByRole('region', { name: `${name} panel` }).locator('xpath=..');
+      const botHand = seat.locator('> [aria-hidden="true"]').first();
+      const box = await botHand.boundingBox();
+      if (!box) throw new Error(`${name}'s bot hand has no layout box.`);
+      expect(box.x).toBeGreaterThanOrEqual(tableBox.x - 1);
+      expect(box.x + box.width).toBeLessThanOrEqual(tableBox.x + tableBox.width + 1);
+    }
+  });
+}
+
 // Rotate/resize guidance does not exist yet; M4-T11 (Leave Confirmation and
 // Unsupported-Layout Pause) implements it. These assertions are registered now,
 // as fixme, so the M4-T04 responsive contract records the required behavior

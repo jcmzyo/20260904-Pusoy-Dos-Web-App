@@ -1,6 +1,6 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.2)
+## UI / UX Document (v1.3)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
 **Last Modified:** September 15, 2026  
@@ -61,6 +61,10 @@ The bottom relationship is:
 - **right:** large Play and Pass controls.
 
 This is a responsive relationship, not fixed pixel positioning.
+
+## 5.3 Bot seat layout (West/East)
+
+West and East bot hands stack lengthwise (vertically) along the seat's outer edge, with that player's details (name, remaining-card count, score, turn/PASS/DONE status) positioned toward the center table rather than the outer edge — the same details-near-center relationship North and South already have. Read left to right: **Lengthwise cards | West details | Center table | East details | Lengthwise cards.** This keeps a full 13-card overlapping hand contained within the table border rather than spilling past it, at every supported viewport (§14).
 
 # 6. Human Hand, Selection, Sorting, and Manual Arrangement
 

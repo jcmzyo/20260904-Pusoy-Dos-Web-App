@@ -104,12 +104,19 @@
   grid-area: north;
 }
 
+/* West/East: cards lengthwise (stacked vertically) on the outer edge, details adjacent to
+ * center - "Lengthwise cards | West Details | Center Table | East Details | Lengthwise Cards" -
+ * so a 13-card hand overlaps within the seat's own row instead of spilling into the table border. */
 .seatWest {
   grid-area: west;
+  flex-direction: row;
+  gap: 12px;
 }
 
 .seatEast {
   grid-area: east;
+  flex-direction: row-reverse;
+  gap: 12px;
 }
 
 .seatSouth {
@@ -122,6 +129,17 @@
 
 .botHand > *:not(:first-child) {
   margin-left: -20px;
+}
+
+.seatWest .botHand,
+.seatEast .botHand {
+  flex-direction: column;
+}
+
+.seatWest .botHand > *:not(:first-child),
+.seatEast .botHand > *:not(:first-child) {
+  margin-left: 0;
+  margin-top: -40px;
 }
 
 .center {
