@@ -4,11 +4,30 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionConfiguration, startSession } from '../../../src/application/startSession';
 import type { StartedSession } from '../../../src/application/startSession';
-import { App } from '../../../src/ui/App';
+import { SessionPresentation } from '../../../src/application/SessionPresentation';
+import type { PlayerController } from '../../../src/orchestrator';
+import { App, SessionTable } from '../../../src/ui/App';
 
 afterEach(cleanup);
 
 describe('Home and immediate Session startup', () => {
+  it('subscribes the table to safe production snapshots across Round continuation', async () => {
+    const session = startSession<PlayerController>(createSessionConfiguration(), {
+      engineRng: { next: () => 0 }, humanController: { playerId: 'south', chooseMove: async (request) => request.legalMoves[0]! },
+    });
+    const presentation = new SessionPresentation(session);
+    const { unmount } = render(<StrictMode><SessionTable presentation={presentation} /></StrictMode>);
+    expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
+    await act(async () => {
+      let turns = 0;
+      while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && turns++ < 400) await presentation.runTurn();
+      expect(presentation.getSnapshot().status).toBe('ROUND_RESULT');
+      presentation.continueToNextRound();
+    });
+    expect(screen.getByText('Basic · Round 2 of 5')).toBeTruthy();
+    unmount();
+  });
+
   it('shows only Start Game on Home and does not start during StrictMode mounting', () => {
     const start = vi.fn();
     render(<StrictMode><App start={start} /></StrictMode>);

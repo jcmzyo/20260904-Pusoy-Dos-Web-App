@@ -34,3 +34,10 @@ export interface PlayerView extends PublicGameView {
   readonly playerId: PlayerId;
   readonly hand: readonly Card[];
 }
+
+/** Available only for the authoritative completed Round, separate from controller views. */
+export interface CompletedRoundReveal {
+  readonly roundNumber: number;
+  readonly playerId: PlayerId;
+  readonly cards: readonly Card[];
+}
