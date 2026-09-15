@@ -1,7 +1,7 @@
 import { BaselineController } from '../ai';
 import { createSession, defaultRuleset, getPublicView, startRound } from '../engine';
 import type { GameEvent, PublicGameView, RNG } from '../engine';
-import { GameRunner } from '../orchestrator';
+import { GameRunner, HumanController } from '../orchestrator';
 import type { PlayerController } from '../orchestrator';
 import { neutralBotNames } from './botNames';
 import type { BotNameProvider, BotNames } from './botNames';
@@ -15,29 +15,27 @@ export function createSessionConfiguration(names: BotNameProvider = neutralBotNa
   return { mode: 'basic', botNames: names() };
 }
 
-export interface StartedSession {
+export interface StartedSession<T extends PlayerController = PlayerController> {
   readonly runner: GameRunner;
+  readonly humanController: T;
   readonly engineRng: RNG;
   readonly initialView: PublicGameView;
   readonly startupEvents: readonly GameEvent[];
   readonly names: Readonly<Record<string, string>>;
 }
 
-interface StartupDependencies {
+interface StartupDependencies<T extends PlayerController> {
   readonly engineRng?: RNG;
-  readonly humanController?: PlayerController;
+  readonly humanController?: T;
 }
 
-/** Initializes the production execution; Turn driving and human input are connected separately. */
-export function startSession(configuration: SessionConfiguration, dependencies: StartupDependencies = {}): StartedSession {
+/** Initializes the production execution and human input; the caller drives Turns explicitly. */
+export function startSession<T extends PlayerController = HumanController>(configuration: SessionConfiguration, dependencies: StartupDependencies<T> = {}): StartedSession<T | HumanController> {
   if (configuration.mode !== 'basic') throw new Error('Only Basic Sessions are supported.');
   if (configuration.botNames.length !== 3 || configuration.botNames.some((name) => name.trim().length === 0)) {
     throw new Error('Session startup requires three non-empty bot names.');
   }
-  const human = dependencies.humanController ?? {
-    playerId: 'south',
-    async chooseMove(): Promise<never> { throw new Error('Human input must be connected before driving Turns.'); },
-  };
+  const human = dependencies.humanController ?? new HumanController('south');
   if (human.playerId !== 'south') throw new Error('The human controller must represent South.');
   const engineRng = dependencies.engineRng ?? { next: () => crypto.getRandomValues(new Uint32Array(1))[0]! / 0x100000000 };
   const bots = ['west', 'north', 'east'].map((id) => new BaselineController(id));
@@ -46,6 +44,7 @@ export function startSession(configuration: SessionConfiguration, dependencies: 
   const started = startRound(created.state, engineRng);
   return {
     runner: new GameRunner(started.state, defaultRuleset, controllers),
+    humanController: human,
     engineRng,
     initialView: getPublicView(started.state),
     startupEvents: [...created.events, ...started.events],
