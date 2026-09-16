@@ -1,4 +1,4 @@
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { SessionPresentation } from '../application/SessionPresentation';
 import type { PresentedSeat, SessionPresentationSnapshot } from '../application/SessionPresentation';
 import { createSessionConfiguration, startSession } from '../application/startSession';
@@ -7,6 +7,8 @@ import type { BotNameProvider } from '../application/botNames';
 import type { Card, Move } from '../domain';
 import { CardBack, CardIndex, PlayingCard } from './primitives/Card';
 import { COMBINATION_LABELS, getDisplayCards } from './primitives/combinationLabels';
+import { DiscardPileOverlay } from './primitives/DiscardPileOverlay';
+import { EventLogOverlay } from './primitives/EventLogOverlay';
 import { HumanHand } from './primitives/HumanHand';
 import { PlayerPanel } from './primitives/PlayerPanel';
 import { PlayPassControls } from './primitives/PlayPassControls';
@@ -109,7 +111,7 @@ function SeatPlayTrail({ lastPlay }: { readonly lastPlay: PresentedSeat['lastPla
   );
 }
 
-function Seat({ seat }: { readonly seat: PresentedSeat }) {
+function Seat({ seat, overlayOpen }: { readonly seat: PresentedSeat; readonly overlayOpen: boolean }) {
   const rotated = seat.seat === 'west' || seat.seat === 'east';
   // Only a bot's own Turn shows a "deciding" indicator; the human's Turn immediately has its own
   // Play/Pass controls, so a spinner there would misleadingly suggest something is loading (M4-T09
@@ -121,7 +123,7 @@ function Seat({ seat }: { readonly seat: PresentedSeat }) {
       <PlayerPanel
         name={seat.name} cardCount={seat.cardCount} score={seat.totalScore}
         isCurrentTurn={seat.isCurrentTurn} passed={seat.passed} done={seat.done} placement={seat.placement}
-        thinking={thinking}
+        thinking={thinking} paused={overlayOpen}
         // Hidden while the "deciding" spinner shows (the person's own follow-up request): about to be
         // replaced by this seat's next decision anyway, so showing its old Play/Pass trail underneath
         // the spinner just adds noise.
@@ -134,10 +136,14 @@ function Seat({ seat }: { readonly seat: PresentedSeat }) {
 /** Center table per ui-ux.md §5.1: a Discard Pile button (the overlay itself is M4-T10) plus the current
  *  hand to beat (cards/type/player), an explicit FREE LEAD, or the Opening Move's distinct 3♣ requirement.
  *  The current hand remains visible through Passes until authoritative beat/reset (SessionPresentation, T03). */
-function CenterTable({ center, seats }: { readonly center: SessionPresentationSnapshot['center']; readonly seats: readonly PresentedSeat[] }) {
+function CenterTable({ center, seats, onOpenDiscardPile }: { readonly center: SessionPresentationSnapshot['center']; readonly seats: readonly PresentedSeat[]; readonly onOpenDiscardPile: () => void }) {
   return (
     <div className={styles.center}>
-      <button type="button" className={styles.discardButton}>Discard Pile</button>
+      {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
+       *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
+       *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
+       *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
+      <button type="button" className={styles.discardButton} onClick={onOpenDiscardPile}>Check Discard Pile</button>
       <div className={styles.currentHand} role="region" aria-label="Current hand to beat">
         {center.kind === 'freeLead' && <p className={styles.freeLead}>FREE LEAD</p>}
         {center.kind === 'opening' && <p className={styles.opening}>OPENING · 3♣ required</p>}
@@ -169,16 +175,39 @@ function maxSelectableCards(center: SessionPresentationSnapshot['center']): numb
   return center.kind === 'hand' ? center.combination.cards.length : FREE_PLAY_MAX_CARDS;
 }
 
+/** Which overlay (M4-T10) is currently open, if any. Discard Pile and Event Log are opened from one
+ *  piece of UI state rather than two independent booleans, so at most one is ever open at a time -
+ *  matching typical single-modal UX and keeping the pause effect below simple (one open/closed
+ *  transition to react to, not two independent sources that could pause/resume out of step with
+ *  each other; see `SessionPresentation.pause`'s own docstring). */
+type OverlayKind = 'none' | 'discardPile' | 'eventLog';
+
 export function SessionTable({ presentation }: { readonly presentation: SessionPresentation }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   const [selectedCards, setSelectedCards] = useState<readonly Card[]>([]);
+  const [overlay, setOverlay] = useState<OverlayKind>('none');
   const isMyTurn = snapshot.status === 'ROUND_ACTIVE' && snapshot.currentPlayerId === HUMAN_PLAYER_ID;
+  const overlayOpen = overlay !== 'none';
+
+  // Opening either overlay pauses automatic Turn advancement; closing (including via unmount) resumes
+  // from the exact same point (ui-ux.md §9.2; SessionPresentation.pause/resume).
+  useEffect(() => {
+    if (!overlayOpen) return;
+    presentation.pause();
+    return () => presentation.resume();
+  }, [overlayOpen, presentation]);
 
   function handleSubmit(move: Move) {
     const pending = presentation.getPendingHumanRequest();
     if (!pending || pending.playerId !== move.playerId) return;
     presentation.resolveHumanMove(pending.requestId, move);
   }
+
+  function closeOverlay() {
+    setOverlay('none');
+  }
+
+  const names = Object.fromEntries(snapshot.seats.map((seat) => [seat.playerId, seat.name]));
 
   return (
     <main className={styles.shell}>
@@ -187,15 +216,18 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
         <p>Basic · Round {snapshot.roundNumber} of 5</p>
       </header>
       <section className={styles.table} aria-label="Game Table">
-        {snapshot.seats.map((seat) => <Seat key={seat.playerId} seat={seat} />)}
-        <CenterTable center={snapshot.center} seats={snapshot.seats} />
+        {snapshot.seats.map((seat) => <Seat key={seat.playerId} seat={seat} overlayOpen={overlayOpen} />)}
+        <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />
       </section>
-      {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event
-       *  Log/Leave Game placeholders - their actual behavior is M4-T10/T11 scope), middle (the human
-       *  hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md §5.2, §6), right (Play/Pass, M4-T08). */}
+      {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event Log,
+       *  M4-T10; Leave Game remains an inert placeholder, M4-T11 scope), middle (the human hand plus
+       *  Sort Rank/Sort Suit, M4-T07; ui-ux.md §5.2, §6), right (Play/Pass, M4-T08). */}
       <div className={styles.bottomBar}>
         <div className={styles.bottomLeft}>
-          <button type="button" className={styles.sideButton}>Event Log</button>
+          {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
+           *  center table's own current hand to beat already shows the latest Play, and a variable-length
+           *  preview line was changing this button's own height as events came in. */}
+          <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
           <button type="button" className={styles.sideButton}>Leave Game</button>
         </div>
         <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
@@ -208,6 +240,8 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
           onSubmit={handleSubmit}
         />
       </div>
+      {overlay === 'discardPile' && <DiscardPileOverlay cards={snapshot.playedCards} onClose={closeOverlay} />}
+      {overlay === 'eventLog' && <EventLogOverlay events={snapshot.roundEvents} names={names} onClose={closeOverlay} />}
     </main>
   );
 }

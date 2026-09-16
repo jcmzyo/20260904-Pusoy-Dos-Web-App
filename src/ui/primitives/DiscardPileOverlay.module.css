@@ -1,0 +1,23 @@
+.empty {
+  margin: 0 0 10px;
+  color: #c8d8cd;
+  font-size: 14px;
+}
+
+/* One fixed row per suit (Clubs/Spades/Hearts/Diamonds, always all four - DiscardPileOverlay.tsx), with
+ * no visible text label identifying it: `min-height` keeps an empty row occupying the same space as a
+ * populated one instead of collapsing to nothing, and a divider (instead of a heading) separates one
+ * suit's row from the next. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.row:not(:last-child) {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(234, 216, 167, 0.15);
+}

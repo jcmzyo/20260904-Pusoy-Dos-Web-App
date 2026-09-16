@@ -16,6 +16,13 @@ export interface PlayerPanelProps {
    *  true for the human's own seat, since the human already has its own Play/Pass controls rather than
    *  anything actually loading. Purely presentational: never reflects real AI compute time. */
   readonly thinking?: boolean;
+  /** Freezes the "deciding" spinner's own CSS animation without hiding it, while a Discard Pile/Event
+   *  Log overlay is open (M4-T10 follow-up; ui-ux.md §9.2: "Orchestrator progression is paused"). A CSS
+   *  `@keyframes` animation keeps running on its own regardless of React re-renders, so without this the
+   *  spinner kept visibly spinning through a pause - reading as "the bot is still deciding" even though
+   *  nothing is actually advancing (the person's own follow-up report). Purely presentational, same as
+   *  `thinking` itself; has no effect unless `thinking` is also true. */
+  readonly paused?: boolean;
   /** This seat's own Play/Pass trail (ui-ux.md §5.4), rendered inside this same panel container
    *  (alongside the status badge/spinner) rather than as a separate element beside it — the person's
    *  own follow-up request. `PlayerPanel` stays agnostic of cards/combinations: the caller renders the
@@ -70,7 +77,7 @@ function resolveGlowClass({ isCurrentTurn, done, placement }: PlayerPanelProps):
  * alone, per ui-ux.md's accessibility expectations.
  */
 export function PlayerPanel(props: PlayerPanelProps) {
-  const { name, cardCount, score, isCurrentTurn, thinking = false, playTrail } = props;
+  const { name, cardCount, score, isCurrentTurn, thinking = false, paused = false, playTrail } = props;
   const status = resolveStatus(props);
   const glowClass = resolveGlowClass(props);
   return (
@@ -90,7 +97,14 @@ export function PlayerPanel(props: PlayerPanelProps) {
         {status !== null && <p className={`${styles.status} ${status.className}`}>{status.text}</p>}
       </div>
       <div className={styles.trailSlot}>
-        {thinking && <span className={styles.spinner} role="status" aria-label={`${name} is deciding`} />}
+        {thinking && (
+          <span
+            className={styles.spinner}
+            style={paused ? { animationPlayState: 'paused' } : undefined}
+            role="status"
+            aria-label={`${name} is deciding`}
+          />
+        )}
         {!thinking && playTrail}
       </div>
     </section>

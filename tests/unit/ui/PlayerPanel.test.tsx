@@ -71,6 +71,18 @@ describe('PlayerPanel status variants', () => {
     expect(screen.getByRole('status', { name: 'West is deciding' })).toBeTruthy();
   });
 
+  it('freezes the "deciding" spinner\'s own CSS animation, without hiding it, while paused (M4-T10 follow-up)', () => {
+    render(<PlayerPanel name="West" cardCount={11} score={0} isCurrentTurn passed={false} done={false} placement={null} thinking paused />);
+    const spinner = screen.getByRole('status', { name: 'West is deciding' });
+    expect(spinner.style.animationPlayState).toBe('paused');
+  });
+
+  it('leaves the "deciding" spinner animating when not paused', () => {
+    render(<PlayerPanel name="West" cardCount={11} score={0} isCurrentTurn passed={false} done={false} placement={null} thinking />);
+    const spinner = screen.getByRole('status', { name: 'West is deciding' });
+    expect(spinner.style.animationPlayState).toBe('');
+  });
+
   it('gives the panel a distinct glow for the current Turn and for each of 1st/2nd/3rd place, but not for an unplaced 4th finish (the person\'s own follow-up request)', () => {
     function classFor(overrides: { readonly isCurrentTurn?: boolean; readonly done?: boolean; readonly placement?: 1 | 2 | 3 | 4 | null }): string {
       render(

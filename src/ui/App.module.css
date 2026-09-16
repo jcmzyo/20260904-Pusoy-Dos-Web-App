@@ -251,7 +251,11 @@
  * own label length (the person's own round-5 follow-up request) - comfortably fits "Leave Game", the
  * longer of the two labels. */
 .sideButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 112px;
+  min-height: 44px;
   padding: 8px 16px;
   border: 1px solid #ead8a7;
   border-radius: 8px;

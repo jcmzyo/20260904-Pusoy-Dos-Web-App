@@ -50,7 +50,10 @@ describe('Home and immediate Session startup', () => {
     for (const name of ['You', 'West', 'North', 'East']) {
       expect(screen.getByRole('region', { name: `${name} panel` })).toBeTruthy();
     }
-    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Discard Pile', 'Event Log', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Play', 'Pass']);
+    // "Check Discard Pile" (M4-T10 follow-up), not bare "Discard Pile" - the person's own follow-up
+    // report that the noun phrase alone read as if clicking it would discard the player's own cards.
+    expect(screen.getAllByRole('button').map((button) => button.textContent))
+      .toEqual(['Check Discard Pile', 'Event Log', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Play', 'Pass']);
   });
 
   it('guards pending asynchronous startup and samples names only once', async () => {
