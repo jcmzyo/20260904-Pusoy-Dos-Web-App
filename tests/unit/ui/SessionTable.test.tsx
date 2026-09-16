@@ -49,9 +49,11 @@ describe('SessionTable seats and center (M4-T06)', () => {
       expect(backs).toHaveLength(seat.seat === 'south' ? 0 : seat.cardCount);
       expect(within(seatContainer).queryAllByRole('img', { name: /of (Clubs|Spades|Hearts|Diamonds)/, hidden: true })).toHaveLength(0);
     }
-    expect(screen.getByRole('button', { name: 'Discard Pile' })).toBeTruthy();
-    // Inert placeholders (round-4 follow-up), the same way Discard Pile itself has been since M4-T06:
-    // their actual overlay/confirmation behavior remains M4-T10/T11 scope.
+    // "Check Discard Pile" (M4-T10 follow-up), not bare "Discard Pile" - the person's own follow-up
+    // report that the noun phrase alone read as if clicking it would discard the player's own cards.
+    expect(screen.getByRole('button', { name: 'Check Discard Pile' })).toBeTruthy();
+    // Leave Game is still an inert placeholder (round-4 follow-up): its own confirmation behavior
+    // remains M4-T11 scope.
     expect(screen.getByRole('button', { name: 'Event Log' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Leave Game' })).toBeTruthy();
   });
@@ -78,11 +80,11 @@ describe('SessionTable seats and center (M4-T06)', () => {
     const center = snapshot.center;
     if (center.kind !== 'hand') throw new Error('Expected the first opening Play to produce a current hand.');
     const player = snapshot.seats.find((seat) => seat.playerId === center.playerId)!;
-    expect(screen.getByText(`${player.name} played Single`)).toBeTruthy();
-    const [card] = center.combination.cards;
     // Scoped to the center region specifically: the same card also renders at the player's own seat
     // (M4-T08's per-seat Play trail, ui-ux.md §5.4), so an unscoped query would match twice.
     const centerRegion = screen.getByRole('region', { name: 'Current hand to beat' });
+    expect(within(centerRegion).getByText(`${player.name} played Single`)).toBeTruthy();
+    const [card] = center.combination.cards;
     expect(within(centerRegion).getByRole('img', { name: `${card!.rank} of ${card!.suit[0]!.toUpperCase()}${card!.suit.slice(1)}` })).toBeTruthy();
   });
 

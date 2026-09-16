@@ -356,4 +356,41 @@ describe('production Session presentation', () => {
     presentation.continueToNextRound();
     expect(presentation.getSnapshot().seats.every((seat) => seat.lastPlay === null && !seat.passed)).toBe(true);
   });
+
+  describe('pause/resume (M4-T10; ui-ux.md §9.2: "Orchestrator progression is paused" while an overlay is open)', () => {
+    it('pause() halts automatic Turn advancement entirely, and resume() continues from the exact same point', async () => {
+      const { presentation } = fixture();
+      presentation.startAutoPlay(0);
+      // Synchronous, immediately after starting autoplay and before any microtask runs: driveTurns'
+      // own first `await` (its pause gate) has not yet resolved, so this is guaranteed to land before
+      // the very first automatic Turn - not a race against however many Turns a 0ms-delay loop might
+      // otherwise already have completed by the time a `waitFor` polling interval next runs.
+      presentation.pause();
+      expect(presentation.isPaused()).toBe(true);
+      const beforeResume = presentation.getSnapshot();
+      // Ample time for the loop to advance if pause were not actually honored (it uses real timers/
+      // microtasks with a 0ms configured delay, so anything left unpaused would race far ahead of this).
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(beforeResume);
+      presentation.resume();
+      expect(presentation.isPaused()).toBe(false);
+      await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(beforeResume));
+    });
+
+    it('resume() without a prior pause(), and a repeated pause()/resume(), are safe no-ops rather than corrupting the wait queue', async () => {
+      const { presentation } = fixture();
+      expect(() => presentation.resume()).not.toThrow();
+      expect(presentation.isPaused()).toBe(false);
+      presentation.pause();
+      presentation.pause();
+      expect(presentation.isPaused()).toBe(true);
+      presentation.resume();
+      presentation.resume();
+      expect(presentation.isPaused()).toBe(false);
+      // The Session still drives normally afterward - pause/resume bookkeeping did not leave it stuck.
+      const eventsBefore = presentation.getSnapshot().events.length;
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getSnapshot().events.length).toBeGreaterThan(eventsBefore));
+    });
+  });
 });

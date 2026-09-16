@@ -81,6 +81,8 @@ export class SessionPresentation {
   private readonly listeners = new Set<() => void>();
   private snapshot: SessionPresentationSnapshot;
   private autoPlayStarted = false;
+  private paused = false;
+  private pauseWaiters: (() => void)[] = [];
 
   constructor(private readonly session: StartedSession) {
     this.snapshot = this.project(session.startupEvents);
@@ -144,12 +146,53 @@ export class SessionPresentation {
     void this.driveTurns(botTurnDelayMs);
   }
 
+  /**
+   * Pauses automatic Turn advancement (M4-T10; ui-ux.md §9.2: "While either overlay is open,
+   * Orchestrator progression is paused so bot actions do not occur unseen"). Idempotent. Only
+   * `driveTurns`'s own loop below observes this — a human Turn already sits idle awaiting
+   * HumanController's own pending Move regardless of pause state, and `continueToNextRound`
+   * (an explicit user action, not automatic advancement) is intentionally unaffected. A single
+   * shared pause flag is sufficient for this task's own two overlays (Discard Pile/Event Log,
+   * opened one at a time from one piece of UI state, App.tsx's `SessionTable`); it is not
+   * reference-counted across independent callers, which is not yet a real scenario until a later
+   * task (e.g. M4-T11's Leave confirmation, M4-T12's Round Result) actually needs its own
+   * independent pause source.
+   */
+  pause(): void {
+    this.paused = true;
+  }
+
+  /** Resumes automatic Turn advancement from the exact point it was paused. Idempotent. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    const waiters = this.pauseWaiters.splice(0);
+    waiters.forEach((resolve) => resolve());
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  private async waitWhilePaused(): Promise<void> {
+    while (this.paused) {
+      await new Promise<void>((resolve) => this.pauseWaiters.push(resolve));
+    }
+  }
+
   private async driveTurns(botTurnDelayMs: number): Promise<void> {
     while (this.getSnapshot().status === 'ROUND_ACTIVE') {
+      await this.waitWhilePaused();
+      if (this.getSnapshot().status !== 'ROUND_ACTIVE') return;
       const currentPlayerId = this.getSnapshot().currentPlayerId;
       if (botTurnDelayMs > 0 && currentPlayerId !== null && currentPlayerId !== this.session.humanController.playerId) {
         await new Promise((resolve) => setTimeout(resolve, botTurnDelayMs));
       }
+      // Re-checked after the presentation delay above: an overlay may have opened while that delay
+      // was in flight, and the actual state-advancing step is the `runTurn()` call below, not the
+      // delay itself - this is the gate that must hold pause, not the one above.
+      await this.waitWhilePaused();
+      if (this.getSnapshot().status !== 'ROUND_ACTIVE') return;
       let result: { readonly accepted: boolean };
       try {
         result = await this.runTurn();

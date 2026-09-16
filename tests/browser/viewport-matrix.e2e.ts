@@ -32,7 +32,7 @@ for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'sup
     for (const name of ['West', 'North', 'East']) {
       await expect(page.getByRole('region', { name: `${name} panel` })).toBeVisible();
     }
-    await expect(page.getByRole('button', { name: 'Discard Pile', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Check Discard Pile', exact: true })).toBeVisible();
   });
 }
 

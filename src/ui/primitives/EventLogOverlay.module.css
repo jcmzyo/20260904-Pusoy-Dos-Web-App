@@ -1,0 +1,42 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.entry {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.1);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.entryText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The played combination's own cards, at the right end of its entry (the person's own follow-up
+ * request to mirror the seat's own Play trail here) - `flex-shrink: 0` keeps the fixed-width `CardIndex`
+ * badges (Card.module.css) from being squeezed when the entry text wraps at a narrow width. */
+.entryCards {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.empty {
+  margin: 0;
+  color: #c8d8cd;
+  font-size: 14px;
+}
