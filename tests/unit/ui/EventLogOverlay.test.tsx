@@ -73,6 +73,26 @@ describe('describeEvent / describeEvents (M4-T10; ui-ux.md §9.2)', () => {
     ]);
   });
 
+  it("does not append \"Free lead!\" when the Trick's own winner had already emptied their hand on that Play and so cannot take the next lead themselves (requirements.md §2.5.1: the next active player becomes the new leader instead) - a real reported bug where an already-finished player's Trick win read as if they had somehow taken the table back", () => {
+    // East's Pair stood unbeaten (a genuine Trick win) on the very Play that emptied East's own hand;
+    // North/South/West all then declined to lead in East's place, so the free lead actually passes to
+    // South - not back to East, who has already left the active rotation.
+    const events: readonly GameEvent[] = [
+      { type: 'CARDS_PLAYED', roundNumber: 2, playerId: 'east', combination: { type: 'pair', cards: [{ rank: '8', suit: 'clubs' }, { rank: '8', suit: 'diamonds' }] } },
+      { type: 'PLAYER_FINISHED', roundNumber: 2, playerId: 'east', placement: 1 },
+      { type: 'PLAYER_PASSED', roundNumber: 2, playerId: 'north' },
+      { type: 'PLAYER_PASSED', roundNumber: 2, playerId: 'south' },
+      { type: 'PLAYER_PASSED', roundNumber: 2, playerId: 'west' },
+      { type: 'TRICK_ENDED', roundNumber: 2, lastSuccessfulPlayerId: 'east' },
+      { type: 'TURN_CHANGED', roundNumber: 2, playerId: 'south' },
+    ];
+    expect(describeEvents(events, NAMES).map((entry) => entry.text)).toEqual([
+      'Cy played Pair.', 'Cy finished 1st.', 'Bo passed.', 'You passed.', 'Ana passed.',
+      // No "Free lead!" here - East (Cy) does not lead next; the following Turn is South's (You), not East's.
+      'Cy won the Trick.',
+    ]);
+  });
+
   it('excludes engine-internal/non-Round-history events (CARDS_DEALT, TURN_CHANGED, SCORE_CALCULATED, SESSION_STARTED, SESSION_ENDED)', () => {
     expect(describeEvent({ type: 'CARDS_DEALT', roundNumber: 1, players: [] }, NAMES)).toBeNull();
     expect(describeEvent({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'south' }, NAMES)).toBeNull();
@@ -112,9 +132,9 @@ describe('EventLogOverlay (M4-T10)', () => {
     expect(items.map((item) => item.textContent)).toEqual(['Round 1 started.', 'Ana passed.', 'Bo passed.']);
   });
 
-  it('shows a placeholder message for an empty Round history', () => {
+  it('shows a placeholder message for an empty Session history', () => {
     render(<EventLogOverlay events={[]} names={NAMES} onClose={() => {}} />);
-    expect(screen.getByText('No events yet this Round.')).toBeTruthy();
+    expect(screen.getByText('No events yet this Session.')).toBeTruthy();
   });
 
   it("renders a CARDS_PLAYED entry's exact cards as visual badges at the end of its line, mirroring the seat's own Play trail (the person's own follow-up request)", () => {

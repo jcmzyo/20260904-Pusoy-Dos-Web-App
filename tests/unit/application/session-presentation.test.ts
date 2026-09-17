@@ -233,6 +233,56 @@ describe('production Session presentation', () => {
     presentation.startAutoPlay();
   });
 
+  it('keeps startAutoPlay driving Turns into the next Round, not only the first (regression: a bot holding 3♣ at the start of Round 2 got stuck indefinitely, because driveTurns exited for good the instant Round 1 ended and nothing ever restarted it)', async () => {
+    let seed = 11;
+    const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+    const created = createSession(ids);
+    const started = startRound(created.state, engineRng);
+    const human = new HumanController('south');
+    const preferPlay = (request: PlayerTurnRequest): Move =>
+      request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!;
+    const bots: readonly PlayerController[] = ids
+      .filter((id) => id !== 'south')
+      .map((playerId) => ({ playerId, chooseMove: async (request: PlayerTurnRequest) => preferPlay(request) }));
+    const controllers = new Map<string, PlayerController>([human, ...bots].map((controller) => [controller.playerId, controller]));
+    const session: StartedSession = {
+      runner: new GameRunner(started.state, defaultRuleset, controllers, true),
+      humanController: human, engineRng, initialView: getPublicView(started.state),
+      startupEvents: [...created.events], names: { south: 'You', west: 'W', north: 'N', east: 'E' },
+    };
+    const presentation = new SessionPresentation(session);
+    // Zero delay keeps this deterministic/fast, same as the fixture above.
+    presentation.startAutoPlay(0);
+
+    // Drives Round 1 to its own Result checkpoint exactly as App.tsx does - only ever resolving
+    // whichever human input arrives, never calling runTurn() directly - so every bot Turn along the
+    // way is genuinely driven by startAutoPlay's own background loop.
+    let guard = 0;
+    while (presentation.getSnapshot().roundCheckpoint === null && guard++ < 500) {
+      await vi.waitFor(() => expect(
+        presentation.getPendingHumanRequest() !== null || presentation.getSnapshot().roundCheckpoint !== null,
+      ).toBe(true));
+      const request = presentation.getPendingHumanRequest();
+      if (request) presentation.resolveHumanMove(request.requestId, preferPlay(request));
+    }
+    expect(guard).toBeLessThan(500);
+    expect(presentation.getSnapshot()).toMatchObject({ status: 'ROUND_RESULT', roundNumber: 1 });
+
+    presentation.continueToNextRound();
+    expect(presentation.getSnapshot()).toMatchObject({ status: 'ROUND_ACTIVE', roundNumber: 2 });
+    // Captured after continueToNextRound() itself (whose own ROUND_STARTED/CARDS_DEALT/TURN_CHANGED
+    // publish already moved this count once, on its own, regardless of whether driveTurns is still
+    // running) - what this test actually needs is a Turn beyond that, which only driveTurns can cause.
+    const eventsAfterContinue = presentation.getSnapshot().events.length;
+
+    // The actual regression: before the fix, nothing above would ever move again - no further public
+    // event, and no human request ever surfaced even for a South Turn - because driveTurns' own loop
+    // had already returned for good once Round 1 ended.
+    await vi.waitFor(() => expect(
+      presentation.getPendingHumanRequest() !== null || presentation.getSnapshot().events.length > eventsAfterContinue,
+    ).toBe(true));
+  });
+
   it('waits botTurnDelayMs before each bot Turn but never delays the start of the human\'s own Turn (M4-T09 slice)', async () => {
     const { presentation } = fixture();
     // Reach South's Turn with plain manual runTurn() calls first (no delay involved at all, whoever

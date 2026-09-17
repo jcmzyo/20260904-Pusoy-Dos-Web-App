@@ -1,10 +1,10 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.5)
+## UI / UX Document (v1.6)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 17, 2026  
-**Parent document:** `requirements.md` v1.14  
+**Last Modified:** September 18, 2026  
+**Parent document:** `requirements.md` v1.15  
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---
@@ -51,7 +51,16 @@ The center contains:
 
 The current hand to beat remains visible through Passes until beaten/reset. Every successfully played card immediately belongs to the public Discard Pile, including cards from the current Trick.
 
-A Straight or Straight Flush displays its five cards in that combination's own ascending house-rule sequence (§2.4.1 of `requirements.md`: `A-2-3-4-5`, `2-3-4-5-6`, `3-4-5-6-7`, ..., `10-J-Q-K-A`, `J-Q-K-A-2`), not the hand's own Sort-by-Rank order (§6). The two orders differ only for the two special low Straights, where Sort-by-Rank's Ace/2-high convention would otherwise scatter the low cards to the end of the display (e.g. showing `3,4,5,A,2` instead of `A,2,3,4,5`). Every other combination type (Single, Pair, Triple, Flush, Full House, Four-of-a-Kind) displays its cards in the order they were played, unchanged.
+Every combination type displays its cards in a fixed canonical order — never the order the cards happened to be selected/submitted in:
+
+- **Single:** the one card, unchanged.
+- **Pair** and **Triple:** all cards share one Rank, so they are ordered by Suit low → high (`Clubs < Spades < Hearts < Diamonds`, §2.2 of `requirements.md`).
+- **Straight** and **Straight Flush:** the five cards in that combination's own ascending house-rule sequence (§2.4.1 of `requirements.md`: `A-2-3-4-5`, `2-3-4-5-6`, `3-4-5-6-7`, ..., `10-J-Q-K-A`, `J-Q-K-A-2`), not the hand's own Sort-by-Rank order (§6). The two orders differ only for the two special low Straights, where Sort-by-Rank's Ace/2-high convention would otherwise scatter the low cards to the end of the display (e.g. showing `3,4,5,A,2` instead of `A,2,3,4,5`).
+- **Flush:** the five same-suit cards ordered by Rank low → high (`3 → ... → A → 2`, the same Rank order §6's Sort by Rank uses).
+- **Full House:** the Triple's three cards first (themselves ordered by Suit low → high), then the Pair's two cards (themselves ordered by Suit low → high) — `requirements.md` §2.4.3's own "Triple"/"Pair" distinction, not submission order.
+- **Four-of-a-Kind:** the four matching cards first (themselves ordered by Suit low → high — all four suits are necessarily present), then the kicker last — `requirements.md` §2.4.4's own "four matching cards"/"kicker" distinction.
+
+This is a UI presentation choice layered on an already-Engine-validated `Combination`; it never changes what combination was recognized, its legality, or its comparison strength (M4-T12.5).
 
 Card face detail (corner index vs. center pip) is defined in §5.6.
 
@@ -77,7 +86,7 @@ West and East render each face-down card **rotated 90° to match the seat's own 
 
 In addition to the center table's current hand to beat (§5.1), each seat shows **its own most recent Play for the active response cycle**, inside that seat's own panel (alongside its name/count/score/status):
 
-- When a seat successfully Plays, that combination renders as a compact rank+suit corner badge per card (not a shrunk full card face, which reads illegibly at that size) inside the seat's own panel. The badge row wraps and stays within the panel's own width so it never grows out into the center table's own space. It follows the same card-order rule as the center table's own hand to beat (§5.1), including the Straight/Straight-Flush sequence order.
+- When a seat successfully Plays, that combination renders as a compact rank+suit corner badge per card (not a shrunk full card face, which reads illegibly at that size) inside the seat's own panel. The badge row wraps and stays within the panel's own width so it never grows out into the center table's own space. It follows the same canonical card-order rule as the center table's own hand to beat (§5.1), for every combination type.
 - That seat's own last Play is shown at full visibility while it is still the hand to beat, and **dimmed ("grayed out")** once a later Play beats it — it is not removed, so the player can see what was beaten and by how much.
 - A seat that Passes shows an explicit **PASS** at its own position (already specified in §8) **instead of** any earlier Play indicator from that same seat this cycle — a seat's own Pass replaces its own prior Play badge rather than showing both together, even if that Play had not yet been beaten.
 - While a seat's own "deciding" indicator (§8) is showing, its Play trail is hidden — it is about to be replaced by that seat's next decision anyway.
@@ -152,9 +161,9 @@ The Discard Pile button opens an overlay containing **all cards successfully pla
 
 ## 9.2 Event Log
 
-The bottom Event Log button shows the most recent factual event as compact preview text where space permits. Opening it shows the chronological public Round history. It initially opens at the newest event; scrolling upward moves toward earlier events and the first event is at the top.
+The bottom Event Log button shows the most recent factual event as compact preview text where space permits. Opening it shows the chronological public **Session** history, not only the current Round's — so an already-completed Round's own history remains reachable after that Round's Result overlay closes and the next Round begins, rather than resetting every Round. It initially opens at the newest event; scrolling upward moves toward earlier events and the first event of the whole Session is at the top.
 
-Record useful public gameplay events such as Round start/opener, exact Play + recognized combination, Pass, Trick reset/free lead, and player finish/placement. It is a player-facing factual history, not a debug trace.
+Record useful public gameplay events such as Round start/opener, exact Play + recognized combination, Pass, Trick reset/free lead, and player finish/placement. Each Round's own start and completion entries double as that Round's own boundary markers within the combined Session history, so earlier Rounds read as one continuous history rather than needing a separate marker event of their own. It is a player-facing factual history, not a debug trace.
 
 Both overlays derive from authoritative public Engine history/events. While either overlay is open, Orchestrator progression is paused so bot actions do not occur unseen. Closing resumes from the same execution point.
 
@@ -183,6 +192,16 @@ The scoring presentation sequence is:
 The animation is short and skippable by click/tap; skipping completes the visual state but must not trigger Next Round. Ties during an unfinished Session retain stable previous relative order rather than inventing a final ranking.
 
 Rounds 1–4 show **Next Round**. Round 5 shows **View Session Results**.
+
+## 12.1 Round-Start Transition Screen
+
+Between clicking **Next Round** and the next Round's own opening Turn becoming interactive, a brief transition screen dims the table and shows the destination Round number (e.g. **Round 3**), then lights the table back up once that Round is actually live. The next Round's own dealing/start is deferred until this transition ends — by its own short timer or an earlier click/tap skip — rather than the new Round flashing into view underneath the transition screen.
+
+The same dim/label/lit treatment also covers Round 1's own very first start, immediately after Start Game, so every Round — including the first — gets the identical transition rather than only Rounds 2 and later. Round 1 is already dealt and live the moment the table first renders, so there is nothing to defer there; the transition instead pauses ordinary Turn advancement for its own short duration (the same reference-counted pause any open overlay already uses, §9.2), purely so the same visual sequence applies uniformly across every Round.
+
+The transition is short, matching the same brief/skippable presentational-delay convention used elsewhere (§8's bot pacing, §11's reveal) rather than a longer ceremony. A click/tap skip only ends the transition itself; it never also advances into further gameplay on its own — the same "skipping must not accidentally activate the next action" rule §11 and §12 already state.
+
+This is presentation only, layered on the same authoritative Round-boundary state already described above; it introduces no new Engine/Orchestrator state.
 
 # 13. Session Summary
 

@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.14)
+## Requirements & Planning Document (v1.15)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 15, 2026
+**Last Modified:** September 18, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -495,6 +495,20 @@ When a player empties their hand in Basic Mode:
 
 This means a player going out does **not** automatically end the current
 trick in Basic Mode.
+
+### 2.5.2 Basic Mode continuation — approved future change (not yet implemented)
+
+**Status:** Approved direction, deferred to a specific future task (**M4-T12.5**). §2.5.1 above remains the current authoritative rule and matches the currently implemented Engine behavior; this subsection only records the approved change for when that task is picked up, so it is not silently lost or reinvented later. Do not implement this ahead of that task.
+
+The person's own follow-up report on top of §2.5.1: silently determining, in one Engine transaction, whether any remaining active player can beat the finisher's own final combination — and if not, immediately reassigning the free lead without any of those players ever taking a visible Turn — reads as though those players were skipped rather than actually checked.
+
+The approved replacement behavior, once implemented: after a player empties their hand (§2.5.1 steps 1–3), each remaining active player, in turn order starting from the next active player after the finisher, still takes an **explicit Turn of their own**:
+
+1.  If that player has a legal combination that beats the finisher's own final combination, they may play it — normal trick flow continues from that Play, and pass count resets — exactly as today.
+2.  If they have no such legal combination, or simply choose not to play a beating combination they do have (a strategic Pass remains available, consistent with §2.5's general Pass rules), they explicitly Pass on their own Turn. The Engine no longer determines this on the player's behalf.
+3.  Once every remaining active player has, in turn, either played a beating combination or explicitly passed without one, the next active player after the finisher becomes the new leader (the same eventual outcome §2.5.1 step 6 already describes) and may play any valid combination.
+
+This does not change the eventual **result** of who ends up leading or who gets to respond — it changes **how** that result is reached, replacing one silent Engine-only determination with each affected player's own visible Turn and (where applicable) a real Pass. This is an Engine/Orchestrator-level Turn-generation change (additional real Turns and `PLAYER_PASSED` events), not merely a UI presentation change. Implementing it requires updating `resolveBasicContinuation.ts` and any engine-level design documentation maintained for it (this repository copy does not currently include a separate `engine.md`), and — once implemented and verified — promoting this subsection's own text into §2.5.1's authoritative rule with the person's approval, rather than leaving both sections describing different behavior indefinitely.
 
 ------------------------------------------------------------------------
 

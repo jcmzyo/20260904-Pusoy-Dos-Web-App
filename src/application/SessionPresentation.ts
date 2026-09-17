@@ -83,6 +83,10 @@ export class SessionPresentation {
   private autoPlayStarted = false;
   private pauseCount = 0;
   private pauseWaiters: (() => void)[] = [];
+  // Woken by `publish()` (every accepted Turn and every `continueToNextRound()`) and by `destroy()`,
+  // mirroring `pauseWaiters`' own convention - lets `driveTurns` below block between Rounds without
+  // busy-polling instead of exiting outright (see its own docstring for the bug this fixes).
+  private roundWaiters: (() => void)[] = [];
   private destroyed = false;
 
   constructor(private readonly session: StartedSession) {
@@ -196,6 +200,8 @@ export class SessionPresentation {
     this.destroyed = true;
     const waiters = this.pauseWaiters.splice(0);
     waiters.forEach((resolve) => resolve());
+    const roundWaiters = this.roundWaiters.splice(0);
+    roundWaiters.forEach((resolve) => resolve());
     this.listeners.clear();
   }
 
@@ -205,10 +211,33 @@ export class SessionPresentation {
     }
   }
 
+  /** Blocks while a Round is not actually in progress (`'READY'` before the first Round, or
+   *  `'ROUND_RESULT'` between Rounds 1-4) without busy-polling, woken by the next `publish()` -
+   *  `continueToNextRound()`'s own publish is exactly what starts driving the next Round's Turns again.
+   *  Returns immediately once a Round is active or the Session is over; `driveTurns`'s own loop
+   *  condition below is what stops advancement for good once `'SESSION_COMPLETE'` is reached. */
+  private async waitForRoundActive(): Promise<void> {
+    while (!this.destroyed && this.getSnapshot().status !== 'ROUND_ACTIVE' && this.getSnapshot().status !== 'SESSION_COMPLETE') {
+      await new Promise<void>((resolve) => this.roundWaiters.push(resolve));
+    }
+  }
+
+  /**
+   * Drives Turns for every Round of the Session, not only the first: after a Round ends, `status`
+   * leaves `'ROUND_ACTIVE'` (to `'ROUND_RESULT'` for Rounds 1-4, or straight to `'SESSION_COMPLETE'` for
+   * Round 5's own status-collapse) and no further Turn is ever requested until `continueToNextRound()`
+   * runs - so this loop must wait for that rather than exiting the instant it first observes a
+   * non-active Round. That was the actual bug behind a bot's Turn spinner getting stuck indefinitely
+   * from Round 2 onward: the original loop's condition doubled as its own exit condition, so it
+   * returned for good the moment Round 1 finished, and nothing was ever driving Turns again afterward
+   * even though `continueToNextRound()` had genuinely started a new, otherwise-undriven Round.
+   */
   private async driveTurns(botTurnDelayMs: number): Promise<void> {
-    while (!this.destroyed && this.getSnapshot().status === 'ROUND_ACTIVE') {
+    while (!this.destroyed && this.getSnapshot().status !== 'SESSION_COMPLETE') {
+      await this.waitForRoundActive();
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
       await this.waitWhilePaused();
-      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') return;
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
       const currentPlayerId = this.getSnapshot().currentPlayerId;
       if (botTurnDelayMs > 0 && currentPlayerId !== null && currentPlayerId !== this.session.humanController.playerId) {
         await new Promise((resolve) => setTimeout(resolve, botTurnDelayMs));
@@ -218,7 +247,7 @@ export class SessionPresentation {
       // `runTurn()` call below, not the delay itself - this is the gate that must hold pause, not the
       // one above.
       await this.waitWhilePaused();
-      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') return;
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
       let result: { readonly accepted: boolean };
       try {
         result = await this.runTurn();
@@ -233,6 +262,8 @@ export class SessionPresentation {
   private publish(events: readonly GameEvent[]): void {
     this.snapshot = this.project([...this.snapshot.events, ...events]);
     this.listeners.forEach((listener) => listener());
+    const roundWaiters = this.roundWaiters.splice(0);
+    roundWaiters.forEach((resolve) => resolve());
   }
 
   private project(events: readonly GameEvent[]): SessionPresentationSnapshot {
