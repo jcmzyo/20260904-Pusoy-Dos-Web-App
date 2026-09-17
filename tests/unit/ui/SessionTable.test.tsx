@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Move } from '../../../src/domain';
 import { SessionPresentation } from '../../../src/application/SessionPresentation';
 import type { StartedSession } from '../../../src/application/startSession';
@@ -131,5 +131,48 @@ describe('SessionTable seats and center (M4-T06)', () => {
     // seats retains either a "Current Play" or "Previous Play, now beaten" landmark.
     expect(screen.queryAllByRole('group', { name: 'Current Play' })).toHaveLength(0);
     expect(screen.queryAllByRole('group', { name: 'Previous Play, now beaten' })).toHaveLength(0);
+  });
+});
+
+describe('Leave Game confirmation (M4-T11; ui-ux.md §10)', () => {
+  it('opens a confirmation naming that progress is not saved; Stay closes it without leaving', () => {
+    const presentation = fixture();
+    const onLeave = vi.fn();
+    render(<SessionTable presentation={presentation} onLeave={onLeave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    expect(screen.getByRole('dialog', { name: 'Leave Game' })).toBeTruthy();
+    expect(screen.getByText(/progress is not saved/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+    // The table itself is still there, unaffected by the cancelled Leave attempt.
+    expect(screen.getByRole('region', { name: 'Game Table' })).toBeTruthy();
+  });
+
+  it('confirming Leave calls the onLeave callback exactly once', () => {
+    const presentation = fixture();
+    const onLeave = vi.fn();
+    render(<SessionTable presentation={presentation} onLeave={onLeave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Leave Game' }));
+    expect(onLeave).toHaveBeenCalledOnce();
+  });
+
+  it('Escape and a backdrop click both behave as Stay, not as Leave', () => {
+    const presentation = fixture();
+    const onLeave = vi.fn();
+    render(<SessionTable presentation={presentation} onLeave={onLeave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+  });
+
+  it('defaults to a safe no-op onLeave for callers (existing tests) that render SessionTable without one', () => {
+    const presentation = fixture();
+    render(<SessionTable presentation={presentation} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Yes, Leave Game' }))).not.toThrow();
   });
 });

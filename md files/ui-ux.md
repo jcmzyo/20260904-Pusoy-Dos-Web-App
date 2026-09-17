@@ -192,7 +192,7 @@ Give 1st/2nd/3rd restrained gold/silver/bronze background/border treatment while
 
 # 14. Responsive and Orientation Contract
 
-Gameplay is landscape-first and must support large desktop, normal laptop, smaller/windowed desktop, tablet landscape, large phone landscape, and a defined small supported phone landscape. Portrait is unsupported gameplay orientation: pause/prevent interaction and show **Rotate your device to continue**; returning to landscape restores coherent state. Too-small landscape shows resize/unsupported guidance rather than an unreadable table.
+Gameplay is landscape-first and must support large desktop, normal laptop, smaller/windowed desktop, tablet landscape, large phone landscape, and a defined small supported phone landscape. Portrait is unsupported gameplay orientation: pause/prevent interaction and show **Rotate your device to continue** — but only on a touch/coarse-pointer device that can actually be physically rotated (a phone or tablet); a portrait-shaped window on a mouse/trackpad (fine-pointer) desktop or laptop cannot be rotated, so it instead gets the same resize/unsupported guidance as too-small landscape (M4-T11 follow-up). Returning to landscape, or to a supported size, restores coherent state. Too-small landscape shows resize/unsupported guidance rather than an unreadable table.
 
 Use a bounded ratio-controlled play area rather than assuming fullscreen or exact 16:9. Cards preserve a constant aspect ratio. Text uses bounded readable sizing and critical controls retain usable click/touch targets. Secondary UI compresses/reflows before core gameplay becomes unusable.
 

@@ -392,5 +392,74 @@ describe('production Session presentation', () => {
       presentation.startAutoPlay(0);
       await vi.waitFor(() => expect(presentation.getSnapshot().events.length).toBeGreaterThan(eventsBefore));
     });
+
+    it('is reference-counted across independent callers, so one resume() does not unpause a second still-active pause() source (M4-T11: Leave confirmation and the portrait/undersized layout guard can be paused at the same time)', async () => {
+      const { presentation } = fixture();
+      presentation.startAutoPlay(0);
+      presentation.pause(); // e.g. Leave confirmation opens
+      presentation.pause(); // e.g. the layout independently becomes unsupported while it is still open
+      expect(presentation.isPaused()).toBe(true);
+      presentation.resume(); // Leave confirmation closes (Stay)
+      // The layout source is still holding it paused - a single idempotent flag (the pre-M4-T11 design)
+      // would have incorrectly reported this as unpaused and let the loop run ahead.
+      expect(presentation.isPaused()).toBe(true);
+      const stillPaused = presentation.getSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(stillPaused);
+      presentation.resume(); // the layout becomes supported again
+      expect(presentation.isPaused()).toBe(false);
+      await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(stillPaused));
+    });
+  });
+
+  describe('destroy (M4-T11 follow-up: Leave Game abandons the Session instead of pausing it forever)', () => {
+    it('stops automatic Turn advancement for good, even if resume() is called afterward', async () => {
+      const { presentation } = fixture();
+      presentation.startAutoPlay(0);
+      // Synchronous, immediately after starting autoplay - see the pause/resume tests above for why
+      // this ordering is race-free against a 0ms-delay loop's own first pending await.
+      presentation.destroy();
+      presentation.resume(); // a stray resume (e.g. an in-flight unmount effect) must not resurrect it
+      const afterDestroy = presentation.getSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(afterDestroy);
+    });
+
+    it('is idempotent and safe to call before startAutoPlay, or more than once', async () => {
+      const { presentation } = fixture();
+      expect(() => presentation.destroy()).not.toThrow();
+      expect(() => presentation.destroy()).not.toThrow();
+      // A Session destroyed before it ever started driving Turns never advances one.
+      presentation.startAutoPlay(0);
+      const afterDestroy = presentation.getSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(afterDestroy);
+    });
+
+    it('wakes a driveTurns loop genuinely suspended in pause() and makes it exit for good, rather than leaving it stuck forever', async () => {
+      const { presentation } = fixture();
+      presentation.pause(); // paused before any Turn ever starts
+      presentation.startAutoPlay(0);
+      // Lets driveTurns' first waitWhilePaused() actually register its waiter and suspend, rather than
+      // racing destroy() against a wait that has not started yet.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(presentation.isPaused()).toBe(true);
+      presentation.destroy();
+      // If destroy() only unstuck the wait without making the loop exit, this stray resume() (dropping
+      // pauseCount back to 0) would let it continue on and start advancing Turns.
+      presentation.resume();
+      const afterDestroy = presentation.getSnapshot();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(afterDestroy);
+    });
+
+    it('leaves getSnapshot and an existing subscription safely callable afterward, even though no further updates are published', () => {
+      const { presentation } = fixture();
+      const listener = vi.fn();
+      const unsubscribe = presentation.subscribe(listener);
+      presentation.destroy();
+      expect(() => presentation.getSnapshot()).not.toThrow();
+      expect(() => unsubscribe()).not.toThrow();
+    });
   });
 });
