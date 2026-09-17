@@ -81,8 +81,9 @@ export class SessionPresentation {
   private readonly listeners = new Set<() => void>();
   private snapshot: SessionPresentationSnapshot;
   private autoPlayStarted = false;
-  private paused = false;
+  private pauseCount = 0;
   private pauseWaiters: (() => void)[] = [];
+  private destroyed = false;
 
   constructor(private readonly session: StartedSession) {
     this.snapshot = this.project(session.startupEvents);
@@ -148,51 +149,76 @@ export class SessionPresentation {
 
   /**
    * Pauses automatic Turn advancement (M4-T10; ui-ux.md §9.2: "While either overlay is open,
-   * Orchestrator progression is paused so bot actions do not occur unseen"). Idempotent. Only
-   * `driveTurns`'s own loop below observes this — a human Turn already sits idle awaiting
-   * HumanController's own pending Move regardless of pause state, and `continueToNextRound`
-   * (an explicit user action, not automatic advancement) is intentionally unaffected. A single
-   * shared pause flag is sufficient for this task's own two overlays (Discard Pile/Event Log,
-   * opened one at a time from one piece of UI state, App.tsx's `SessionTable`); it is not
-   * reference-counted across independent callers, which is not yet a real scenario until a later
-   * task (e.g. M4-T11's Leave confirmation, M4-T12's Round Result) actually needs its own
-   * independent pause source.
+   * Orchestrator progression is paused so bot actions do not occur unseen"). Only `driveTurns`'s own
+   * loop below observes this — a human Turn already sits idle awaiting HumanController's own pending
+   * Move regardless of pause state, and `continueToNextRound` (an explicit user action, not automatic
+   * advancement) is intentionally unaffected.
+   *
+   * Reference-counted rather than a single idempotent flag: M4-T11 added independent pause sources
+   * (Leave confirmation, and the portrait/undersized layout guard) that can be active at the same time
+   * as each other or as an open Discard Pile/Event Log overlay — e.g. the window is resized to an
+   * unsupported size while Leave confirmation is already open. Each `pause()` must be matched by exactly
+   * one `resume()`; advancement only actually resumes once every caller that paused it has resumed.
    */
   pause(): void {
-    this.paused = true;
+    this.pauseCount += 1;
   }
 
-  /** Resumes automatic Turn advancement from the exact point it was paused. Idempotent. */
+  /** Resumes automatic Turn advancement once every `pause()` call has been matched by a `resume()`.
+   *  A `resume()` with no outstanding `pause()` is a no-op rather than going negative. */
   resume(): void {
-    if (!this.paused) return;
-    this.paused = false;
+    if (this.pauseCount === 0) return;
+    this.pauseCount -= 1;
+    if (this.pauseCount > 0) return;
     const waiters = this.pauseWaiters.splice(0);
     waiters.forEach((resolve) => resolve());
   }
 
   isPaused(): boolean {
-    return this.paused;
+    return this.pauseCount > 0;
+  }
+
+  /**
+   * Permanently abandons this Session's presentation (M4-T11 follow-up: Leave Game). Unlike
+   * `pause()`/`resume()` — for temporary interruptions (an open overlay, an unsupported viewport)
+   * that resume the SAME Session — leaving the table gives up on the Session outright, so this makes
+   * `driveTurns`'s background loop actually exit rather than parking it forever on an unmatched extra
+   * `pause()`: a permanent pause would leave that loop suspended on a `pauseWaiters` Promise that never
+   * resolves, keeping this object (and its closure over `session`/`listeners`) reachable for as long as
+   * anything still holds a reference to it. `destroy()` instead lets the loop return and this instance
+   * become eligible for garbage collection once the caller (App.tsx) drops its own reference.
+   *
+   * Idempotent — a repeat call is a safe no-op — and safe regardless of pause state or whether
+   * `startAutoPlay` was ever called at all.
+   */
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    const waiters = this.pauseWaiters.splice(0);
+    waiters.forEach((resolve) => resolve());
+    this.listeners.clear();
   }
 
   private async waitWhilePaused(): Promise<void> {
-    while (this.paused) {
+    while (!this.destroyed && this.pauseCount > 0) {
       await new Promise<void>((resolve) => this.pauseWaiters.push(resolve));
     }
   }
 
   private async driveTurns(botTurnDelayMs: number): Promise<void> {
-    while (this.getSnapshot().status === 'ROUND_ACTIVE') {
+    while (!this.destroyed && this.getSnapshot().status === 'ROUND_ACTIVE') {
       await this.waitWhilePaused();
-      if (this.getSnapshot().status !== 'ROUND_ACTIVE') return;
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') return;
       const currentPlayerId = this.getSnapshot().currentPlayerId;
       if (botTurnDelayMs > 0 && currentPlayerId !== null && currentPlayerId !== this.session.humanController.playerId) {
         await new Promise((resolve) => setTimeout(resolve, botTurnDelayMs));
       }
-      // Re-checked after the presentation delay above: an overlay may have opened while that delay
-      // was in flight, and the actual state-advancing step is the `runTurn()` call below, not the
-      // delay itself - this is the gate that must hold pause, not the one above.
+      // Re-checked after the presentation delay above: an overlay may have opened (or `destroy()` may
+      // have been called) while that delay was in flight, and the actual state-advancing step is the
+      // `runTurn()` call below, not the delay itself - this is the gate that must hold pause, not the
+      // one above.
       await this.waitWhilePaused();
-      if (this.getSnapshot().status !== 'ROUND_ACTIVE') return;
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') return;
       let result: { readonly accepted: boolean };
       try {
         result = await this.runTurn();

@@ -10,6 +10,39 @@ import { App, SessionTable } from '../../../src/ui/App';
 
 afterEach(cleanup);
 
+/** Simulates a browser resize/orientation change for `useLayoutSupport` (M4-T11): jsdom's own default
+ *  window is 1024x768 (the T04 matrix's `tablet-landscape` entry - comfortably supported), so every
+ *  other test file's rendering is unaffected; only tests that call this exercise the guard. */
+function resizeWindowTo(width: number, height: number) {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });
+  window.dispatchEvent(new Event('resize'));
+}
+
+afterEach(() => resizeWindowTo(1024, 768));
+
+/** Simulates a touch/coarse-pointer device (a phone or tablet) for `useLayoutSupport`'s pointer-based
+ *  rotate-vs-resize guidance (M4-T11 follow-up): jsdom has no `window.matchMedia` at all by default,
+ *  which the hook already treats as a fine-pointer/desktop device, so every other test exercises that
+ *  default without needing this. Restored (deleted) after every test so it never leaks between them. */
+function mockCoarsePointer() {
+  window.matchMedia = ((query: string) => ({
+    matches: query === '(pointer: coarse)',
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+}
+
+afterEach(() => {
+  // @ts-expect-error - deleting back to jsdom's own default (no matchMedia at all).
+  delete window.matchMedia;
+});
+
 describe('Home and immediate Session startup', () => {
   it('subscribes the table to safe production snapshots across Round continuation', async () => {
     const session = startSession<PlayerController>(createSessionConfiguration(), {
@@ -93,5 +126,119 @@ describe('Home and immediate Session startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
     expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
     expect(start).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
+  it('replaces Home with rotate guidance in a portrait viewport on a touch device, and with resize guidance in an undersized landscape viewport', () => {
+    mockCoarsePointer(); // a phone/tablet - the only kind of device that can actually be rotated
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+
+    // Portrait: matches the T04 matrix's own `portrait-unsupported` entry (390x844).
+    act(() => resizeWindowTo(390, 844));
+    expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+
+    // Back to a supported size restores Home.
+    act(() => resizeWindowTo(1024, 768));
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+
+    // Undersized landscape: matches the T04 matrix's own `undersized-landscape` entry (560x320).
+    act(() => resizeWindowTo(560, 320));
+    expect(screen.getByText(/resize/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+  });
+
+  it('shows resize guidance, not rotate, for a portrait-shaped window on a fine-pointer (mouse/trackpad) desktop device (M4-T11 follow-up)', () => {
+    // No mockCoarsePointer() here: jsdom's default (no matchMedia at all) is already treated as a
+    // fine-pointer/desktop device - the person cannot physically rotate a desktop monitor, so asking
+    // them to would be an impossible instruction.
+    render(<App />);
+    act(() => resizeWindowTo(390, 844)); // same portrait-shaped dimensions as the touch-device test above
+    expect(screen.getByText('Resize your window to continue')).toBeTruthy();
+    expect(screen.queryByText('Rotate your device to continue')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+  });
+
+  it('preserves a live Session across an unsupported-layout interruption and shows it again once supported', async () => {
+    mockCoarsePointer(); // simulates an actual phone being rotated, matching this test's own intent
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
+    expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
+
+    act(() => resizeWindowTo(390, 844));
+    expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
+
+    act(() => resizeWindowTo(1024, 768));
+    expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
+    // Still the same Round of the same Session, not a fresh restart.
+    expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
+  });
+
+  it('pauses automatic Turn advancement while the layout is unsupported, and resumes it once supported again', async () => {
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    const resumeSpy = vi.spyOn(SessionPresentation.prototype, 'resume');
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+    const pauseCallsBeforeResize = pauseSpy.mock.calls.length;
+    const resumeCallsBeforeResize = resumeSpy.mock.calls.length;
+
+    act(() => resizeWindowTo(390, 844));
+    expect(pauseSpy.mock.calls.length).toBeGreaterThan(pauseCallsBeforeResize);
+
+    act(() => resizeWindowTo(1024, 768));
+    expect(resumeSpy.mock.calls.length).toBeGreaterThan(resumeCallsBeforeResize);
+
+    pauseSpy.mockRestore();
+    resumeSpy.mockRestore();
+  });
+
+  it('does not pause anything on Home, where there is no Session yet', () => {
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    render(<App />);
+    act(() => resizeWindowTo(390, 844));
+    expect(pauseSpy).not.toHaveBeenCalled();
+    pauseSpy.mockRestore();
+  });
+});
+
+describe('Best-effort browser unload warning (M4-T11; ui-ux.md §10)', () => {
+  it('warns before unload while a Session is active, and does not before one has started', async () => {
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<App start={start} />);
+
+    const beforeStart = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(beforeStart)).toBe(true); // not prevented: nothing to lose yet
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+
+    const duringSession = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(duringSession)).toBe(false); // prevented: unfinished Session progress
+  });
+});
+
+describe('Leave Game abandons the Session (M4-T11 follow-up)', () => {
+  it('destroys the underlying SessionPresentation and returns to Home once Leave is confirmed', async () => {
+    const destroySpy = vi.spyOn(SessionPresentation.prototype, 'destroy');
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Leave Game' }));
+
+    expect(destroySpy).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
+
+    destroySpy.mockRestore();
   });
 });

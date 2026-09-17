@@ -35,6 +35,29 @@
   color: #c8d8cd;
 }
 
+/* Portrait/undersized-landscape guidance (M4-T11; ui-ux.md §14) - its own heading size rather than
+ * `.home`'s (tuned specifically for the short "Pusoy Dos" title), since the guidance text is longer. */
+.unsupportedLayout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.unsupportedLayout h1 {
+  margin: 0;
+  font-size: clamp(22px, 5vw, 36px);
+  letter-spacing: -0.02em;
+}
+
+.unsupportedLayout p {
+  margin: 0;
+  color: #c8d8cd;
+  font-size: 14px;
+}
+
 .start {
   margin-top: 24px;
   padding: 16px 40px;

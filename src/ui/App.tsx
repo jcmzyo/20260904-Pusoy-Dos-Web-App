@@ -10,8 +10,10 @@ import { COMBINATION_LABELS, getDisplayCards } from './primitives/combinationLab
 import { DiscardPileOverlay } from './primitives/DiscardPileOverlay';
 import { EventLogOverlay } from './primitives/EventLogOverlay';
 import { HumanHand } from './primitives/HumanHand';
+import { LeaveConfirmOverlay } from './primitives/LeaveConfirmOverlay';
 import { PlayerPanel } from './primitives/PlayerPanel';
 import { PlayPassControls } from './primitives/PlayPassControls';
+import { useLayoutSupport } from './primitives/useLayoutSupport';
 import styles from './App.module.css';
 
 /** Fixed Phase 1 human seat (requirements.md §1, ui-ux.md §4: "Human South"). */
@@ -27,6 +29,34 @@ export function App({ start = startSession, botNames }: AppProps) {
   const [session, setSession] = useState<SessionPresentation | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const layout = useLayoutSupport();
+
+  // Portrait/undersized layouts pause live progression the same way an open overlay does (M4-T11;
+  // ui-ux.md §14: "Portrait ... pause/prevent interaction"). This is a second, independent pause source
+  // from SessionTable's own overlay/Leave-confirm pausing below — both can be active together (e.g. the
+  // window shrinks below the supported size while Leave confirmation is already open) — which is exactly
+  // why `SessionPresentation.pause`/`resume` are reference-counted rather than a single shared flag.
+  // Nothing to pause before a Session exists (Home has no progression).
+  useEffect(() => {
+    if (!session || layout === 'supported') return;
+    session.pause();
+    return () => session.resume();
+  }, [session, layout]);
+
+  // Best-effort browser unload warning while a Session is unfinished (M4-T11; ui-ux.md §10: "Browser
+  // refresh/tab/window close uses supported unload warnings where available; browser wording is not
+  // guaranteed"). Modern browsers ignore any custom message and show their own fixed wording; setting
+  // `returnValue` (rather than relying on the return value alone) is what actually triggers the prompt
+  // across the widest range of browsers.
+  useEffect(() => {
+    if (!session) return;
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [session]);
 
   async function handleStart() {
     if (started.current) return;
@@ -48,8 +78,25 @@ export function App({ start = startSession, botNames }: AppProps) {
     }
   }
 
+  // Confirmed Leave Game (M4-T11; ui-ux.md §10). Progress is not saved, so this abandons the Session
+  // outright via `destroy()` — which stops its background Turn-advancement loop for good and lets it be
+  // garbage-collected — rather than leaving it running unseen (or merely parked forever) once the person
+  // has navigated away from it, and re-arms Start Game for a fresh Session the same way Home's own
+  // initial state does.
+  function handleLeave() {
+    session?.destroy();
+    setSession(null);
+    started.current = false;
+  }
+
+  // Replaces Home/the table outright rather than overlaying it (M4-T11; ui-ux.md §14): unlike Discard
+  // Pile/Event Log/Leave confirmation, there is nothing safely showable underneath at these dimensions.
+  if (layout !== 'supported') {
+    return <UnsupportedLayoutNotice category={layout} />;
+  }
+
   if (session) {
-    return <SessionTable presentation={session} />;
+    return <SessionTable presentation={session} onLeave={handleLeave} />;
   }
 
   return (
@@ -61,6 +108,26 @@ export function App({ start = startSession, botNames }: AppProps) {
         {starting ? 'Starting…' : 'Start Game'}
       </button>
       {error !== null && <p role="alert">Could not start the Session: {error}</p>}
+    </main>
+  );
+}
+
+/** Portrait/undersized-landscape guidance (M4-T11; ui-ux.md §14). `category` is never `'supported'` —
+ *  callers only render this once `useLayoutSupport` has already left that case. */
+function UnsupportedLayoutNotice({ category }: { readonly category: 'portrait' | 'undersized' }) {
+  // TEMPORARY diagnostic (remove once the mobile pointer-detection report is resolved): shows exactly
+  // what this browser reports for the pointer-capability heuristic and current dimensions, so a real
+  // phone's actual matchMedia result is visible on-screen without needing remote devtools.
+  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const fine = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
+  const none = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: none)').matches;
+  return (
+    <main className={`${styles.shell} ${styles.unsupportedLayout}`}>
+      <h1>{category === 'portrait' ? 'Rotate your device to continue' : 'Resize your window to continue'}</h1>
+      <p>Pusoy Dos needs a wider landscape view to stay playable.</p>
+      <p style={{ fontSize: 12, opacity: 0.7 }}>
+        DEBUG: {window.innerWidth}x{window.innerHeight} · coarse={String(coarse)} fine={String(fine)} none={String(none)} · hasMatchMedia={String(typeof window.matchMedia === 'function')}
+      </p>
     </main>
   );
 }
@@ -175,14 +242,21 @@ function maxSelectableCards(center: SessionPresentationSnapshot['center']): numb
   return center.kind === 'hand' ? center.combination.cards.length : FREE_PLAY_MAX_CARDS;
 }
 
-/** Which overlay (M4-T10) is currently open, if any. Discard Pile and Event Log are opened from one
- *  piece of UI state rather than two independent booleans, so at most one is ever open at a time -
- *  matching typical single-modal UX and keeping the pause effect below simple (one open/closed
- *  transition to react to, not two independent sources that could pause/resume out of step with
- *  each other; see `SessionPresentation.pause`'s own docstring). */
-type OverlayKind = 'none' | 'discardPile' | 'eventLog';
+/** Which overlay (M4-T10; Leave confirmation, M4-T11) is currently open, if any. Discard Pile, Event
+ *  Log, and Leave confirmation are all opened from one piece of UI state rather than independent
+ *  booleans, so at most one is ever open at a time - matching typical single-modal UX and keeping the
+ *  pause effect below simple (one open/closed transition to react to). This is purely a same-component
+ *  mutual-exclusivity convenience, not what makes composing with App.tsx's own independent
+ *  layout-guard pause source safe - `SessionPresentation.pause`/`resume` are reference-counted for that. */
+type OverlayKind = 'none' | 'discardPile' | 'eventLog' | 'leaveConfirm';
 
-export function SessionTable({ presentation }: { readonly presentation: SessionPresentation }) {
+export function SessionTable({
+  presentation,
+  // Optional, defaulting to a no-op, so the many existing tests that render `SessionTable` directly to
+  // exercise unrelated M4-T06/T07/T08/T10 behavior (and never click Leave Game) do not all need a prop
+  // they don't care about; App.tsx's own real usage always passes its actual `handleLeave`.
+  onLeave = () => {},
+}: { readonly presentation: SessionPresentation; readonly onLeave?: () => void }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   const [selectedCards, setSelectedCards] = useState<readonly Card[]>([]);
   const [overlay, setOverlay] = useState<OverlayKind>('none');
@@ -220,15 +294,15 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
         <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />
       </section>
       {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event Log,
-       *  M4-T10; Leave Game remains an inert placeholder, M4-T11 scope), middle (the human hand plus
-       *  Sort Rank/Sort Suit, M4-T07; ui-ux.md §5.2, §6), right (Play/Pass, M4-T08). */}
+       *  M4-T10; Leave Game, M4-T11), middle (the human hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md
+       *  §5.2, §6), right (Play/Pass, M4-T08). */}
       <div className={styles.bottomBar}>
         <div className={styles.bottomLeft}>
           {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
            *  center table's own current hand to beat already shows the latest Play, and a variable-length
            *  preview line was changing this button's own height as events came in. */}
           <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
-          <button type="button" className={styles.sideButton}>Leave Game</button>
+          <button type="button" className={styles.sideButton} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
         </div>
         <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
         <PlayPassControls
@@ -242,6 +316,7 @@ export function SessionTable({ presentation }: { readonly presentation: SessionP
       </div>
       {overlay === 'discardPile' && <DiscardPileOverlay cards={snapshot.playedCards} onClose={closeOverlay} />}
       {overlay === 'eventLog' && <EventLogOverlay events={snapshot.roundEvents} names={names} onClose={closeOverlay} />}
+      {overlay === 'leaveConfirm' && <LeaveConfirmOverlay onStay={closeOverlay} onLeave={onLeave} />}
     </main>
   );
 }
