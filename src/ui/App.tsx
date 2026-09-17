@@ -115,10 +115,19 @@ export function App({ start = startSession, botNames }: AppProps) {
 /** Portrait/undersized-landscape guidance (M4-T11; ui-ux.md §14). `category` is never `'supported'` —
  *  callers only render this once `useLayoutSupport` has already left that case. */
 function UnsupportedLayoutNotice({ category }: { readonly category: 'portrait' | 'undersized' }) {
+  // TEMPORARY diagnostic (remove once the mobile pointer-detection report is resolved): shows exactly
+  // what this browser reports for the pointer-capability heuristic and current dimensions, so a real
+  // phone's actual matchMedia result is visible on-screen without needing remote devtools.
+  const coarse = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const fine = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: fine)').matches;
+  const none = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: none)').matches;
   return (
     <main className={`${styles.shell} ${styles.unsupportedLayout}`}>
       <h1>{category === 'portrait' ? 'Rotate your device to continue' : 'Resize your window to continue'}</h1>
       <p>Pusoy Dos needs a wider landscape view to stay playable.</p>
+      <p style={{ fontSize: 12, opacity: 0.7 }}>
+        DEBUG: {window.innerWidth}x{window.innerHeight} · coarse={String(coarse)} fine={String(fine)} none={String(none)} · hasMatchMedia={String(typeof window.matchMedia === 'function')}
+      </p>
     </main>
   );
 }

@@ -1,9 +1,9 @@
 # Pusoy Dos --- M4 Minimal Playable UI
 
-## Milestone Design + Task Breakdown (v1.2)
+## Milestone Design + Task Breakdown (v1.3)
 
 **Status:** Approved milestone design and implementation task plan  
-**Last Modified:** September 15, 2026  
+**Last Modified:** September 17, 2026  
 **Milestone:** M4 --- Minimal Playable UI  
 **Phase:** Phase 1 --- Initial Playable Basic Game  
 **Parent requirements:** `requirements.md` v1.14  
@@ -11,7 +11,7 @@
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
 **AI design:** `ai.md` v1.5  
-**UI/UX design:** `ui-ux.md` v1.4  
+**UI/UX design:** `ui-ux.md` v1.5  
 **Testing strategy:** `testing-simulation.md` v1.8
 
 ---
@@ -456,21 +456,22 @@ The product has a clear terminal state and clean restart/home paths.
 Make the completed table usable across the frozen T04 viewport matrix.
 
 ### Work
-Tune overlap, bounded typography, control sizing, overlays, table fit, and reflow. Preserve one-baseline unselected human cards; selected cards alone rise. Secondary UI compresses before core controls. Do not solve constraints by distorting card ratio.
+Tune overlap, bounded typography, control sizing, overlays, table fit, and reflow. Preserve one-baseline unselected human cards; selected cards alone rise. Secondary UI compresses before core controls. Do not solve constraints by distorting card ratio. Scale the play area (table plus bottom action bar) as a single proportional unit so it fits fully within the viewport without a scrollbar at every supported size (ui-ux.md §14), deriving the scale from available height first when a viewport's real usable height — not just its width — is the tighter constraint (M4-T11 follow-up finding: a real mobile browser's own address bar/chrome can leave meaningfully less usable height in landscape than device-emulated viewport presets assume).
 
 ### Automated Tests
-Playwright matrix: core controls visible/targetable; no critical clipping/overlap; cards keep ratio; 13-card hand targetable; overlays usable; Round Result/Session Summary usable; portrait/undersized guidance correct.
+Playwright matrix: core controls visible/targetable; no critical clipping/overlap; cards keep ratio; 13-card hand targetable; overlays usable; Round Result/Session Summary usable; portrait/undersized guidance correct; play area fits the viewport without scrolling at every supported size.
 
 ### Manual Tests
-Run the human viewport checklist on each supported class. Confirm readability, targetability, hand dragging, and result overlays by observation rather than pixel-perfect aesthetic judgment.
+Run the human viewport checklist on each supported class. Confirm readability, targetability, hand dragging, and result overlays by observation rather than pixel-perfect aesthetic judgment. Confirm no scrolling is needed to reach Play/Pass or other core controls at any supported size.
 
 ### Expected Result
-One coherent landscape-first product works from supported phone landscape through desktop/windowed browser.
+One coherent landscape-first product works from supported phone landscape through desktop/windowed browser, scaling as a proportional whole without requiring the person to scroll to reach core controls.
 
 ### Definition of Done
 - [ ] Frozen matrix passes browser checks.
 - [ ] Human checklist has no blocking viewport defect.
 - [ ] Card ratio/selection baseline invariant preserved.
+- [ ] Play area fits the viewport (no scrollbar) at every supported size, including real-device landscape heights narrower than their nominal/emulated estimate.
 
 # M4-T15 — Phase 1 End-to-End Acceptance and Regression Gate
 

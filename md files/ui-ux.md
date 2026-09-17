@@ -1,9 +1,9 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.4)
+## UI / UX Document (v1.5)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 15, 2026  
+**Last Modified:** September 17, 2026  
 **Parent document:** `requirements.md` v1.14  
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
@@ -196,6 +196,8 @@ Gameplay is landscape-first and must support large desktop, normal laptop, small
 
 Use a bounded ratio-controlled play area rather than assuming fullscreen or exact 16:9. Cards preserve a constant aspect ratio. Text uses bounded readable sizing and critical controls retain usable click/touch targets. Secondary UI compresses/reflows before core gameplay becomes unusable.
 
+The play area (table plus the bottom action bar) scales as a single proportional unit rather than each element resizing independently, so relative proportions — table, seats, cards, controls — stay visually consistent from large screens down to small ones, and the whole area fits within the viewport height without requiring a scrollbar at any supported size. When a real device's available height is unusually short relative to its width (a real mobile browser's own address bar/chrome can leave noticeably less usable height than device-emulated estimates assume), height is the binding constraint: the scale is derived from available height first, and width follows from that scale, producing a narrower but fully height-fit table rather than one that fills available width and overflows vertically. M4-T14 (Full Responsive Hardening) owns applying this scaling approach across the frozen viewport matrix.
+
 Human cards remain on the same baseline; constrained layouts increase horizontal overlap rather than vertically staggering unselected cards. Selected cards alone rise.
 
 Exact representative CSS viewport dimensions and minimum supported dimensions are frozen during M4 implementation task T04 and reused for automated/manual QA.
@@ -216,7 +218,7 @@ Human checks should include whether the tester can understand whose turn it is, 
 
 # 17. Deferred Approved UI Ideas
 
-Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; additional accessibility controls. Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
+Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; additional accessibility controls; an adaptive playable-portrait layout (Phase 2 idea — §14's landscape-first contract, including rotate guidance for portrait, remains Phase 1 behavior; a portrait-specific reflowed layout is not Phase 1 scope). Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
 
 # 18. Phase 1 UI Acceptance
 
