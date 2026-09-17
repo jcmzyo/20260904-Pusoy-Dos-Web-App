@@ -9,15 +9,34 @@ import { CardBack, CardIndex, PlayingCard } from './primitives/Card';
 import { COMBINATION_LABELS, getDisplayCards } from './primitives/combinationLabels';
 import { DiscardPileOverlay } from './primitives/DiscardPileOverlay';
 import { EventLogOverlay } from './primitives/EventLogOverlay';
+import { cardKey, compareByRank } from './primitives/handOrdering';
 import { HumanHand } from './primitives/HumanHand';
 import { LeaveConfirmOverlay } from './primitives/LeaveConfirmOverlay';
 import { PlayerPanel } from './primitives/PlayerPanel';
 import { PlayPassControls } from './primitives/PlayPassControls';
+import { RoundResultOverlay } from './primitives/RoundResultOverlay';
 import { useLayoutSupport } from './primitives/useLayoutSupport';
 import styles from './App.module.css';
 
 /** Fixed Phase 1 human seat (requirements.md §1, ui-ux.md §4: "Human South"). */
 const HUMAN_PLAYER_ID = 'south';
+
+/** How long the 4th-place reveal shows before the Round Result overlay appears, absent an earlier
+ *  click/tap skip (M4-T12; ui-ux.md §11: "roughly 1.5-2 seconds"). Tests pass 0 for a deterministic/
+ *  instant transition, mirroring `SessionPresentation.startAutoPlay`'s own tunable-delay convention. */
+const ROUND_REVEAL_DURATION_MS = 1750;
+
+/** Default per-stage delay for the Round Result overlay's own scoring-reveal animation (ui-ux.md §12);
+ *  see `RoundResultOverlay`'s own `stageDelayMs` for the sequence this paces. */
+const ROUND_RESULT_STAGE_DELAY_MS = 650;
+
+/** How long the Round-start transition screen (dim + "Round X") shows once "Next Round" is clicked,
+ *  before the next Round's own opening Turn actually starts, absent an earlier click/tap skip - a
+ *  person's own follow-up request on top of M4-T12, not part of its own original Definition of Done.
+ *  Short, matching the reveal's own "roughly 1.5-2 seconds" convention above rather than a longer
+ *  ceremony. Tests pass 0 for a deterministic/instant transition, same convention as every other
+ *  presentation-timing constant here. */
+const ROUND_TRANSITION_DURATION_MS = 1300;
 
 interface AppProps {
   readonly start?: (configuration: SessionConfiguration) => StartedSession | Promise<StartedSession>;
@@ -96,7 +115,7 @@ export function App({ start = startSession, botNames }: AppProps) {
   }
 
   if (session) {
-    return <SessionTable presentation={session} onLeave={handleLeave} />;
+    return <SessionTable presentation={session} onLeave={handleLeave} showInitialTransition />;
   }
 
   return (
@@ -148,6 +167,27 @@ function BotHand({ cardCount, rotated = false }: { readonly cardCount: number; r
   );
 }
 
+/** The 4th-place finisher's remaining hand, revealed face-up sorted by Rank at their own seat once the
+ *  Round is authoritative-complete (M4-T12; ui-ux.md §11: "reveal the 4th-place player's remaining
+ *  cards in that player's normal table position, sorted by Rank"). Only ever rendered for a bot seat —
+ *  the human's own hand is never hidden from the human in the first place, so `SessionTable`'s own
+ *  `isRevealing` gate never passes this for South. Reuses `.botHand`'s own layout (including its
+ *  West/East rotation wrapper) so the reveal does not change that seat's own reserved footprint
+ *  (App.module.css's own table/panel dimension-stability contract, §5.7). Unlike `BotHand`'s decorative
+ *  face-down cards, these are real face-up cards now public information, so this is not `aria-hidden`. */
+function RevealedHand({ cards, rotated = false }: { readonly cards: readonly Card[]; readonly rotated?: boolean }) {
+  const sorted = [...cards].sort(compareByRank);
+  return (
+    <div className={styles.botHand}>
+      {sorted.map((card) => (
+        rotated
+          ? <div key={cardKey(card)} className={styles.rotatedCard}><PlayingCard card={card} widthPx={40} /></div>
+          : <PlayingCard key={cardKey(card)} card={card} widthPx={40} />
+      ))}
+    </div>
+  );
+}
+
 /** This seat's own Play trail (ui-ux.md §5.4): once a seat has Played in the active response cycle, its
  *  own combination stays visible at its seat, dimming once beaten, until the whole cycle clears
  *  (SessionPresentation's `lastPlay`, computed from public Play/Pass/Trick-reset events; already `null`
@@ -169,7 +209,7 @@ function SeatPlayTrail({ lastPlay }: { readonly lastPlay: PresentedSeat['lastPla
   );
 }
 
-function Seat({ seat, overlayOpen }: { readonly seat: PresentedSeat; readonly overlayOpen: boolean }) {
+function Seat({ seat, overlayOpen, revealedCards }: { readonly seat: PresentedSeat; readonly overlayOpen: boolean; readonly revealedCards?: readonly Card[] }) {
   const rotated = seat.seat === 'west' || seat.seat === 'east';
   // Only a bot's own Turn shows a "deciding" indicator; the human's Turn immediately has its own
   // Play/Pass controls, so a spinner there would misleadingly suggest something is loading (M4-T09
@@ -177,7 +217,11 @@ function Seat({ seat, overlayOpen }: { readonly seat: PresentedSeat; readonly ov
   const thinking = seat.isCurrentTurn && seat.seat !== HUMAN_PLAYER_ID;
   return (
     <div className={`${styles.seat} ${SEAT_POSITION_CLASS[seat.seat]}`}>
-      {seat.seat !== 'south' && <BotHand cardCount={seat.cardCount} rotated={rotated} />}
+      {seat.seat !== 'south' && (
+        revealedCards
+          ? <RevealedHand cards={revealedCards} rotated={rotated} />
+          : <BotHand cardCount={seat.cardCount} rotated={rotated} />
+      )}
       <PlayerPanel
         name={seat.name} cardCount={seat.cardCount} score={seat.totalScore}
         isCurrentTurn={seat.isCurrentTurn} passed={seat.passed} done={seat.done} placement={seat.placement}
@@ -247,7 +291,36 @@ export function SessionTable({
   // exercise unrelated M4-T06/T07/T08/T10 behavior (and never click Leave Game) do not all need a prop
   // they don't care about; App.tsx's own real usage always passes its actual `handleLeave`.
   onLeave = () => {},
-}: { readonly presentation: SessionPresentation; readonly onLeave?: () => void }) {
+  // Optional, defaulting to a no-op — Session Summary itself is M4-T13 scope. Round 5's Round Result
+  // overlay already needs its own distinct "View Session Results" continuation action now (M4-T12's own
+  // Definition of Done: "R5 uses View Session Results"), so this is the seam that action calls; for now
+  // it is an inert placeholder, the same established pattern this codebase already uses for a control
+  // that exists ahead of the task that gives it real behavior (Discard Pile's button before M4-T10;
+  // Event Log/Leave Game's before M4-T10/M4-T11) — reported in this task's own completion report.
+  onSessionComplete = () => {},
+  // Test-only presentation-timing overrides (both mirror `SessionPresentation.startAutoPlay`'s own
+  // "pass 0 for a deterministic/instant sequence" convention); App.tsx's real usage always leaves both
+  // at their production defaults (`ROUND_REVEAL_DURATION_MS`, `ROUND_RESULT_STAGE_DELAY_MS`).
+  revealDurationMs = ROUND_REVEAL_DURATION_MS,
+  resultStageDelayMs = ROUND_RESULT_STAGE_DELAY_MS,
+  // Test-only override, same convention as the two props above; App.tsx's real usage leaves it at
+  // `ROUND_TRANSITION_DURATION_MS`.
+  roundTransitionDurationMs = ROUND_TRANSITION_DURATION_MS,
+  // Shows the same Round-start transition screen for this component's own very first mount (person's own
+  // follow-up report: Round 1 got no "dim, then Round X, then lit" treatment, only Rounds 2+ did). Defaults
+  // to false so the many existing tests that render `SessionTable` directly and expect it immediately
+  // interactive - never having clicked any "Start Game" flow of their own - are unaffected; App.tsx's real
+  // usage passes `true` here, exactly once, right when a freshly started Session first renders.
+  showInitialTransition = false,
+}: {
+  readonly presentation: SessionPresentation;
+  readonly onLeave?: () => void;
+  readonly onSessionComplete?: () => void;
+  readonly revealDurationMs?: number;
+  readonly resultStageDelayMs?: number;
+  readonly roundTransitionDurationMs?: number;
+  readonly showInitialTransition?: boolean;
+}) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   const [selectedCards, setSelectedCards] = useState<readonly Card[]>([]);
   const [overlay, setOverlay] = useState<OverlayKind>('none');
@@ -261,6 +334,111 @@ export function SessionTable({
     presentation.pause();
     return () => presentation.resume();
   }, [overlayOpen, presentation]);
+
+  // End-of-Round presentation (M4-T12; ui-ux.md §11-§12): `roundCheckpoint` is set exactly while the
+  // current Round is authoritative-complete (SessionPresentation's own projection, independent of
+  // `status` — which for Round 5 skips straight to `SESSION_COMPLETE` without ever passing through
+  // `ROUND_RESULT`, since the Basic Session's own official result becomes available in that same Engine
+  // transaction; `roundCheckpoint`/`reveal` stay populated regardless, so this gate covers Round 5 too).
+  const roundComplete = snapshot.roundCheckpoint !== null;
+  const [resultPhase, setResultPhase] = useState<'reveal' | 'result'>('reveal');
+  const [handledRound, setHandledRound] = useState<number | null>(null);
+
+  // A newly-completed Round always restarts at the reveal phase. This runs during render, not a
+  // useEffect, on purpose: an effect-based reset fires one render *after* the render where `roundComplete`
+  // first flips true for the new Round, and on that first render `resultPhase` is still whatever a
+  // PREVIOUS Round's own settled state left it at ('result') - which briefly (but visibly, and reported:
+  // "the previous result window pops for a second") opens that Round's own Result overlay before the
+  // effect corrects it a moment later. This is reproducible at every Round boundary from Round 2 onward
+  // (Round 1 has no earlier settled phase to leak from). Adjusting state during render - React's own
+  // documented pattern for exactly this "reset when an id changes" case - lands the reset in the very
+  // same commit, so the stale phase is never actually painted.
+  if (roundComplete && handledRound !== snapshot.roundNumber) {
+    setHandledRound(snapshot.roundNumber);
+    setResultPhase('reveal');
+  } else if (!roundComplete && handledRound !== null) {
+    setHandledRound(null);
+  }
+
+  // The reveal has nothing to show (no reveal yet) or nothing worth revealing (the human's own 4th-place
+  // hand was never hidden from the human to begin with) - move straight to the Round Result overlay.
+  // Otherwise, auto-advance after `revealDurationMs` absent an earlier click/tap skip.
+  useEffect(() => {
+    if (!roundComplete || resultPhase !== 'reveal') return;
+    if (snapshot.reveal === null || snapshot.reveal.playerId === HUMAN_PLAYER_ID) { setResultPhase('result'); return; }
+    const timer = setTimeout(() => setResultPhase('result'), revealDurationMs);
+    return () => clearTimeout(timer);
+  }, [roundComplete, resultPhase, snapshot.reveal, revealDurationMs]);
+
+  // Round-start transition (person's own follow-up request: "a good or simple round transition aside
+  // from the score board... dim the table initially then Round X then lit the game to make it playable
+  // again"): once "Next Round" is clicked, this holds the upcoming Round's own number while a brief
+  // dim-and-label screen shows, and `continueToNextRound()` itself is deferred until that screen ends
+  // (by its own timer or an earlier click/tap skip) - so the freshly dealt Round only actually becomes
+  // visible/interactive once the transition is over ("lit... playable again"), rather than the new
+  // table flashing into view underneath the transition screen. Round 5 has no next Round to transition
+  // into, so `handleContinue` below never sets this for it - `onSessionComplete` still fires immediately.
+  //
+  // `showInitialTransition` extends the exact same screen to Round 1's own very first start (a further
+  // follow-up report: the person expected the same "dim, then Round X, then lit" treatment there too,
+  // not only between Rounds). That case has no prior Round Result to continue from - Round 1 is already
+  // dealt and live the moment this component mounts - so `pendingContinueRef` tracks whether the timer/
+  // skip below should actually call `continueToNextRound()` on the way out (only ever true once
+  // `handleContinue` itself sets it) or just clear the transition in place for the initial-display case.
+  const pendingContinueRef = useRef(false);
+  const [startingRound, setStartingRound] = useState<number | null>(() => (showInitialTransition ? snapshot.roundNumber : null));
+
+  // Unlike the between-Rounds case (already inert - `driveTurns` only ever runs while `status` is
+  // `ROUND_ACTIVE`, and a completed Round's own status stays `ROUND_RESULT` until `continueToNextRound`
+  // actually runs), Round 1 is genuinely live and auto-playing the moment this component mounts - so the
+  // initial transition needs its own explicit pause, the same reference-counted pause/resume every other
+  // overlay here already uses, rather than relying on Round-completion status to do it implicitly.
+  const isTransitioning = startingRound !== null;
+  useEffect(() => {
+    if (!isTransitioning) return;
+    presentation.pause();
+    return () => presentation.resume();
+  }, [isTransitioning, presentation]);
+
+  useEffect(() => {
+    if (startingRound === null) return;
+    const timer = setTimeout(() => {
+      if (pendingContinueRef.current) {
+        presentation.continueToNextRound();
+        pendingContinueRef.current = false;
+      }
+      setStartingRound(null);
+    }, roundTransitionDurationMs);
+    return () => clearTimeout(timer);
+  }, [startingRound, roundTransitionDurationMs, presentation]);
+
+  // While `startingRound` is set, the Round Result overlay stops rendering (superseded by the
+  // transition screen below) even though `roundComplete` itself is still true - `continueToNextRound()`
+  // is what actually clears `roundCheckpoint`, and it only runs once the transition ends.
+  const isRevealing = roundComplete && resultPhase === 'reveal' && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID;
+  const isResultOverlayOpen = roundComplete && resultPhase === 'result' && startingRound === null;
+  const isTableInert = isResultOverlayOpen || startingRound !== null;
+
+  function skipReveal() {
+    setResultPhase('result');
+  }
+
+  function skipRoundTransition() {
+    if (startingRound === null) return;
+    if (pendingContinueRef.current) {
+      presentation.continueToNextRound();
+      pendingContinueRef.current = false;
+    }
+    setStartingRound(null);
+  }
+
+  function handleContinue() {
+    // Round 5's Round Result has no next Round to continue to - the Basic Session's own official result
+    // (`sessionResult`) is exactly what distinguishes it, rather than a hardcoded "roundNumber === 5".
+    if (snapshot.sessionResult !== null) { onSessionComplete(); return; }
+    pendingContinueRef.current = true;
+    setStartingRound(snapshot.roundNumber + 1);
+  }
 
   function handleSubmit(move: Move) {
     const pending = presentation.getPendingHumanRequest();
@@ -280,34 +458,88 @@ export function SessionTable({
         <h1>Pusoy Dos</h1>
         <p>Basic · Round {snapshot.roundNumber} of 5</p>
       </header>
-      <section className={styles.table} aria-label="Game Table">
-        {snapshot.seats.map((seat) => <Seat key={seat.playerId} seat={seat} overlayOpen={overlayOpen} />)}
-        <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />
-      </section>
-      {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event Log,
-       *  M4-T10; Leave Game, M4-T11), middle (the human hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md
-       *  §5.2, §6), right (Play/Pass, M4-T08). */}
-      <div className={styles.bottomBar}>
-        <div className={styles.bottomLeft}>
-          {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
-           *  center table's own current hand to beat already shows the latest Play, and a variable-length
-           *  preview line was changing this button's own height as events came in. */}
-          <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
-          <button type="button" className={styles.sideButton} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
+      {/* Dimmed while the Round Result overlay or the Round-start transition screen below is showing
+       *  (ui-ux.md §12: "a modal/overlay over the dimmed completed table"; the transition screen extends
+       *  the same treatment to its own brief window) - `pointer-events: none` also keeps every control
+       *  underneath (Play/Pass, Discard Pile/Event Log/Leave Game, hand selection) inert while either is
+       *  up, matching the Result overlay's own non-dismissible, explicit-continuation-only contract. */}
+      <div className={isTableInert ? styles.tableDimmed : undefined}>
+        <section className={styles.table} aria-label="Game Table">
+          {snapshot.seats.map((seat) => (
+            <Seat
+              key={seat.playerId}
+              seat={seat}
+              overlayOpen={overlayOpen}
+              {...(isRevealing && snapshot.reveal!.playerId === seat.playerId ? { revealedCards: snapshot.reveal!.cards } : {})}
+            />
+          ))}
+          <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />
+        </section>
+        {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event Log,
+         *  M4-T10; Leave Game, M4-T11), middle (the human hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md
+         *  §5.2, §6), right (Play/Pass, M4-T08). */}
+        <div className={styles.bottomBar}>
+          <div className={styles.bottomLeft}>
+            {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
+             *  center table's own current hand to beat already shows the latest Play, and a variable-length
+             *  preview line was changing this button's own height as events came in. */}
+            <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
+            <button type="button" className={styles.sideButton} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
+          </div>
+          <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
+          <PlayPassControls
+            selected={selectedCards}
+            center={snapshot.center}
+            humanHand={snapshot.humanHand}
+            playerId={HUMAN_PLAYER_ID}
+            isMyTurn={isMyTurn}
+            onSubmit={handleSubmit}
+          />
         </div>
-        <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
-        <PlayPassControls
-          selected={selectedCards}
-          center={snapshot.center}
-          humanHand={snapshot.humanHand}
-          playerId={HUMAN_PLAYER_ID}
-          isMyTurn={isMyTurn}
-          onSubmit={handleSubmit}
-        />
       </div>
+      {/* Full-screen click/tap-to-skip control for the 4th-hand reveal (ui-ux.md §11: "A click/tap may
+       *  finish the reveal immediately") - a real (keyboard-reachable) button rather than a decorative
+       *  click-catcher div, so the same skip is available without a mouse/touch. This only ever advances
+       *  the local reveal→result phase, never `onContinue`/`continueToNextRound` - "the same input must
+       *  not accidentally activate the next result action" (ui-ux.md §11): it is a convenience on top of
+       *  the reveal's own timed auto-advance, not the only way to proceed. */}
+      {isRevealing && (
+        <button type="button" className={styles.revealSkipLayer} onClick={skipReveal} aria-label="Skip reveal" />
+      )}
       {overlay === 'discardPile' && <DiscardPileOverlay cards={snapshot.playedCards} onClose={closeOverlay} />}
-      {overlay === 'eventLog' && <EventLogOverlay events={snapshot.roundEvents} names={names} onClose={closeOverlay} />}
+      {/* Whole-Session history (the person's own follow-up report: the Round Result overlay pauses every
+       *  other control, so a Round's own Event Log entries were otherwise unreachable again once that
+       *  Round ended) - `snapshot.events`, not `snapshot.roundEvents`; see EventLogOverlay's own updated
+       *  docstring for the full scope change. */}
+      {overlay === 'eventLog' && <EventLogOverlay events={snapshot.events} names={names} onClose={closeOverlay} />}
       {overlay === 'leaveConfirm' && <LeaveConfirmOverlay onStay={closeOverlay} onLeave={onLeave} />}
+      {isResultOverlayOpen && snapshot.roundCheckpoint && (
+        <RoundResultOverlay
+          roundNumber={snapshot.roundNumber}
+          seats={snapshot.seats}
+          placements={snapshot.roundCheckpoint.placements}
+          isFinalRound={snapshot.sessionResult !== null}
+          onContinue={handleContinue}
+          stageDelayMs={resultStageDelayMs}
+        />
+      )}
+      {startingRound !== null && <RoundTransitionOverlay roundNumber={startingRound} onSkip={skipRoundTransition} />}
     </main>
+  );
+}
+
+/**
+ * Round-start transition (person's own follow-up request on top of M4-T12: "a good or simple round
+ * transition... dim the table initially then Round X then lit the game to make it playable again"),
+ * shown for `roundTransitionDurationMs` between the previous Round's own Result overlay closing and the
+ * next Round's own opening Turn actually becoming visible/interactive. A full-screen click/tap-to-skip
+ * button, same interaction as the reveal's own skip layer above - clicking anywhere ends the transition
+ * immediately rather than waiting out the full duration.
+ */
+function RoundTransitionOverlay({ roundNumber, onSkip }: { readonly roundNumber: number; readonly onSkip: () => void }) {
+  return (
+    <button type="button" className={styles.roundTransition} onClick={onSkip} aria-label={`Starting Round ${roundNumber}`}>
+      <span className={styles.roundTransitionText}>Round {roundNumber}</span>
+    </button>
   );
 }

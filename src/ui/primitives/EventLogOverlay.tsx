@@ -21,18 +21,20 @@ export interface EventLogEntry {
 }
 
 /**
- * Public, factual, player-facing text for one Round event (ui-ux.md §9.2: "Record useful public
- * gameplay events such as Round start/opener, exact Play + recognized combination, Pass, Trick
+ * Public, factual, player-facing text for one Session event (originally ui-ux.md §9.2: "Record useful
+ * public gameplay events such as Round start/opener, exact Play + recognized combination, Pass, Trick
  * reset/free lead, and player finish/placement. It is a player-facing factual history, not a debug
- * trace."). `names` maps each `PlayerId` to its seat's display name (App.tsx builds this from the same
- * `SessionPresentationSnapshot.seats` the rest of the table already renders from).
+ * trace." - see EventLogOverlay's own docstring below for the follow-up that widened this from a single
+ * Round to the whole Session). `names` maps each `PlayerId` to its seat's display name (App.tsx builds
+ * this from the same `SessionPresentationSnapshot.seats` the rest of the table already renders from).
  *
  * Returns `null` for engine-internal bookkeeping events not in that list - `CARDS_DEALT` (would leak
  * exact hand sizes as a discrete "event" rather than the always-visible per-seat count already shown),
  * `TURN_CHANGED` (redundant with the Play/Pass/Trick-reset entries that already explain every Turn
- * transition), `SCORE_CALCULATED` (Round scoring is M4-T12's own Result overlay, not this Round-in-
- * progress log), and `SESSION_STARTED`/`SESSION_ENDED` (outside a single Round's own history, per
- * §9.2's "Round history" scope, and Session completion is M4-T13's own Summary screen).
+ * transition), `SCORE_CALCULATED` (Round scoring is M4-T12's own Result overlay, not this log), and
+ * `SESSION_STARTED`/`SESSION_ENDED` (each Round's own `ROUND_STARTED`/`ROUND_ENDED` entry already marks
+ * the Session's start/end in practice - the first and last of those - and the official final result
+ * remains M4-T13's own Summary screen's job, not a duplicate log line here).
  *
  * The Round's own completion is reported here via `ROUND_ENDED`'s 4th-place finish specifically:
  * `PLAYER_FINISHED` is only ever emitted for 1st-3rd (`GameEvent`'s own `placement: 1 | 2 | 3`), so
@@ -75,42 +77,53 @@ export function describeEvent(event: GameEvent, names: Readonly<Record<string, s
 }
 
 /** Maps `events` (chronological) to their Event Log entries, dropping the internal events `describeEvent`
- *  excludes. Shared by the overlay's own full list and the Event Log button's latest-event preview
- *  (App.tsx) so both always agree on which events actually count as "the latest event". */
+ *  excludes. */
 export function describeEvents(events: readonly GameEvent[], names: Readonly<Record<string, string>>): readonly EventLogEntry[] {
   const entries: EventLogEntry[] = [];
   events.forEach((event, index) => {
     const described = describeEvent(event, names);
     if (described === null) return;
-    // A TRICK_ENDED continues straight into a FREE LEAD for its own winner, unless this same Trick end
-    // is also the Round's own completion - GameEngine.submitMove always emits TRICK_ENDED immediately
-    // followed, in the same batch, by either TURN_CHANGED (a genuine free lead) or ROUND_ENDED. This
-    // mirrors SessionPresentation's own `project()` lookahead, which makes the identical distinction for
-    // the same reason (clearing every seat's own Play trail only on a genuine mid-Round reset).
-    const text = event.type === 'TRICK_ENDED' && events[index + 1]?.type !== 'ROUND_ENDED'
-      ? `${described.text} Free lead!`
-      : described.text;
+    // A TRICK_ENDED continues straight into a FREE LEAD for its own winner in the ordinary case -
+    // GameEngine.submitMove always emits TRICK_ENDED immediately followed, in the same batch, by either
+    // TURN_CHANGED (a genuine free lead) or ROUND_ENDED (this same Trick end is also the Round's own
+    // completion). But when the Trick's own winner went out on that very Play (requirements.md §2.5.1:
+    // their combination legitimately stood, yet a player who has already emptied their hand cannot take
+    // the next lead themselves), the very next active player becomes the new leader instead - the
+    // following TURN_CHANGED then names that player, not the Trick's own winner. Appending "Free lead!"
+    // to the winner's own line regardless was a genuine bug (the person's own follow-up report): an
+    // already-finished player's Trick win, immediately before a different seat's own next Turn, read as
+    // if that finished player had somehow taken the table back. Only append it once the very next event
+    // actually confirms the winner themselves is who leads next.
+    const next = events[index + 1];
+    const freeLeadGoesToWinner = event.type === 'TRICK_ENDED'
+      && next?.type === 'TURN_CHANGED' && next.playerId === event.lastSuccessfulPlayerId;
+    const text = freeLeadGoesToWinner ? `${described.text} Free lead!` : described.text;
     entries.push({ key: index, text, cards: described.cards });
   });
   return entries;
 }
 
 export interface EventLogOverlayProps {
-  /** The current Round's own events in chronological order (`SessionPresentationSnapshot.roundEvents`) -
-   *  ui-ux.md §9.2 scopes the Event Log to "the chronological public Round history", matching the Task's
-   *  own "Include Round start/opener, exact Plays/combinations, Pass, reset/free lead, finishes/
-   *  placements" (all Round-scoped facts, none Session-spanning). */
+  /** The whole Session's own events in chronological order (`SessionPresentationSnapshot.events`), not
+   *  only the current Round's (`roundEvents`) - a person's own follow-up report on top of M4-T10/M4-T12:
+   *  once a Round ends, the Round Result overlay pauses every other control (including this button)
+   *  until the person explicitly continues, and the Event Log itself used to reset to empty on the very
+   *  next Round - between those two, an already-finished Round's own history became unreachable again
+   *  the moment its own Result overlay closed. Each Round's own `ROUND_STARTED`/`ROUND_ENDED` entries
+   *  (`describeEvent` above) now double as this list's own Round-boundary markers, so earlier Rounds
+   *  read as one continuous history rather than needing a separate synthetic marker event of their own. */
   readonly events: readonly GameEvent[];
   readonly names: Readonly<Record<string, string>>;
   readonly onClose: () => void;
 }
 
 /**
- * Event Log overlay (M4-T10; ui-ux.md §9.2): "It initially opens at the newest event; scrolling upward
- * moves toward earlier events and the first event is at the top." Entries render oldest-first, top to
- * bottom (so the very first event is literally at the top of the list, as required), and the scroll
- * container is scrolled to its own bottom on open so the newest event is what is actually in view first -
- * scrolling up from there reaches progressively earlier entries, exactly as specified.
+ * Event Log overlay (M4-T10; ui-ux.md §9.2, widened to the whole Session per this component's own
+ * `events` docstring above): "It initially opens at the newest event; scrolling upward moves toward
+ * earlier events and the first event is at the top." Entries render oldest-first, top to bottom (so the
+ * very first event of the whole Session is literally at the top of the list, as required), and the
+ * scroll container is scrolled to its own bottom on open so the newest event is what is actually in view
+ * first - scrolling up from there reaches progressively earlier entries, exactly as specified.
  */
 export function EventLogOverlay({ events, names, onClose }: EventLogOverlayProps) {
   const listRef = useRef<HTMLOListElement>(null);
@@ -123,8 +136,8 @@ export function EventLogOverlay({ events, names, onClose }: EventLogOverlayProps
 
   return (
     <Overlay title="Event Log" onClose={onClose}>
-      <ol ref={listRef} className={styles.list} aria-label="Round event history">
-        {entries.length === 0 && <li className={styles.empty}>No events yet this Round.</li>}
+      <ol ref={listRef} className={styles.list} aria-label="Session event history">
+        {entries.length === 0 && <li className={styles.empty}>No events yet this Session.</li>}
         {entries.map((entry) => (
           <li key={entry.key} className={styles.entry}>
             <span className={styles.entryText}>{entry.text}</span>

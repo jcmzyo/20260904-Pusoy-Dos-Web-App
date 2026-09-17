@@ -336,3 +336,55 @@
   opacity: 0.4;
   filter: grayscale(55%);
 }
+
+/* Round Result overlay's own "dimmed completed table" (M4-T12; ui-ux.md §12) — wraps the table/bottom-bar
+ * group (App.tsx's `SessionTable`) while `RoundResultOverlay` is showing. `pointer-events: none` keeps
+ * every control underneath inert (Play/Pass, hand selection, Discard Pile/Event Log/Leave Game) while the
+ * overlay's own explicit-continuation-only contract is in effect. */
+.tableDimmed {
+  filter: brightness(0.4) saturate(0.7);
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+/* Click/tap-to-skip layer for the 4th-hand reveal (M4-T12; ui-ux.md §11) — transparent, full-screen, and
+ * above everything else so a click anywhere during the reveal advances it, without changing the table's
+ * own visible appearance (the reveal itself, unlike the Round Result overlay above, is not specified as
+ * dimmed - only the cards at the revealed seat change). */
+.revealSkipLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  appearance: none;
+}
+
+/* Round-start transition screen (person's own follow-up request on top of M4-T12: "dim the table
+ * initially then Round X then lit the game to make it playable again") - the same backdrop treatment
+ * and z-index as RoundResultOverlay's own `.backdrop`, since the two are mutually exclusive (App.tsx's
+ * `isResultOverlayOpen`/`startingRound` gating) rather than ever stacking. A real (keyboard-reachable)
+ * full-screen button, same click/tap-to-skip convention as `.revealSkipLayer` above, rather than a
+ * decorative click-catcher div. */
+.roundTransition {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(6, 20, 16, 0.72);
+  border: none;
+  padding: 0;
+  appearance: none;
+}
+
+.roundTransitionText {
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ead8a7;
+}

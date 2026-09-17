@@ -83,6 +83,12 @@ describe('Home and immediate Session startup', () => {
     for (const name of ['You', 'West', 'North', 'East']) {
       expect(screen.getByRole('region', { name: `${name} panel` })).toBeTruthy();
     }
+    // Round 1 gets the same brief dim-and-label transition as every later Round (person's own follow-up
+    // report on top of M4-T12); skip it here via its own click/tap-to-skip control (same convention as
+    // the reveal's own skip) so the table underneath is actually interactive for the assertion below,
+    // rather than waiting out the real production `ROUND_TRANSITION_DURATION_MS`.
+    fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+    expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull();
     // "Check Discard Pile" (M4-T10 follow-up), not bare "Discard Pile" - the person's own follow-up
     // report that the noun phrase alone read as if clicking it would discard the player's own cards.
     expect(screen.getAllByRole('button').map((button) => button.textContent))

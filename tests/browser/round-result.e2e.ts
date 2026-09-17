@@ -1,0 +1,151 @@
+import { expect, test } from '@playwright/test';
+
+/**
+ * Real-browser coverage for M4-T12 (ui-ux.md §11-§12): the specific concerns Vitest/RTL's jsdom
+ * environment cannot meaningfully verify - real CSS (`filter`/`pointer-events`) actually rendered on the
+ * dimmed completed table, and a real pointer click on the reveal's own full-screen skip control not also
+ * reaching whatever sits beneath it. Game-state-level coverage (rank-sorted reveal cards, authoritative
+ * scores, tie-stable/settle reorder sequence, R1-R4 vs R5 continuation wording) is already exhaustively
+ * covered deterministically, via a seeded Engine RNG, by
+ * `tests/integration/ui/session-table-round-result.test.tsx` - that determinism is only available
+ * in-process; the production entry point this file drives (`npm run dev`, `startSession`'s real RNG) has
+ * no seed hook, by design (M4-T01: no speculative configuration surface beyond Basic/four players).
+ *
+ * `driveRoundToResult` below always Passes while responding (canonically legal regardless of held cards)
+ * and leads the single lowest-value legal card only when forced to open/free-lead. This has a real,
+ * acknowledged consequence: the human seat's own hand almost never shrinks, so in practice the human
+ * seat itself finishes 4th almost every run - the reveal (`isRevealing`) only ever shows for a *bot's*
+ * 4th-place hand (App.tsx), so this drive strategy reliably exercises the "nothing to reveal, straight to
+ * the Round Result overlay" path rather than the reveal-then-skip path. The loop still watches for "Skip
+ * reveal" opportunistically (a bot 4th-place finish is not actually impossible, just not the common case
+ * this strategy produces) and exercises the real click there when it does appear.
+ *
+ * Also drives a genuine second Round to completion after the first "Next Round" click (see the bottom
+ * of the single test below) - regression coverage for a real reported bug where nothing ever advanced
+ * again past Round 1 in the actual browser.
+ */
+
+const TURN_BUDGET = 300;
+
+async function waitForYourTurnOrRoundOver(page: import('@playwright/test').Page) {
+  await page.waitForFunction(
+    () => {
+      const panel = document.querySelector('[aria-label="You panel"]');
+      const isYourTurn = panel?.getAttribute('aria-current') === 'true';
+      const dialogOpen = document.querySelector('[role="dialog"]') !== null;
+      const revealSkip = document.querySelector('[aria-label="Skip reveal"]') !== null;
+      return isYourTurn || dialogOpen || revealSkip;
+    },
+    { timeout: 20_000 },
+  );
+}
+
+/** Drives the human seat through an entire Round with the minimal legal strategy described above,
+ *  stopping as soon as the Round Result overlay is open (`revealSkipped: true` if a bot's own 4th-place
+ *  reveal appeared and was skipped along the way to get there). */
+async function driveRoundToResult(page: import('@playwright/test').Page): Promise<{ revealSkipped: boolean }> {
+  const passButton = page.getByRole('button', { name: 'Pass', exact: true });
+  const playButton = page.getByRole('button', { name: 'Play', exact: true });
+  const dialog = page.getByRole('dialog');
+  const skipReveal = page.getByRole('button', { name: 'Skip reveal', exact: true });
+  const openingLabel = page.getByText('OPENING · 3♣ required', { exact: true });
+  const hand = page.getByRole('group', { name: 'Your hand' });
+
+  for (let turn = 0; turn < TURN_BUDGET; turn++) {
+    if (await dialog.isVisible()) return { revealSkipped: false };
+
+    await waitForYourTurnOrRoundOver(page);
+
+    if (await dialog.isVisible()) return { revealSkipped: false };
+    if (await skipReveal.isVisible()) {
+      await skipReveal.click();
+      await expect(dialog).toBeVisible();
+      return { revealSkipped: true };
+    }
+
+    if (await passButton.isEnabled()) {
+      await passButton.click();
+    } else {
+      // Forced to lead (opening or free lead): a single card is always a structurally legal Play, and
+      // during the opening specifically it is human's Turn at all only because the deal gave this seat
+      // the 3♣ (the Engine's own opening-Turn invariant), so that single card always satisfies "must
+      // include 3♣" too.
+      if (await openingLabel.isVisible()) {
+        await hand.getByRole('img', { name: '3 of Clubs', exact: true }).click();
+      } else {
+        await hand.getByRole('img').first().click();
+      }
+      await expect(playButton).toBeEnabled();
+      await playButton.click();
+    }
+  }
+  throw new Error(`Round did not reach its Result overlay within ${TURN_BUDGET} human decisions.`);
+}
+
+test('the Round Result overlay is a real, non-dismissible dialog over a genuinely dimmed and inert completed table (M4-T12; ui-ux.md §12)', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start Game', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
+
+  const roundLabel = page.getByText(/^Basic · Round \d of 5$/);
+  const roundTextBeforeResult = await roundLabel.textContent();
+  const { revealSkipped } = await driveRoundToResult(page);
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute('aria-label', /^Round \d Result$/);
+
+  // A skip must have reached only the Round Result overlay - never also invoking "Next Round"/"View
+  // Session Results" underneath it in the very same click (ui-ux.md §11: "the same input must not
+  // accidentally activate the next result action"). The Round number is still the pre-result one; only
+  // the explicit continuation button (exercised below) is ever allowed to advance it.
+  if (revealSkipped) {
+    await expect(roundLabel).toHaveText(roundTextBeforeResult ?? '');
+  }
+
+  // Real CSS actually computed on the table beneath the overlay - `pointer-events: none` and the
+  // brightness/saturate dimming (App.module.css's `.tableDimmed`) are both real-rendering concerns a
+  // jsdom-based RTL test cannot meaningfully assert (App.tsx/App.module.css, M4-T12).
+  const tableRegion = page.getByRole('region', { name: 'Game Table' });
+  const dimmedWrapper = tableRegion.locator('xpath=..');
+  await expect(dimmedWrapper).toHaveCSS('pointer-events', 'none');
+  await expect(dimmedWrapper).not.toHaveCSS('filter', 'none');
+
+  // A real pointer click at the Pass button's own on-screen position, forced past Playwright's own
+  // actionability guard (which would otherwise itself refuse the click as non-interactable) - proves the
+  // dimmed table is truly inert to a genuine click, not merely visually implied. Pass is only ever
+  // rendered enabled while responding; forcing the click through and finding the dialog and Round number
+  // both unchanged either way (whether or not Pass happened to be enabled at this exact instant) shows
+  // the click never reached a live control.
+  const passButton = page.getByRole('button', { name: 'Pass', exact: true });
+  await passButton.click({ force: true }).catch(() => {});
+  await expect(dialog).toBeVisible();
+
+  // Escape/backdrop click never dismisses this overlay (RoundResultOverlay's own non-dismissible
+  // contract) - only ever skips its own scoring animation to the settled state.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+
+  const continueButton = page.getByRole('button', { name: /^(Next Round|View Session Results)$/ });
+  await expect(continueButton).toBeVisible({ timeout: 10_000 });
+  const isFinalRound = (await continueButton.textContent())?.includes('View Session Results') ?? false;
+  await continueButton.click();
+  await expect(dialog).not.toBeVisible();
+
+  if (!isFinalRound) {
+    // Explicit continuation actually continued (not merely closed the dialog): the Round number
+    // advanced, and the table's own dimming/inertness lifted.
+    await expect(roundLabel).not.toHaveText(roundTextBeforeResult ?? '');
+    await expect(dimmedWrapper).not.toHaveCSS('pointer-events', 'none');
+
+    // Regression coverage for the reported bug: a bot holding 3♣ at the start of Round 2 got stuck
+    // indefinitely (SessionPresentation's background driveTurns loop exited for good the instant Round 1
+    // ended and nothing ever restarted it once "Next Round" started a new one). Driving all the way
+    // through a second Round here, in a real browser, over the exact same "Next Round" transition the
+    // person actually hit, is the strongest available proof this stays fixed - a jsdom/RTL test cannot
+    // hang the way the real reported symptom did (a bot's Turn spinner frozen forever).
+    await driveRoundToResult(page);
+    await expect(dialog).toBeVisible();
+  }
+});
