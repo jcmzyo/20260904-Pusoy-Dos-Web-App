@@ -156,6 +156,11 @@
 .botHand {
   display: flex;
   min-width: 280px;
+  /* One card's own height (40px wide × 5:7 aspect ratio = 56px tall) so this row never collapses to 0
+   * height at 0 cards, which would otherwise shift PlayerPanel below it (same root cause the West/East
+   * min-width fix above addresses for that axis; the person's own follow-up report only named East, but
+   * North/South share the identical empty-row-collapse mechanism). */
+  min-height: 56px;
   justify-content: center;
 }
 
@@ -166,7 +171,11 @@
 .seatWest .botHand,
 .seatEast .botHand {
   flex-direction: column;
-  min-width: auto;
+  /* One rotated card's own width (`.rotatedCard`, 56px) rather than `auto` - at 0 cards this column had
+   * no children at all, collapsing to 0 width and letting the whole seat's row narrow, which visibly
+   * shifted PlayerPanel sideways toward the table the moment a West/East hand emptied out (the person's
+   * own follow-up report, observed at East). */
+  min-width: 56px;
   min-height: 280px;
 }
 
@@ -321,8 +330,11 @@
 
 /* Per-seat Play trail (ui-ux.md §5.4): this seat's own last Play in the active response cycle, dimmed
  * once a later Play beats it, cleared once the cycle itself resets (SessionPresentation's `lastPlay`).
- * Renders inside PlayerPanel's own container (its `playTrail` slot); wraps and stays bounded to that
- * panel's own width so a 5-card combination never grows out into the center table's own space. */
+ * Renders inside PlayerPanel's own container (its `playTrail` slot), sized (via that panel's own fixed
+ * width, PlayerPanel.module.css's `.panel`) to fit a full 5-card combination on one row without
+ * wrapping (the person's own follow-up report: a Straight's last card wrapping onto its own second
+ * row) - `flex-wrap: wrap` remains only as a defensive fallback, not something a legal (at most 5-card)
+ * combination is expected to ever actually trigger. */
 .lastPlay {
   display: flex;
   flex-wrap: wrap;

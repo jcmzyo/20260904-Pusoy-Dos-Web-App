@@ -1,10 +1,10 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.6)
+## UI / UX Document (v1.10)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
 **Last Modified:** September 18, 2026  
-**Parent document:** `requirements.md` v1.15  
+**Parent document:** `requirements.md` v1.16  
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
 ---
@@ -51,16 +51,16 @@ The center contains:
 
 The current hand to beat remains visible through Passes until beaten/reset. Every successfully played card immediately belongs to the public Discard Pile, including cards from the current Trick.
 
-Every combination type displays its cards in a fixed canonical order — never the order the cards happened to be selected/submitted in:
+Every combination type displays its cards in a fixed canonical order — never the order the cards happened to be selected/submitted in. Across every type, the card(s) whose Rank actually determines that combination's comparison strength (`requirements.md` §2.4.2-§2.4.4) always display **rightmost**:
 
 - **Single:** the one card, unchanged.
-- **Pair** and **Triple:** all cards share one Rank, so they are ordered by Suit low → high (`Clubs < Spades < Hearts < Diamonds`, §2.2 of `requirements.md`).
-- **Straight** and **Straight Flush:** the five cards in that combination's own ascending house-rule sequence (§2.4.1 of `requirements.md`: `A-2-3-4-5`, `2-3-4-5-6`, `3-4-5-6-7`, ..., `10-J-Q-K-A`, `J-Q-K-A-2`), not the hand's own Sort-by-Rank order (§6). The two orders differ only for the two special low Straights, where Sort-by-Rank's Ace/2-high convention would otherwise scatter the low cards to the end of the display (e.g. showing `3,4,5,A,2` instead of `A,2,3,4,5`).
-- **Flush:** the five same-suit cards ordered by Rank low → high (`3 → ... → A → 2`, the same Rank order §6's Sort by Rank uses).
-- **Full House:** the Triple's three cards first (themselves ordered by Suit low → high), then the Pair's two cards (themselves ordered by Suit low → high) — `requirements.md` §2.4.3's own "Triple"/"Pair" distinction, not submission order.
-- **Four-of-a-Kind:** the four matching cards first (themselves ordered by Suit low → high — all four suits are necessarily present), then the kicker last — `requirements.md` §2.4.4's own "four matching cards"/"kicker" distinction.
+- **Pair** and **Triple:** all cards share one Rank, so they are ordered by Suit low → high (`Clubs < Spades < Hearts < Diamonds`, §2.2 of `requirements.md`) — the highest-Suit card, which alone breaks a tie between two equal-Rank Pairs (§2.4.2), lands rightmost.
+- **Straight** and **Straight Flush:** the five cards in that combination's own ascending house-rule sequence (§2.4.1 of `requirements.md`: `A-2-3-4-5`, `2-3-4-5-6`, `3-4-5-6-7`, ..., `10-J-Q-K-A`, `J-Q-K-A-2`), not the hand's own Sort-by-Rank order (§6). The two orders differ only for the two special low Straights, where Sort-by-Rank's Ace/2-high convention would otherwise scatter the low cards to the end of the display (e.g. showing `3,4,5,A,2` instead of `A,2,3,4,5`). The sequence's own effective-highest card, which determines Straight/Straight Flush strength, lands rightmost.
+- **Flush:** the five same-suit cards ordered by Rank low → high (`3 → ... → A → 2`, the same Rank order §6's Sort by Rank uses) — the highest card, which determines Flush strength (§2.4.2), lands rightmost.
+- **Full House:** the Pair's two cards first (themselves ordered by Suit low → high), then the Triple's three cards (themselves ordered by Suit low → high) — `requirements.md` §2.4.3's own "Pair"/"Triple" distinction, not submission order. A Full House is ranked by **the Triple's Rank only** (the Pair never affects comparison, §2.4.3), so the Triple — the actual power determiner — lands rightmost, not the Pair.
+- **Four-of-a-Kind:** the kicker first, then the four matching cards (themselves ordered by Suit low → high — all four suits are necessarily present) — `requirements.md` §2.4.4's own "kicker"/"four matching cards" distinction. A Four-of-a-Kind is ranked by **the rank of the four matching cards only** (the kicker never affects comparison, §2.4.4), so the quad — the actual power determiner — lands rightmost, not the kicker.
 
-This is a UI presentation choice layered on an already-Engine-validated `Combination`; it never changes what combination was recognized, its legality, or its comparison strength (M4-T12.5).
+This is a UI presentation choice layered on an already-Engine-validated `Combination`; it never changes what combination was recognized, its legality, or its comparison strength (M4-T12.5). (M4-T12.5 correction: an earlier version of this section had the Full House and Four-of-a-Kind orders backwards — Triple-then-Pair and quad-then-kicker — which put the non-power-determining part rightmost, breaking the same "power determiner lands rightmost" convention every other combination type above already follows. The orders above are the corrected ones.)
 
 Card face detail (corner index vs. center pip) is defined in §5.6.
 
@@ -86,14 +86,16 @@ West and East render each face-down card **rotated 90° to match the seat's own 
 
 In addition to the center table's current hand to beat (§5.1), each seat shows **its own most recent Play for the active response cycle**, inside that seat's own panel (alongside its name/count/score/status):
 
-- When a seat successfully Plays, that combination renders as a compact rank+suit corner badge per card (not a shrunk full card face, which reads illegibly at that size) inside the seat's own panel. The badge row wraps and stays within the panel's own width so it never grows out into the center table's own space. It follows the same canonical card-order rule as the center table's own hand to beat (§5.1), for every combination type.
+- When a seat successfully Plays, that combination renders as a compact rank+suit corner badge per card (not a shrunk full card face, which reads illegibly at that size) inside the seat's own panel. The badge row is sized to fit a full 5-card combination on one line (§5.7) rather than wrapping — a wrap would put the row's own last card on its own second line, which read poorly for a 5-card Straight/Flush/Full House/Four-of-a-Kind/Straight Flush (person's own follow-up report). It follows the same canonical card-order rule as the center table's own hand to beat (§5.1), for every combination type.
 - That seat's own last Play is shown at full visibility while it is still the hand to beat, and **dimmed ("grayed out")** once a later Play beats it — it is not removed, so the player can see what was beaten and by how much.
 - A seat that Passes shows an explicit **PASS** at its own position (already specified in §8) **instead of** any earlier Play indicator from that same seat this cycle — a seat's own Pass replaces its own prior Play badge rather than showing both together, even if that Play had not yet been beaten.
 - While a seat's own "deciding" indicator (§8) is showing, its Play trail is hidden — it is about to be replaced by that seat's next decision anyway.
 - All per-seat Play/Pass indicators are cleared together the moment the response cycle resets to a **FREE LEAD** (Trick reset) — matching the same reset boundary that already clears PASS in §8.
-- **Exception:** if that same Trick reset is also the Round's own completion (the 3rd-place finisher's final Play), every seat's trail is left showing as-is rather than cleared, so the Play that ended the Round doesn't disappear before the person ever sees it. It clears normally on the next genuine mid-Round reset, and always clears going into the next Round.
+- **Exception:** a seat that has itself finished (1st-3rd) keeps its own final Play showing for the rest of the Round, through every later mid-Round reset, rather than being cleared the instant the very next Trick concludes — a finished seat never takes another Turn this Round, so there is nothing to clear it *to*. This includes but is not limited to the Round's own completion (the 3rd-place finisher's final Play). **Follow-up correction (post-M4-T12.5):** this was originally implemented only for the Round-ending finish; an earlier (1st/2nd place) finisher's own final Play was still being wiped by the next mid-Round reset, reading as if it never happened — reported as inconsistent between seats. Every finisher's own last Play now persists the same way, whether or not their finish also ends the Round. It clears normally on the next genuine mid-Round reset for every *other* (still-active) seat, and always clears every seat going into the next Round.
 
 This is presentation only: it derives from the same authoritative public Play/Pass/Trick-reset events already used for the center table and Event Log (§9.2), and does not change what information is public or when.
+
+**Follow-up correction (post-M4-T12.5):** a seat's own Pass is meant to permanently replace its own prior Play badge for the rest of that response cycle (the bullet above), but a gap let it reappear: when a later Play by anyone else makes every previously-Passed player newly eligible to respond again (the Engine's own house rule — Passing does not remove a player from the current Trick, and a fresh higher bid gives every earlier Passer another chance to beat it), that same reset was also, incidentally, un-marking this seat's own already-cleared Pass in the presentation layer — letting its stale pre-Pass Play badge reappear at its seat as if it had just Played again, reported as "I passed, but my previous play was still present" (and, inconsistently across seats, as some Play badges reading correctly grayed-out/beaten while a reappeared stale one did not). A seat's own Pass now stays cleared through this reset too, reappearing only once that same seat actually takes its own next Turn (a fresh Play, or another Pass).
 
 ## 5.5 In-table finish and turn glow
 
@@ -116,9 +118,13 @@ Every face-up card always shows the two corner rank/suit indices. Whether it add
 
 ## 5.7 Table and panel dimension stability
 
-The table's own bordered box does not change size as a Round is played, and neither does any individual seat's own panel — each reserves its own worst case (a full 13-card hand for the bot-hand stack, a wrapped 5-card trail for the panel, a full hand-to-beat display for the center) and holds it constant through the Round, rather than growing or shrinking as that seat's hand empties or its status/trail come and go. Only an actual viewport resize changes these sizes.
+The table's own bordered box does not change size as a Round is played, and neither does any individual seat's own panel — each reserves its own worst case (a full 13-card hand for the bot-hand stack, a single-row 5-card trail for the panel, a full hand-to-beat display for the center) and holds it constant through the Round, rather than growing or shrinking as that seat's hand empties or its status/trail come and go. Only an actual viewport resize changes these sizes.
 
 Within a panel, content is vertically centered as a block, and the status badge and Play trail each occupy an always-reserved slot (empty when there is nothing to show) rather than being removed outright — so an idle seat with no badge, or a seat with no trail to show, doesn't shift its name/count position or leave a lopsided gap.
+
+**Follow-up corrections (post-M4-T12.5):** two further gaps in this same worst-case-reservation contract, both reported by the person: (1) a panel's own *width* was only a minimum, not held constant the same way its height already was — the longer "DONE · 1st"/"2nd"/"3rd"/"4th" status text widened the panel relative to "Turn"/"PASS"/plain "DONE", reading as the panel changing size. Width is now fixed the same way height already was. (2) West/East's own rotated bot-hand column reserved height for the empty case but not width, and North/South's reserved width but not height — at 0 cards, the empty axis collapsed to 0 and visibly shifted the panel (observed at East). Both axes are now floored to one card's own footprint regardless of card count.
+
+**Further follow-up correction (post-M4-T12.5):** the fixed panel width set by (1) above was itself too narrow for two of the panel's own worst-case contents it was meant to cover: a full 5-card Play trail (§5.4) wrapped its last card onto its own second row instead of one line, and the widest status text ("DONE · 2nd" and every other placement, all the same length) line-wrapped and visibly overlapped the row below it — both reported by the person ("Make sure the seat width can fit the 5 hands"; "'Done . 2nd' doesn't fit in one line and blocks text"). The panel's fixed width is now sized to fit both without wrapping, and the status badge itself never line-wraps regardless of available width.
 
 # 6. Human Hand, Selection, Sorting, and Manual Arrangement
 
@@ -177,6 +183,8 @@ When the 3rd-place player finishes, the Engine has completed the Basic Round and
 
 Show the reveal for roughly **1.5–2 seconds**. A click/tap may finish the reveal immediately. The same input must not accidentally activate the next result action.
 
+**Follow-up correction (post-M4-T12):** once shown, the 4th-place player's revealed hand stays visible at that seat (dimmed behind the Result overlay, same as the rest of the table) for as long as that Round's own Result overlay is showing - it must not flip back to face-down the instant that overlay opens, which read as if the reveal never happened at all. It only clears once the Round-start transition to the next Round actually begins.
+
 # 12. Round Result Overlay
 
 Round Result is a modal/overlay over the dimmed completed table, not a separate page. It is not dismissible by outside click/Escape; progression occurs through its explicit action.
@@ -195,7 +203,9 @@ Rounds 1–4 show **Next Round**. Round 5 shows **View Session Results**.
 
 ## 12.1 Round-Start Transition Screen
 
-Between clicking **Next Round** and the next Round's own opening Turn becoming interactive, a brief transition screen dims the table and shows the destination Round number (e.g. **Round 3**), then lights the table back up once that Round is actually live. The next Round's own dealing/start is deferred until this transition ends — by its own short timer or an earlier click/tap skip — rather than the new Round flashing into view underneath the transition screen.
+Between clicking **Next Round** and the next Round's own opening Turn becoming interactive, a brief transition screen dims the table and shows the destination Round number (e.g. **Round 3**), then lights the table back up once that Round is actually live.
+
+**Follow-up correction (post-M4-T12.5):** the next Round's own dealing/start used to be deferred until this transition ended, on the theory that dealing early would let the new Round flash into view underneath the transition screen. In practice this left the *previous* Round's own leftover cards (whatever remained in each hand when it ended) sitting dimmed underneath for the whole transition, which then visibly swapped for the freshly dealt Round the instant the screen cleared — reported as the cards "flipping" and getting replaced. The next Round is now dealt immediately when **Next Round** is clicked, before this screen even opens; the dimmed table already shows the fresh Round throughout the transition, so lighting it back up only ever brightens it rather than replacing anything.
 
 The same dim/label/lit treatment also covers Round 1's own very first start, immediately after Start Game, so every Round — including the first — gets the identical transition rather than only Rounds 2 and later. Round 1 is already dealt and live the moment the table first renders, so there is nothing to defer there; the transition instead pauses ordinary Turn advancement for its own short duration (the same reference-counted pause any open overlay already uses, §9.2), purely so the same visual sequence applies uniformly across every Round.
 

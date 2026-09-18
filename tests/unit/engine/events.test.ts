@@ -68,24 +68,42 @@ describe('factual Engine events', () => {
     }
   });
 
-  it.each([false, true])('reports a finished leader and immediate reset=%s without inventing Passes', (unbeatable) => {
-    const result = submitMove(fixture([[card('8')], [card('3')], [card(unbeatable ? '4' : '9')], [card('5')]]),
+  it('reports a finished leader and requires every remaining active player\'s own explicit Pass before Trick reset (requirements.md §2.5.2, M4-T12.5)', () => {
+    // Nobody can beat south's finishing single 8; the Engine no longer reassigns the free
+    // lead immediately (no more "immediate reset" / invented silence) — west, north and east
+    // each take a real Turn of their own and each produce a genuine PLAYER_PASSED event.
+    const result = submitMove(fixture([[card('8')], [card('3')], [card('4')], [card('5')]]),
       { kind: 'play', playerId: 'south', cards: [card('8')] }, defaultRuleset);
-    expect(types(result.events)).toEqual(unbeatable
-      ? ['CARDS_PLAYED', 'PLAYER_FINISHED', 'TRICK_ENDED', 'TURN_CHANGED']
-      : ['CARDS_PLAYED', 'PLAYER_FINISHED', 'TURN_CHANGED']);
+    expect(types(result.events)).toEqual(['CARDS_PLAYED', 'PLAYER_FINISHED', 'TURN_CHANGED']);
     expect(result.events[1]).toEqual({ type: 'PLAYER_FINISHED', roundNumber: 1, playerId: 'south', placement: 1 });
-    expect(result.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: unbeatable ? 'west' : 'north' });
-    if (!unbeatable) {
-      let state = result.state;
-      for (const playerId of ['north', 'east', 'west']) {
-        const passed = submitMove(state, { kind: 'pass', playerId }, defaultRuleset);
-        expect(types(passed.events)).toEqual(playerId === 'west'
-          ? ['PLAYER_PASSED', 'TRICK_ENDED', 'TURN_CHANGED'] : ['PLAYER_PASSED', 'TURN_CHANGED']);
-        if (playerId === 'west') expect(passed.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'west' });
-        state = passed.state;
-      }
+    expect(result.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'west' });
+    let state = result.state;
+    for (const playerId of ['west', 'north', 'east']) {
+      const passed = submitMove(state, { kind: 'pass', playerId }, defaultRuleset);
+      expect(passed.events[0]).toEqual({ type: 'PLAYER_PASSED', roundNumber: 1, playerId });
+      expect(types(passed.events)).toEqual(playerId === 'east'
+        ? ['PLAYER_PASSED', 'TRICK_ENDED', 'TURN_CHANGED'] : ['PLAYER_PASSED', 'TURN_CHANGED']);
+      if (playerId === 'east') expect(passed.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'west' });
+      state = passed.state;
     }
+  });
+
+  it('gives an intervening remaining player a real Pass Turn before a later player\'s own beating Play, instead of silently skipping to them', () => {
+    // West cannot beat south's finishing single 8 and must explicitly Pass; only then does
+    // north get a Turn, on which north actually plays a beating single 9 (a real choice, not
+    // an Engine-computed jump straight to whichever remaining player could beat it).
+    const result = submitMove(fixture([[card('8')], [card('3')], [card('9'), card('2')], [card('5')]]),
+      { kind: 'play', playerId: 'south', cards: [card('8')] }, defaultRuleset);
+    expect(types(result.events)).toEqual(['CARDS_PLAYED', 'PLAYER_FINISHED', 'TURN_CHANGED']);
+    expect(result.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'west' });
+    const westPass = submitMove(result.state, { kind: 'pass', playerId: 'west' }, defaultRuleset);
+    expect(types(westPass.events)).toEqual(['PLAYER_PASSED', 'TURN_CHANGED']);
+    expect(westPass.events[0]).toEqual({ type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'west' });
+    expect(westPass.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'north' });
+    const northPlay = submitMove(westPass.state, { kind: 'play', playerId: 'north', cards: [card('9')] }, defaultRuleset);
+    expect(types(northPlay.events)).toEqual(['CARDS_PLAYED', 'TURN_CHANGED']);
+    expect(northPlay.events[0]).toEqual({ type: 'CARDS_PLAYED', roundNumber: 1, playerId: 'north', combination: { type: 'single', cards: [card('9')] } });
+    expect(northPlay.events.at(-1)).toEqual({ type: 'TURN_CHANGED', roundNumber: 1, playerId: 'east' });
   });
 
   it('reproduces all five Rounds with accurate completion payloads and no hidden cards', () => {

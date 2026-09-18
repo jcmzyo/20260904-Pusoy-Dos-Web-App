@@ -12,15 +12,43 @@ function combo(type: Combination['type'], cards: readonly Card[]): Combination {
 
 describe(
   'getDisplayCards (requirements.md §2.4.1 house-rule Straight sequence; person\'s own follow-up request: ' +
-    '"instead of 3,4,5,A,2, arrange it as A,2,3,4,5")',
+    '"instead of 3,4,5,A,2, arrange it as A,2,3,4,5"; ui-ux.md §5.1 canonical order, M4-T12.5 correction: ' +
+    'the combination\'s own power-determining card(s) always display rightmost)',
   () => {
-    it('leaves non-Straight combination types exactly in their own submission order', () => {
+    it('leaves a Single exactly as submitted (there is nothing to reorder)', () => {
       const single = combo('single', [c('7', 'hearts')]);
       expect(getDisplayCards(single)).toEqual([c('7', 'hearts')]);
+    });
 
-      // Submission order deliberately not rank-sorted; every other combination type is unaffected.
+    it('orders a Pair by Suit low → high regardless of submission order', () => {
+      const pair = combo('pair', [c('9', 'diamonds'), c('9', 'clubs')]);
+      expect(getDisplayCards(pair)).toEqual([c('9', 'clubs'), c('9', 'diamonds')]);
+    });
+
+    it('orders a Triple by Suit low → high regardless of submission order', () => {
+      const triple = combo('triple', [c('Q', 'hearts'), c('Q', 'clubs'), c('Q', 'spades')]);
+      expect(getDisplayCards(triple)).toEqual([c('Q', 'clubs'), c('Q', 'spades'), c('Q', 'hearts')]);
+    });
+
+    it('orders a Flush by Rank low → high regardless of submission order', () => {
+      const flush = combo('flush', [c('J', 'hearts'), c('3', 'hearts'), c('9', 'hearts'), c('5', 'hearts'), c('7', 'hearts')]);
+      expect(getDisplayCards(flush)).toEqual([
+        c('3', 'hearts'), c('5', 'hearts'), c('7', 'hearts'), c('9', 'hearts'), c('J', 'hearts'),
+      ]);
+    });
+
+    it('orders a Full House as the Pair first, then the Triple (Suit low → high within each) — the Triple’s Rank alone determines Full House power, so it displays rightmost', () => {
       const fullHouse = combo('fullHouse', [c('K', 'clubs'), c('7', 'hearts'), c('K', 'diamonds'), c('7', 'spades'), c('K', 'hearts')]);
-      expect(getDisplayCards(fullHouse)).toEqual(fullHouse.cards);
+      expect(getDisplayCards(fullHouse)).toEqual([
+        c('7', 'spades'), c('7', 'hearts'), c('K', 'clubs'), c('K', 'hearts'), c('K', 'diamonds'),
+      ]);
+    });
+
+    it('orders a Four-of-a-Kind as the kicker first, then the four matching cards (Suit low → high) — the quad’s Rank alone determines Four-of-a-Kind power, so it displays rightmost', () => {
+      const fourOfAKind = combo('fourOfAKind', [c('8', 'diamonds'), c('4', 'clubs'), c('8', 'hearts'), c('8', 'spades'), c('8', 'clubs')]);
+      expect(getDisplayCards(fourOfAKind)).toEqual([
+        c('4', 'clubs'), c('8', 'clubs'), c('8', 'spades'), c('8', 'hearts'), c('8', 'diamonds'),
+      ]);
     });
 
     it('reorders the special low Straight A-2-3-4-5 into its own ascending sequence, not domain Rank order', () => {

@@ -84,6 +84,12 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     // Skipping the reveal only reached the Round Result overlay - it did not also continue to the next
     // Round (ui-ux.md §11: "the same input must not accidentally activate the next result action").
     expect(presentation.getSnapshot().roundNumber).toBe(reveal.roundNumber);
+    // Person's own follow-up report: the revealed hand was flipping back to face-down the instant the
+    // Round Result overlay opened - it must instead stay visible (dimmed behind the overlay, same as
+    // the rest of the table) for as long as that same Round's own Result overlay is showing.
+    for (const label of sortedLabels) {
+      expect(screen.getByRole('img', { name: label })).toBeTruthy();
+    }
   });
 
   it('moves straight to the Round Result overlay, with nothing to reveal, when the human finishes 4th', async () => {
@@ -159,16 +165,24 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
 
       const transition = screen.getByRole('button', { name: `Starting Round ${roundBefore + 1}` });
       expect(transition.textContent).toBe(`Round ${roundBefore + 1}`);
-      // Still the previous Round's own table underneath - `continueToNextRound` has not actually run yet.
-      expect(presentation.getSnapshot().roundNumber).toBe(roundBefore);
-      expect(continueToNextRoundSpy).not.toHaveBeenCalled();
+      // `continueToNextRound` already ran the instant "Next Round" was clicked (person's own follow-up
+      // report: deferring it until the transition's own timer ended left the *previous* Round's own
+      // leftover cards sitting dimmed underneath, which then visibly swapped for the freshly dealt Round
+      // the instant this screen cleared) - the fresh Round is already dealt, just still dimmed/inert.
+      expect(continueToNextRoundSpy).toHaveBeenCalledOnce();
+      expect(presentation.getSnapshot().roundNumber).toBe(roundBefore + 1);
+      // The fresh 13-card deal for every seat is already the underlying data throughout the dimmed
+      // transition, not only once it lifts - nothing is left to swap once the screen clears.
+      expect(presentation.getSnapshot().humanHand).toHaveLength(13);
+      expect(presentation.getSnapshot().seats.every((seat) => seat.cardCount === 13)).toBe(true);
       const dimmedWrapper = screen.getByRole('region', { name: 'Game Table' }).parentElement!;
       expect(dimmedWrapper.className).toContain('tableDimmed');
 
       await act(async () => { await vi.advanceTimersByTimeAsync(999); });
-      expect(continueToNextRoundSpy).not.toHaveBeenCalled();
+      expect(continueToNextRoundSpy).toHaveBeenCalledOnce();
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
 
+      // The timer only ever lifts the dim now - it never calls `continueToNextRound` a second time.
       expect(continueToNextRoundSpy).toHaveBeenCalledOnce();
       expect(presentation.getSnapshot().roundNumber).toBe(roundBefore + 1);
       expect(screen.queryByRole('button', { name: `Starting Round ${roundBefore + 1}` })).toBeNull();

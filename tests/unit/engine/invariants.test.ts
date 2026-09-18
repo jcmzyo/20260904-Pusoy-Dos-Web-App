@@ -133,7 +133,10 @@ describe('reusable Engine invariants', () => {
     state = result.state;
     failure(() => assertEngineInvariants(changeContext(state, { currentPlayerId: 'south' }), rules), 'TURN_OWNER');
     if (!unbeatable) {
-      for (const playerId of ['north', 'east', 'west']) {
+      // requirements.md §2.5.2 (M4-T12.5): west, north and east each take their own explicit Turn, in
+      // order, before the free lead reassigns — even though north could beat south's finishing 8 with a
+      // 9, north (like west and east) is exercised here taking a strategic Pass instead.
+      for (const playerId of ['west', 'north', 'east']) {
         const pass: Move = { kind: 'pass', playerId };
         const passed = submitMove(state, pass, rules);
         expect(() => assertMoveInvariants(state, pass, passed, rules)).not.toThrow();

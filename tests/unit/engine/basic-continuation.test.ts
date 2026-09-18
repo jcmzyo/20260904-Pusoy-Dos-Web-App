@@ -26,7 +26,7 @@ function freeze<T>(value: T): T {
 }
 
 describe('Basic finished-player continuation', () => {
-  it('finds the first beating player for every seat, active subset and responder subset', () => {
+  it('always gives the very next active player an explicit response Turn, regardless of who could eventually beat it (requirements.md §2.5.2, M4-T12.5)', () => {
     for (let start = 0; start < 4; start += 1) {
       for (let activeMask = 1; activeMask < 8; activeMask += 1) {
         for (let beatMask = 0; beatMask < 8; beatMask += 1) {
@@ -51,10 +51,13 @@ describe('Basic finished-player continuation', () => {
           } else {
             expect(result.kind).toBe('continue');
             if (result.kind !== 'continue') throw new Error('Expected continuation');
-            const responder = active.find((distance) => beatMask & (1 << (distance - 1)));
-            expect(result.progression.currentPlayerId).toBe(ids[(start + (responder ?? active[0]!)) % 4]);
-            expect(result.progression.trick).toEqual(responder ? { kind: 'response', current: { type: 'single', cards: [card('8')] } } : { kind: 'freeLead' });
-            expect(result.progression.responseCycle).toEqual(responder ? { lastSuccessfulPlayerId: ids[start], passedPlayerIds: [] } : null);
+            // Whether or not this exact next player (or some later remaining player, per beatMask) could
+            // beat the finisher's combination never changes who gets the Turn: it is always the very next
+            // active player, on an ordinary response Turn — never an immediate silent jump to a beater
+            // found elsewhere, and never an immediate silent free-lead reassignment.
+            expect(result.progression.currentPlayerId).toBe(ids[(start + active[0]!) % 4]);
+            expect(result.progression.trick).toEqual({ kind: 'response', current: { type: 'single', cards: [card('8')] } });
+            expect(result.progression.responseCycle).toEqual({ lastSuccessfulPlayerId: ids[start], passedPlayerIds: [] });
           }
         }
       }
@@ -82,11 +85,28 @@ describe('Basic finished-player continuation', () => {
     }
   });
 
-  it('uses full legal combination comparison including cross-type five-card responses', () => {
+  it('uses full legal combination comparison including cross-type five-card responses, after each intervening player\'s own explicit Turn', () => {
     const straight: Card[] = ['3', '4', '5', '6', '7'].map((rank, index) => ({ rank: rank as Rank, suit: index % 2 ? 'spades' : 'clubs' }));
     const flush: Card[] = ['3', '5', '7', '9', 'J'].map((rank) => ({ rank: rank as Rank, suit: 'hearts' }));
-    const result = resolve(context([straight, [card('2')], flush, [{ rank: 'A', suit: 'diamonds' }]]));
-    expect(result.kind === 'continue' && result.progression.currentPlayerId).toBe('north');
+    const initial = context([straight, [card('2')], flush, [{ rank: 'A', suit: 'diamonds' }]]);
+    const finish = resolve(initial);
+    if (finish.kind !== 'continue') throw new Error('Expected continuation');
+    // West's lone single 2 cannot answer a five-card Straight: west gets an explicit Turn first
+    // (never silently skipped in favor of north, who can actually beat it) and must Pass on it.
+    expect(finish.progression.currentPlayerId).toBe('west');
+    expect(finish.progression.trick).toEqual({ kind: 'response', current: { type: 'straight', cards: straight } });
+    const westPass = resolve({ ...initial, players: finish.players, ...finish.progression }, finish.finishOrder, finish.progression.responseCycle, { kind: 'pass', playerId: 'west' });
+    if (westPass.kind !== 'continue') throw new Error('Expected continuation');
+    expect(westPass.progression.currentPlayerId).toBe('north');
+    // Only now, on north's own Turn, is the cross-type five-card comparison actually exercised: a Flush
+    // legally beats a Straight, and playing it (north's whole hand) also finishes north.
+    const northPlay = resolve({ ...initial, players: westPass.players, ...westPass.progression }, westPass.finishOrder, westPass.progression.responseCycle, { kind: 'play', playerId: 'north', cards: flush });
+    expect(northPlay.finishOrder).toEqual(['south', 'north']);
+    expect(northPlay.kind).toBe('continue');
+    // West remains active (only passed earlier, never finished) and east is still active too, so the
+    // Round is not yet down to one player; east — the next active player after north — gets the Turn.
+    if (northPlay.kind !== 'continue') throw new Error('Expected continuation');
+    expect(northPlay.progression).toEqual({ currentPlayerId: 'east', trick: { kind: 'response', current: { type: 'flush', cards: flush } }, responseCycle: { lastSuccessfulPlayerId: 'north', passedPlayerIds: [] } });
   });
 
   it('resets after voluntary Passes against a finished leader without re-entering finished seats', () => {
@@ -95,7 +115,7 @@ describe('Basic finished-player continuation', () => {
     if (first.kind !== 'continue') throw new Error('Expected continuation');
     let state = { ...initial, players: first.players, ...first.progression };
     let cycle = first.progression.responseCycle;
-    for (const playerId of ['north', 'east', 'west']) {
+    for (const playerId of ['west', 'north', 'east']) {
       expect(state.currentPlayerId).toBe(playerId);
       const result = resolve(state, first.finishOrder, cycle, { kind: 'pass', playerId });
       if (result.kind !== 'continue') throw new Error('Expected continuation');
@@ -137,13 +157,28 @@ describe('Basic finished-player continuation', () => {
     expect(engine).not.toHaveProperty('resolveBasicContinuation');
   });
 
-  it('an unbeatable final play clears old Passes and permits a different-size free lead', () => {
+  it('an unbeatable final play clears old Passes, requires each remaining player\'s own explicit Pass, and then permits a different-size free lead', () => {
     const initial = context([[card('2')], [card('4'), { rank: '4', suit: 'spades' }, card('3')], [card('5')], [card('6')]]);
     const state: MoveValidationContext = { ...initial, trick: { kind: 'response', current: { type: 'single', cards: [card('A')] } } };
-    const result = resolve(state, [], { lastSuccessfulPlayerId: 'east', passedPlayerIds: ['west', 'north'] });
-    if (result.kind !== 'continue') throw new Error('Expected continuation');
-    expect(result.progression).toEqual({ currentPlayerId: 'west', trick: { kind: 'freeLead' }, responseCycle: null });
-    const next = resolve({ ...state, players: result.players, ...result.progression }, result.finishOrder, null, { kind: 'play', playerId: 'west', cards: initial.players[1]!.hand.slice(0, 2) });
+    const finish = resolve(state, [], { lastSuccessfulPlayerId: 'east', passedPlayerIds: ['west', 'north'] });
+    if (finish.kind !== 'continue') throw new Error('Expected continuation');
+    // South's single 2 is unbeatable, but the stale ['west', 'north'] Passes recorded against east's
+    // earlier combination must not carry over: south's own finishing Play starts a fresh response cycle,
+    // and west, north and east must each explicitly Pass on it in turn before the free lead reassigns.
+    expect(finish.progression).toEqual({ currentPlayerId: 'west', trick: { kind: 'response', current: { type: 'single', cards: [card('2')] } }, responseCycle: { lastSuccessfulPlayerId: 'south', passedPlayerIds: [] } });
+    let current = { ...state, players: finish.players, ...finish.progression };
+    let cycle = finish.progression.responseCycle;
+    for (const playerId of ['west', 'north', 'east']) {
+      expect(current.currentPlayerId).toBe(playerId);
+      const passed = resolve(current, finish.finishOrder, cycle, { kind: 'pass', playerId });
+      if (passed.kind !== 'continue') throw new Error('Expected continuation');
+      current = { ...current, ...passed.progression };
+      cycle = passed.progression.responseCycle;
+    }
+    expect(current.currentPlayerId).toBe('west');
+    expect(current.trick).toEqual({ kind: 'freeLead' });
+    expect(cycle).toBeNull();
+    const next = resolve(current, finish.finishOrder, null, { kind: 'play', playerId: 'west', cards: initial.players[1]!.hand.slice(0, 2) });
     expect(next.kind === 'continue' && next.progression.trick).toEqual({ kind: 'response', current: { type: 'pair', cards: initial.players[1]!.hand.slice(0, 2) } });
   });
 

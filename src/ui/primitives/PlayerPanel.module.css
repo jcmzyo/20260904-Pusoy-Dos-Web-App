@@ -16,7 +16,16 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 96px;
+  /* Fixed (not min-) width, same convention/reason as the fixed height above: held constant across
+   * every state (blank/"Turn"/"PASS"/"DONE" alone/"DONE · 1st"-"4th") - a bare `min-width` let the
+   * panel visibly widen the moment a placement label appeared (the person's own follow-up report: "the
+   * panel change[s] sizes" when DONE pops up). Sized for this panel's own two widest real states: the
+   * "DONE · 1st"/"2nd"/"3rd"/"4th" status text, and a wrapped-free single row of a full 5-card Play
+   * trail (App.module.css's `.lastPlay`, 5 fixed 22px-wide `CardIndex` badges plus 4 3px gaps = 122px) -
+   * 130px left only ~98px of interior width once padding/border are subtracted, too narrow for either
+   * one on one line (the person's own follow-up report: a 5-card Straight's last card wrapping onto its
+   * own second row, and "DONE · 2nd" itself wrapping and overlapping the row below). */
+  width: 168px;
   height: 152px;
   overflow: hidden;
   padding: 8px 14px;
@@ -39,8 +48,8 @@
 }
 
 /* Always rendered (PlayerPanel.tsx), fixed height regardless of whether the "deciding" spinner or a
- * Play trail badge row is actually present - sized for the taller of the two (a wrapped two-row, up to
- * 5-card trail). */
+ * Play trail badge row is actually present - sized for the taller of the two (a single-row, up to
+ * 5-card trail; `.panel`'s own fixed width above keeps it from ever wrapping onto a second row). */
 .trailSlot {
   min-height: 60px;
   display: flex;
@@ -92,6 +101,11 @@
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  /* Belt-and-suspenders alongside `.panel`'s own widened fixed width above: this pill's text (up to
+   * "DONE · 2nd"/"3rd" etc.) must never line-wrap, since a wrapped second line has no reserved space of
+   * its own and instead overlaps `.trailSlot` below it (the person's own follow-up report: "'Done . 2nd'
+   * doesn't fit in one line and blocks text"). */
+  white-space: nowrap;
 }
 
 .statusTurn {
