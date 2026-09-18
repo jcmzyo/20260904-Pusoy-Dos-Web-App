@@ -435,7 +435,7 @@ Round completion is informative, satisfying, and safe.
 ### Goal
 Resolve three follow-up reports surfaced during M4-T12 review that are polishing or rule-clarification in nature rather than new milestone scope, without expanding into unrelated work:
 
-- **(A) Baseline AI possibly holding a losing combination.** Reported: a bot appeared to keep holding a strong combination (e.g. a Straight) even while already losing a Round. **This sub-item's exact scope is not yet finalized — see Open Question below; do not implement a behavior change here without the person's confirmation of what was actually observed.**
+- **(A) Baseline AI possibly holding a losing combination.** Reported: a bot appeared to keep holding a strong combination (e.g. a Straight) even while already losing a Round. **Resolved — see Open Question below for the confirmed scenario and the implemented fix.**
 - **(B) Basic Mode continuation — explicit per-player Pass before free-lead reassignment.** Approved rule change recorded in `requirements.md` §2.5.2: replace the Engine's current silent determination (steps 4–6 of §2.5.1) with an explicit Turn for every remaining active player.
 - **(C) Combination display order for Pair/Triple, Flush, Full House, and Four-of-a-Kind.** Approved rule recorded in `ui-ux.md` §5.1: these combination types currently display in raw submission order; they must instead use the newly documented canonical order (Straight/Straight Flush are unaffected — already correct).
 
@@ -464,8 +464,12 @@ The three follow-up reports from M4-T12 review are resolved, or explicitly re-sc
 - [ ] `getDisplayCards` uses the documented canonical order for every combination type; Straight/Straight Flush behavior unchanged.
 - [ ] Focused tests, full regression, typecheck, and build all pass.
 
-### Open Question (blocks sub-item A only; B and C do not depend on it)
-What exactly was observed for the "AI holds a losing combination" report — did the bot have a *legal, beating* Play available (e.g. a Straight) and choose to Pass or play something weaker anyway while clearly behind, or did it simply never get a legal opportunity to play that combination before the Round ended? A concrete example (seed/fixture or a description of the hands involved) would let this sub-item be scoped precisely rather than guessed at.
+### Open Question (blocks sub-item A only; B and C do not depend on it) — RESOLVED
+Confirmed scenario (person's own account): the bot held a J-Q-K-A-2 Straight while an opponent, down to their last two cards, played Singles 6 then 9 across two Tricks and finished the Round unopposed; the bot had a legal beating Single available in the Straight both times and Passed anyway. Per the Engine's own finish rule, beating an opponent's *final* card can never undo their finish — it only decides who leads the next Trick — so the exploitable moments were the earlier Tricks, before the opponent reached their last card or two.
+
+Root cause: `evaluateCandidates.ts`'s documented hierarchy (ai.md §8) ranked resulting-hand efficiency (`minPlays`) above urgent opponent pressure, so breaking a five-card Straight into a single (which sharply raises `minPlays`) always lost to PASS even when another active player held only 1-2 cards.
+
+Fix (approved: "Add Round-standing awareness", then confirmed as a full reversal of the conflicting pinned test): urgent opponent pressure (an active opponent at 1-2 cards) now outranks `minPlays` efficiency — the Bot prefers any legal beating Play over PASS ahead of hand efficiency, then still uses `minPlays`/resource cost/shedding/control to choose which Play. Without that pressure, `minPlays` remains primary and structure is preserved exactly as before. Implemented in `evaluateCandidates.ts`; documented in `ai.md` §8 (v1.6). See `tests/unit/ai/evaluation.test.ts` for the reported-scenario regression test and the reversed/updated pinned test.
 
 # M4-T13 — Session Summary and Replay Navigation
 

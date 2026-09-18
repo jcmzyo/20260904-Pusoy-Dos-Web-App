@@ -35,15 +35,28 @@ export interface PresentedSeat {
    * === this seat`).
    *
    * Also `null` the instant this same seat itself Passes (even on a later Turn within the same cycle,
-   * after already Playing once): a seat's own Pass explicitly replaces its own prior Play indicator
-   * rather than showing both at once (the person's own follow-up request) — `passed` above is what
-   * then drives the PASS label.
+   * after already Playing once), and it STAYS `null` even once a later Play by someone else in that
+   * same still-open cycle makes this seat eligible to respond again (the Engine's own `passedPlayerIds`
+   * reset) - a seat's own Pass explicitly replaces its own prior Play indicator rather than showing both
+   * at once (the person's own follow-up report: "I passed, but my previous play was still present"),
+   * and only this same seat's own next actual Turn (a fresh Play or another Pass) changes it again;
+   * `passed` above is what drives the PASS label in the meantime.
    *
    * If the Trick that ends the Round is also the Round's own final Trick (e.g. the 3rd-place finisher's
    * last Play), every seat's trail is deliberately left as-is rather than cleared — otherwise the very
    * Play that ended the Round would disappear an instant before the person ever sees it (round-4 follow-
    * up). It clears normally on the next genuine mid-Round reset, and on the next Round via
    * `continueToNextRound`.
+   *
+   * A seat that has itself finished (1st-3rd) is the other exception (M4-T12.5 follow-up): once
+   * finished, it takes no further Turn this Round, so its own final Play keeps showing at its seat
+   * through every later mid-Round reset too, not only the Round-ending one above - previously it was
+   * wiped the instant the very next Trick concluded, reading as if a finisher's own winning Play simply
+   * never happened (inconsistent with the 3rd-place finisher's own Play, which already survived).
+   * `beaten` for a finished seat's persisted Play is frozen at the moment its own Trick actually
+   * concludes (whether some other Play beat it before the response cycle moved on), since the live
+   * `center` comparison stops being meaningful once the table moves to a later Trick this finisher no
+   * longer takes part in.
    */
   readonly lastPlay: { readonly combination: Combination; readonly beaten: boolean } | null;
 }
@@ -276,19 +289,46 @@ export class SessionPresentation {
     // NOT cleared by a later Play — only by the response cycle itself actually ending (Trick reset/free
     // lead), so an already-beaten Play keeps showing (grayed, via `beaten` below) until then.
     const lastPlaysBySeat = new Map<PlayerId, Combination>();
+    // A seat that has itself finished (1st-3rd; M4-T12.5 follow-up) never takes another Turn this
+    // Round, so its own final Play stays visible at its seat for the rest of the Round rather than
+    // being wiped by the very next mid-Round Trick reset - matching how the 3rd-place finisher's own
+    // final Play already survives Round completion below, but now applied uniformly to every
+    // finisher rather than only the one whose finish happens to also end the Round. `frozenBeaten`
+    // locks in whether that final Play was itself topped (via that Trick's own `lastSuccessfulPlayerId`)
+    // at the moment its Trick actually concludes, since the live `center`-based comparison below stops
+    // being meaningful for a seat once it moves on to a later Trick this finisher no longer takes part in.
+    const finishedSeats = new Set<PlayerId>();
+    const frozenBeaten = new Map<PlayerId, boolean>();
     for (const [index, event] of roundEvents.entries()) {
       if (event.type === 'CARDS_PLAYED') { lastPlay = event; passed.clear(); lastPlaysBySeat.set(event.playerId, event.combination); }
+      if (event.type === 'PLAYER_FINISHED') finishedSeats.add(event.playerId);
       if (event.type === 'TRICK_ENDED') {
         // GameEngine.submitMove always emits TRICK_ENDED immediately followed, in the same batch, by
         // either TURN_CHANGED (the Round continues into a free lead) or ROUND_ENDED (this same Trick end
-        // is also the Round's own completion, e.g. the 3rd-place finisher's final Play). Only the former
-        // is an actual mid-Round reset that should clear every seat's trail; the latter would otherwise
-        // wipe the very Play that just ended the Round an instant before the End-of-Round reveal/result
-        // (still M4-T12) ever gets to show it (the person's own follow-up report) — so this leaves every
-        // seat's trail as-is through Round completion, until `continueToNextRound` genuinely starts fresh.
-        if (roundEvents[index + 1]?.type !== 'ROUND_ENDED') { passed.clear(); lastPlaysBySeat.clear(); }
+        // is also the Round's own completion, e.g. the 3rd-place finisher's final Play). The latter needs
+        // no special handling here — nothing plays again this Round, so every seat's trail is already
+        // left as-is; the former is an actual mid-Round reset, but must still preserve (rather than wipe)
+        // any already-finished seat's own final Play, freezing its beaten status against this exact
+        // Trick's own outcome before moving on.
+        if (roundEvents[index + 1]?.type !== 'ROUND_ENDED') {
+          for (const id of [...lastPlaysBySeat.keys()]) {
+            if (!finishedSeats.has(id)) { lastPlaysBySeat.delete(id); continue; }
+            if (!frozenBeaten.has(id)) frozenBeaten.set(id, event.lastSuccessfulPlayerId !== id);
+          }
+          for (const id of [...passed]) if (!finishedSeats.has(id)) passed.delete(id);
+        }
       }
-      if (event.type === 'PLAYER_PASSED') passed.add(event.playerId);
+      // A seat's own Pass immediately clears its own `lastPlaysBySeat` entry too, not only `passed`
+      // (M4-T12.5 follow-up: "I passed, but my previous play was still present"). Without this, a
+      // later Play by someone else in this same still-open response cycle unconditionally clears the
+      // whole `passed` Set above (line ~301: the Engine's own `passedPlayerIds` reset, since that later
+      // Play makes every previously-passed player newly eligible to respond again to the new higher
+      // bid) - `passed.has(seat)` would then read false again for this seat even though it never took a
+      // new Turn of its own, and its stale pre-Pass combination (still sitting in `lastPlaysBySeat`,
+      // otherwise untouched by a Pass) would reappear at its seat as if freshly Played. Deleting it here
+      // means a Pass always immediately empties this seat's own trail, and it only reappears once this
+      // same seat actually Plays again.
+      if (event.type === 'PLAYER_PASSED') { passed.add(event.playerId); lastPlaysBySeat.delete(event.playerId); }
     }
     let center: SessionPresentationSnapshot['center'] = { kind: 'empty' };
     if (round?.trick?.kind === 'response' || round?.status === 'completed') {
@@ -307,8 +347,9 @@ export class SessionPresentation {
       const placement = roundCheckpoint?.placements.find((entry) => entry.playerId === seat)?.placement
         ?? (finishIndex === -1 ? null : (finishIndex + 1) as 1 | 2 | 3);
       const seatLastPlay = lastPlaysBySeat.get(seat);
+      const frozen = frozenBeaten.get(seat);
       const lastPlayPresentation = seatLastPlay === undefined || passed.has(seat) ? null
-        : { combination: seatLastPlay, beaten: !(center.kind === 'hand' && center.playerId === seat) };
+        : { combination: seatLastPlay, beaten: frozen ?? !(center.kind === 'hand' && center.playerId === seat) };
       return {
         seat, playerId: seat, name, cardCount: player?.cardCount ?? 0, totalScore: standing.totalScore,
         isCurrentTurn: round?.currentPlayerId === seat, passed: passed.has(seat), done: player?.finished ?? false, placement,

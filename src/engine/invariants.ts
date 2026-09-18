@@ -3,7 +3,6 @@ import { createDeck } from './cards/createDeck';
 import { inspectCombination } from './combinations/inspectCombination';
 import type { RulesetConfig } from './config/RulesetConfig';
 import type { MoveResult } from './GameEngine';
-import { generateLegalResponseMoves } from './moves/generateLegalResponseMoves';
 import { validateMove } from './moves/validateMove';
 import type { BasicRoundResult, BasicRoundState } from './rounds/resolveBasicRound';
 import { basicSessionStandings, resolveBasicSessionResult } from './sessions/basicSessionResult';
@@ -152,13 +151,16 @@ export function assertMoveInvariants(previous: BasicSessionState, move: Move, re
   let reset: boolean;
   let next: PlayerId;
   if (validation.kind === 'play') {
+    // requirements.md §2.5.2 (M4-T12.5): a finishing Play never immediately resets to a free lead by
+    // itself, even when no remaining player can beat it — the very next active player always gets an
+    // explicit response Turn of their own first, exactly like an ordinary (non-finishing) Play. Free-lead
+    // reassignment happens only once every remaining active player has, in turn, explicitly Passed
+    // (handled below, in the `else` / Pass branch).
     leader = move.playerId;
     passed = [];
-    const remaining = clockwiseAfter(leader);
-    const responder = finished ? remaining.find((player) => generateLegalResponseMoves(player.hand, player.playerId, validation.combination, ruleset).some((candidate) => candidate.kind === 'play')) : remaining[0];
-    reset = responder === undefined;
-    next = (responder ?? remaining[0])!.playerId;
-    if (!reset) check(after.context.trick.kind === 'response' && after.context.trick.current.type === validation.combination.type
+    reset = false;
+    next = clockwiseAfter(leader)[0]!.playerId;
+    check(after.context.trick.kind === 'response' && after.context.trick.current.type === validation.combination.type
       && cardsEqual(after.context.trick.current.cards, validation.combination.cards), 'TRICK', 'Accepted Play must become the current combination.');
   } else {
     requireInvariant(before.responseCycle, state, 'PASS_RESET', 'Accepted Pass requires a response cycle.');

@@ -382,6 +382,59 @@ describe('production Session presentation', () => {
     expect(sawPlayThenPass).toBe(true);
   });
 
+  it('keeps a seat\'s own cleared Play trail cleared even after a later Play resets `passed` for everyone (M4-T12.5 follow-up: "I passed, but my previous play was still present")', async () => {
+    // Same "played once, then Pass" strategy as the test above, but this one specifically drives PAST
+    // that seat's own Pass into a later Play by someone else in the same still-open response cycle -
+    // the Engine's own `passedPlayerIds` reset (resolveTurnAndPass.ts: a new Play makes every
+    // previously-passed player newly eligible to respond again) unconditionally clears
+    // SessionPresentation's own `passed` Set too, which used to also let this seat's stale
+    // pre-Pass `lastPlaysBySeat` entry (never itself touched by that seat's own Pass) reappear at its
+    // seat, reading as though it had just Played again.
+    const playedOnce = new Set<string>();
+    const { presentation } = fixture((request) => {
+      if (playedOnce.has(request.playerId)) {
+        const passMove = request.legalMoves.find((move) => move.kind === 'pass');
+        if (passMove) return passMove;
+      }
+      const playMove = request.legalMoves.find((move) => move.kind === 'play');
+      if (playMove) {
+        playedOnce.add(request.playerId);
+        return playMove;
+      }
+      return request.legalMoves.find((move) => move.kind === 'pass')!;
+    });
+
+    let passedAfterPlay: string | null = null;
+    // Drives Turns (across as many response cycles as it takes) until some seat that had already
+    // Played is observed explicitly Passing (its own trail already cleared, per the invariant the
+    // test above covers) with at least one other active seat still left to take a Turn afterward in
+    // that same cycle - otherwise there is no later Play left in this cycle to trigger the reset this
+    // test targets.
+    let guard = 0;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && passedAfterPlay === null && guard++ < 200) {
+      await presentation.runTurn();
+      const passer = presentation.getSnapshot().seats.find((seat) => seat.passed && playedOnce.has(seat.playerId));
+      if (passer) passedAfterPlay = passer.playerId;
+    }
+    if (passedAfterPlay === null) throw new Error('Expected a seat that had Played to later Pass within the Turn budget.');
+
+    // Continues driving Turns through at least one more Play by someone else (the exact trigger for
+    // the Engine's own `passedPlayerIds`/`passed` reset) and asserts the Passed seat's own trail never
+    // reappears in the meantime - through this cycle's own free lead, and into the next cycle's Plays,
+    // right up until (but not including) this same seat's own next Turn.
+    let sawLaterPlay = false;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && !sawLaterPlay && guard++ < 200) {
+      const before = presentation.getSnapshot();
+      if (before.currentPlayerId === passedAfterPlay) break;
+      await presentation.runTurn();
+      const after = presentation.getSnapshot();
+      if (after.playedCards.length > before.playedCards.length) sawLaterPlay = true;
+      const passedSeat = after.seats.find((seat) => seat.playerId === passedAfterPlay)!;
+      expect(passedSeat.lastPlay).toBeNull();
+    }
+    expect(sawLaterPlay).toBe(true);
+  });
+
   it('keeps every seat\'s own Play/Pass trail visible through Round completion itself, only clearing on the next actual Round (round-5 follow-up)', async () => {
     // The Trick that ends the Round (the 3rd-place finisher's own final Play) also always emits a
     // TRICK_ENDED (GameEngine.submitMove), which used to wipe every seat's trail an instant before the
@@ -405,6 +458,44 @@ describe('production Session presentation', () => {
     // Continuing to the next Round is the actual, deliberate reset boundary.
     presentation.continueToNextRound();
     expect(presentation.getSnapshot().seats.every((seat) => seat.lastPlay === null && !seat.passed)).toBe(true);
+  });
+
+  it('keeps a 1st/2nd-place finisher\'s own final Play visible at its seat for the rest of the Round, not only the Round-ending 3rd-place finish (M4-T12.5 follow-up)', async () => {
+    // Previously only the Round-ending Trick (the 3rd-place finisher's own final Play, immediately
+    // followed by ROUND_ENDED rather than TURN_CHANGED) was exempted from the mid-Round Trick-reset
+    // wipe above - an EARLIER finisher's (1st/2nd place) own final Play was wiped the instant that same
+    // Trick concluded, reading as if it never happened at all (the person's own follow-up report:
+    // inconsistent - "sometimes bots doesn't have their last played hand in their seat panel").
+    const { presentation } = fixture((request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!);
+    let turns = 0;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && presentation.getSnapshot().roundEvents.every((event) => event.type !== 'PLAYER_FINISHED') && turns++ < 400) {
+      await presentation.runTurn();
+    }
+    const afterFirstFinish = presentation.getSnapshot();
+    const finishedEvent = afterFirstFinish.roundEvents.find((event) => event.type === 'PLAYER_FINISHED');
+    if (!finishedEvent || finishedEvent.type !== 'PLAYER_FINISHED') throw new Error('Expected a 1st-place finish within the Turn budget.');
+    const finisher = finishedEvent.playerId;
+    const finisherSeatNow = afterFirstFinish.seats.find((seat) => seat.playerId === finisher)!;
+    expect(finisherSeatNow.lastPlay).not.toBeNull();
+    expect(finisherSeatNow.done).toBe(true);
+
+    // Drive further Turns until at least one more full Trick (a fresh free lead) has concluded - the
+    // exact mid-Round reset that used to wipe the finisher's own trail.
+    let sawFreeLeadAfter = false;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && !sawFreeLeadAfter && turns++ < 400) {
+      await presentation.runTurn();
+      if (presentation.getSnapshot().center.kind === 'freeLead') sawFreeLeadAfter = true;
+    }
+    expect(sawFreeLeadAfter).toBe(true);
+    const finisherSeatLater = presentation.getSnapshot().seats.find((seat) => seat.playerId === finisher)!;
+    // The same combination they actually finished with is still showing - `beaten` itself may have
+    // legitimately flipped to true in the meantime (someone else in that same Trick's own continuation
+    // topped it before the Trick concluded; finishing is unconditional regardless, requirements.md
+    // §2.5.1), which is exactly the frozen, accurate outcome rather than the transient snapshot taken
+    // the instant they finished.
+    expect(finisherSeatLater.lastPlay).not.toBeNull();
+    expect(finisherSeatLater.lastPlay!.combination).toEqual(finisherSeatNow.lastPlay!.combination);
+    expect(finisherSeatLater.passed).toBe(false);
   });
 
   describe('pause/resume (M4-T10; ui-ux.md §9.2: "Orchestrator progression is paused" while an overlay is open)', () => {

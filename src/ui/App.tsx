@@ -373,19 +373,24 @@ export function SessionTable({
   // Round-start transition (person's own follow-up request: "a good or simple round transition aside
   // from the score board... dim the table initially then Round X then lit the game to make it playable
   // again"): once "Next Round" is clicked, this holds the upcoming Round's own number while a brief
-  // dim-and-label screen shows, and `continueToNextRound()` itself is deferred until that screen ends
-  // (by its own timer or an earlier click/tap skip) - so the freshly dealt Round only actually becomes
-  // visible/interactive once the transition is over ("lit... playable again"), rather than the new
-  // table flashing into view underneath the transition screen. Round 5 has no next Round to transition
-  // into, so `handleContinue` below never sets this for it - `onSessionComplete` still fires immediately.
+  // dim-and-label screen shows. `continueToNextRound()` itself now runs immediately in `handleContinue`
+  // below, before this screen even opens - not deferred until the screen's own timer/skip ends. It used
+  // to be deferred, on the theory that dealing early would let the fresh Round "flash into view
+  // underneath the transition screen" - but deferring it instead left the *previous* Round's own
+  // leftover cards (whatever remained in each hand when it ended) sitting dimmed underneath for the
+  // whole transition, which then visibly swapped for the freshly dealt Round the instant the screen
+  // cleared (a further follow-up report). Dealing early means the dimmed table already shows the fresh
+  // Round throughout the transition, so lifting the dim only ever brightens it rather than replacing
+  // anything - `isTableInert` below (via `startingRound !== null`) is exactly what keeps that already-
+  // dealt Round hidden/inert until this screen's own timer or an explicit skip ends it. Round 5 has no
+  // next Round to transition into, so `handleContinue` below never sets this for it - `onSessionComplete`
+  // still fires immediately.
   //
   // `showInitialTransition` extends the exact same screen to Round 1's own very first start (a further
   // follow-up report: the person expected the same "dim, then Round X, then lit" treatment there too,
-  // not only between Rounds). That case has no prior Round Result to continue from - Round 1 is already
-  // dealt and live the moment this component mounts - so `pendingContinueRef` tracks whether the timer/
-  // skip below should actually call `continueToNextRound()` on the way out (only ever true once
-  // `handleContinue` itself sets it) or just clear the transition in place for the initial-display case.
-  const pendingContinueRef = useRef(false);
+  // not only between Rounds). That case has no prior Round Result to continue from at all - Round 1 is
+  // already dealt and live the moment this component mounts - so it sets `startingRound` directly below
+  // rather than through `handleContinue`, and never calls `continueToNextRound()`.
   const [startingRound, setStartingRound] = useState<number | null>(() => (showInitialTransition ? snapshot.roundNumber : null));
 
   // Unlike the between-Rounds case (already inert - `driveTurns` only ever runs while `status` is
@@ -402,21 +407,24 @@ export function SessionTable({
 
   useEffect(() => {
     if (startingRound === null) return;
-    const timer = setTimeout(() => {
-      if (pendingContinueRef.current) {
-        presentation.continueToNextRound();
-        pendingContinueRef.current = false;
-      }
-      setStartingRound(null);
-    }, roundTransitionDurationMs);
+    const timer = setTimeout(() => setStartingRound(null), roundTransitionDurationMs);
     return () => clearTimeout(timer);
-  }, [startingRound, roundTransitionDurationMs, presentation]);
+  }, [startingRound, roundTransitionDurationMs]);
 
-  // While `startingRound` is set, the Round Result overlay stops rendering (superseded by the
-  // transition screen below) even though `roundComplete` itself is still true - `continueToNextRound()`
-  // is what actually clears `roundCheckpoint`, and it only runs once the transition ends.
+  // `continueToNextRound()` now runs immediately in `handleContinue` (see `startingRound`'s own
+  // docstring above), so `roundComplete` is already false for the entire round-start transition, not
+  // only once it ends - `startingRound === null` below is what actually keeps the Round Result overlay
+  // from rendering during that transition; `roundComplete` alone would already be false by then anyway,
+  // this just keeps the condition explicit/self-documenting rather than relying on that ordering.
   const isRevealing = roundComplete && resultPhase === 'reveal' && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID;
   const isResultOverlayOpen = roundComplete && resultPhase === 'result' && startingRound === null;
+  // Once the 4th-place player's own hand has been revealed, it stays revealed through the Result
+  // overlay too (person's own follow-up report: it was flipping back to face-down the instant the
+  // Result overlay/scoreboard opened, reading as if the reveal never happened at all). Distinct from
+  // `isRevealing` above (which only gates the timed reveal *phase* itself, e.g. the skip button) -
+  // this instead covers the seat's own revealed-cards display across both `resultPhase` values, only
+  // clearing once the round-start transition to the next Round actually begins.
+  const isHandRevealed = roundComplete && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID && startingRound === null;
   const isTableInert = isResultOverlayOpen || startingRound !== null;
 
   function skipReveal() {
@@ -425,10 +433,6 @@ export function SessionTable({
 
   function skipRoundTransition() {
     if (startingRound === null) return;
-    if (pendingContinueRef.current) {
-      presentation.continueToNextRound();
-      pendingContinueRef.current = false;
-    }
     setStartingRound(null);
   }
 
@@ -436,7 +440,10 @@ export function SessionTable({
     // Round 5's Round Result has no next Round to continue to - the Basic Session's own official result
     // (`sessionResult`) is exactly what distinguishes it, rather than a hardcoded "roundNumber === 5".
     if (snapshot.sessionResult !== null) { onSessionComplete(); return; }
-    pendingContinueRef.current = true;
+    // Deals the next Round now, before the transition screen even opens (see that screen's own
+    // docstring above) - `snapshot` here is still this render's own pre-continuation value, so
+    // `snapshot.roundNumber + 1` is exactly the Round `continueToNextRound()` just started.
+    presentation.continueToNextRound();
     setStartingRound(snapshot.roundNumber + 1);
   }
 
@@ -470,7 +477,7 @@ export function SessionTable({
               key={seat.playerId}
               seat={seat}
               overlayOpen={overlayOpen}
-              {...(isRevealing && snapshot.reveal!.playerId === seat.playerId ? { revealedCards: snapshot.reveal!.cards } : {})}
+              {...(isHandRevealed && snapshot.reveal!.playerId === seat.playerId ? { revealedCards: snapshot.reveal!.cards } : {})}
             />
           ))}
           <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />

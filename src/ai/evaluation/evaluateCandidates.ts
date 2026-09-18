@@ -17,18 +17,24 @@ export interface CandidateEvaluation extends MoveCandidate {
 }
 
 /**
- * PLAY and PASS use the same lexicographic policy: finish, remaining minPlays
- * plus the narrow reserve cost below, fewer 2s spent, then more cards shed.
+ * PLAY and PASS share one lexicographic policy: finish first, then urgent
+ * response pressure, then remaining minPlays (plus the narrow reserve cost
+ * below), fewer 2s spent, then more cards shed.
+ * An active opponent with 1–2 public cards creates urgent response pressure:
+ * release the lone-2 reserve and prefer ANY legal beating Play over PASS
+ * ahead of hand efficiency (M4-T12.5 correction — contesting/denying control
+ * from a player about to finish outranks preserving a Pair/Straight/other
+ * structure intact; a bot may legitimately break a five-card structure into
+ * a single here). Counts imply urgency, never specific unseen holdings or
+ * inability after a voluntary PASS. Own/finished players create no pressure.
+ * Without that pressure, minPlays remains primary and PASS still preserves
+ * structure over an unnecessary Play, exactly as before.
  * At low pressure, a responding lone 2 leaving multiple Plays costs one step:
  * preserve it over PASS's unchanged hand, but use it to finish or reach one Play.
  * This is a tactical reserve, not a second penalty for breaking hand structure.
  * Pair/five-card damage is represented only by exact decomposition.
- * An active opponent with 1–2 public cards creates urgent response pressure:
- * release the lone-2 reserve and prefer contesting over PASS at equal minPlays,
- * before resource cost. Counts imply urgency, never specific unseen holdings
- * or inability after a voluntary PASS. Own/finished players create no pressure.
- * Then prefer taking an available Play opportunity and, for otherwise equal
- * responses, the weakest Engine-ranked commitment that takes the current Trick.
+ * Among tied Plays, prefer fewer 2s spent, then more cards shed, then the
+ * weakest Engine-ranked commitment that still takes the current Trick.
  * Control is an immediate contest heuristic, never a prediction of winning it.
  * Returns preference order; exact ties retain the canonical candidate order.
  */
@@ -58,8 +64,9 @@ export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetC
   });
   if (onDecomposition) onDecomposition(decomposer.getMetrics()!);
   return evaluations.sort((a, b) => Number(b.immediateFinish) - Number(a.immediateFinish) ||
+    (opponentPressure ? a.passOpportunityCost - b.passOpportunityCost : 0) ||
     (a.minPlays + a.singleTwoReserveCost) - (b.minPlays + b.singleTwoReserveCost) ||
-    (opponentPressure ? a.passOpportunityCost - b.passOpportunityCost : 0) || a.twosSpent - b.twosSpent ||
+    a.twosSpent - b.twosSpent ||
     b.cardsShed - a.cardsShed || a.passOpportunityCost - b.passOpportunityCost ||
     (a.responseControl && b.responseControl ? Number(canBeat(a.responseControl, b.responseControl, ruleset)) -
       Number(canBeat(b.responseControl, a.responseControl, ruleset)) : 0));

@@ -97,14 +97,31 @@ describe('core Baseline evaluation', () => {
     expect(inputs[0]!.legalMoves).toEqual(inputs[1]!.legalMoves);
   });
 
-  it('keeps structural preservation, cheap commitments, forced PASS and finish priority under pressure', () => {
+  it('keeps contesting-over-structure, cheap commitments, forced PASS and finish priority under pressure', () => {
+    // M4-T12.5 correction: under urgent response pressure (an active opponent at 1-2 cards), the
+    // Baseline Bot breaks a five-card structure to contest the Trick rather than preserve it - the
+    // exact reported scenario (a bot holding a Straight while an opponent about to finish plays low
+    // Singles unopposed). It plays the weakest single that still beats the current combination,
+    // per the existing "weakest Engine-ranked commitment that takes the Trick" tie-break.
     const counts = [1, 2, 3];
-    expect(chooseBaselineMove(request([c('4'), c('5', 'spades'), c('6'), c('7', 'hearts'), c('8')], [c('3', 'diamonds')], counts))).toMatchObject({ kind: 'pass' });
+    expect(chooseBaselineMove(request([c('4'), c('5', 'spades'), c('6'), c('7', 'hearts'), c('8')], [c('3', 'diamonds')], counts))).toEqual({ kind: 'play', playerId: 'south', cards: [c('4')] });
     expect(chooseBaselineMove(request([c('7'), c('9'), c('2', 'diamonds')], [c('6')], counts))).toMatchObject({ kind: 'play', cards: [c('7')] });
     expect(evaluateCandidates(request([c('4')], [c('A')], counts))).toMatchObject([{ move: { kind: 'pass' }, passOpportunityCost: 0 }]);
     expect(chooseBaselineMove(request([c('2', 'diamonds')], [c('A')], counts))).toMatchObject({ kind: 'play', cards: [c('2', 'diamonds')] });
     const freeLead = request([c('4'), c('7'), c('2', 'diamonds')], undefined, counts);
     expect(chooseBaselineMove(freeLead)).toEqual(chooseBaselineMove(request(freeLead.view.hand)));
+  });
+
+  it('breaks a held Straight to contest low Singles from a nearly-finished opponent (reported scenario, M4-T12.5)', () => {
+    // Reported: a Bot held a J-Q-K-A-2 Straight while an opponent, down to their last two cards
+    // (Singles 6 then 9), played both unopposed and finished the Round - the Bot never contested
+    // either Trick despite having a legal beating Single available in the Straight both times.
+    const straight = [c('J'), c('Q', 'spades'), c('K', 'hearts'), c('A', 'diamonds'), c('2', 'clubs')];
+    const opponentAboutToFinish = [1, 3, 3];
+    expect(chooseBaselineMove(request(straight, [c('6')], opponentAboutToFinish))).toEqual({ kind: 'play', playerId: 'south', cards: [c('J')] });
+    expect(chooseBaselineMove(request(straight, [c('9')], opponentAboutToFinish))).toEqual({ kind: 'play', playerId: 'south', cards: [c('J')] });
+    // Without that pressure, the Straight is still preserved intact (unchanged prior behavior).
+    expect(chooseBaselineMove(request(straight, [c('6')]))).toMatchObject({ kind: 'pass' });
   });
 
   it('locks full decisions across repeated execution, reordered inputs, real cache warmth and metrics on/off', () => {

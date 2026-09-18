@@ -1,10 +1,10 @@
 # Pusoy Dos --- AI System Design
 
-## AI System Document (v1.5)
+## AI System Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 14, 2026  
-**Parent document:** `requirements.md` v1.14  
+**Last Modified:** September 18, 2026  
+**Parent document:** `requirements.md` v1.16  
 **Shared model:** `domain-model.md` v1.3  
 **Engine design:** `engine.md` v1.7  
 **Orchestrator design:** `orchestrator.md` v1.6  
@@ -167,19 +167,21 @@ The decomposition implementation must use/reuse canonical Engine-compatible comb
 
 # 8. Structured Candidate Evaluation
 
-Prefer explicit structured/lexicographic comparison over one opaque weighted sum with many magic constants. Initial design direction:
+Prefer explicit structured/lexicographic comparison over one opaque weighted sum with many magic constants. Current hierarchy (revised M4-T12.5 — see below):
 
 1. immediate finish / terminal opportunity;
-2. resulting-hand efficiency (`minPlays`);
-3. urgent public opponent pressure;
+2. urgent public opponent pressure;
+3. resulting-hand efficiency (`minPlays`);
 4. resource cost / preservation;
 5. immediate shedding progress;
 6. lightweight Trick/control value;
 7. canonical deterministic tie-break.
 
-This hierarchy may be refined during detailed M2 design when behavior examples expose conflicts. Exact decomposition is the primary hand-structure signal but must not become an absolute rule that prevents obvious tactical overrides.
+Exact decomposition is the primary hand-structure signal but must not become an absolute rule that prevents obvious tactical overrides.
 
 Resource heuristics should avoid double-counting structural damage already reflected in `minPlays`.
+
+**M4-T12.5 correction (was: efficiency above pressure).** The original Phase 1 ordering ranked hand efficiency above opponent pressure, so the Bot would preserve an intact Pair/Straight/other structure rather than break it to contest a Trick, even while an active opponent held only 1-2 cards. Observed effect: a bot holding a five-card Straight passed on two consecutive low Singles from an opponent who then finished the Round unopposed, while the bot never got to play its Straight at all. Pressure now outranks efficiency: when an active opponent has 1-2 public cards, the Bot prefers any legal beating Play over PASS ahead of `minPlays`, then still uses `minPlays`/resource cost/shedding/control to choose *which* Play among the legal beating candidates. Without that pressure, `minPlays` remains primary and PASS still preserves structure over an unnecessary Play, unchanged from the original design.
 
 ---
 
@@ -239,10 +241,11 @@ Cover at minimum:
 - immediate finish;
 - free lead with many combinations;
 - cheap response vs unnecessarily strong response;
-- PASS despite legal beating Play;
+- PASS despite legal beating Play (no opponent pressure);
 - cheap Play preferred over unnecessary PASS;
 - PASS preferred over wasting a major resource when final evaluator implies it;
 - opponent one-card pressure;
+- breaking a five-card structure to contest a Trick under opponent pressure (M4-T12.5);
 - own two/three-card endgame;
 - breaking/preserving Pair or five-card structure;
 - candidates with different `minPlays`;
