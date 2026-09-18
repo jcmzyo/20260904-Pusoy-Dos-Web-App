@@ -85,6 +85,20 @@
   border-bottom: none;
 }
 
+/* The human player's own seat (ui-ux.md §13 follow-up, M4-T13 UI refinement) - just the seat's own name
+ * cell gets a restrained teal text color, not the whole row (the person's own later follow-up report:
+ * "only the text color should glow cyan and not the background" - an earlier full-row background here
+ * both looked heavier than intended and, on a Final Ranking row that is also gold/silver/bronze, visibly
+ * fought with that medal color underneath it). Distinct from the gold/silver/bronze medal palette used
+ * elsewhere (SessionSummary.module.css, PlayerPanel.module.css) and from the warm tan already used for
+ * buttons/the Turn status pill, so "this is you" never gets confused with a placement or turn indicator.
+ * The row's own "You" name text already carries the meaning (§15's label-plus-color rule); this is purely
+ * an additional glance-able cue. */
+.you td:first-child {
+  font-weight: 700;
+  color: #7fe3d4;
+}
+
 .continueButton {
   align-self: center;
   margin-top: 4px;

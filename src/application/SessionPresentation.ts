@@ -315,7 +315,19 @@ export class SessionPresentation {
             if (!finishedSeats.has(id)) { lastPlaysBySeat.delete(id); continue; }
             if (!frozenBeaten.has(id)) frozenBeaten.set(id, event.lastSuccessfulPlayerId !== id);
           }
-          for (const id of [...passed]) if (!finishedSeats.has(id)) passed.delete(id);
+          // A Pass that itself closes the response cycle (nobody left to out-bid the current hand) emits
+          // PLAYER_PASSED immediately followed by this very TRICK_ENDED in the SAME Turn's event batch
+          // (GameEngine.submitMove) - so without this exemption, that seat's own `passed.add` two lines
+          // below would be wiped by this same sweep before `project()` ever publishes a snapshot showing
+          // it, and the person's own closing Pass would never show a PASS status at all (the person's own
+          // follow-up report: "the player passed but no Pass indicator on the seat panel ... it doesn't
+          // happen always" - it only ever broke for a cycle-closing Pass, never a mid-cycle one). Keeping
+          // it exempted here matches `passed`'s own established convention elsewhere (and `lastPlay`'s,
+          // above): it persists until this same seat's own next Turn, not retroactively erased by the
+          // very reset its own action caused.
+          const closingPass = roundEvents[index - 1];
+          const closingPasserId = closingPass?.type === 'PLAYER_PASSED' ? closingPass.playerId : null;
+          for (const id of [...passed]) if (!finishedSeats.has(id) && id !== closingPasserId) passed.delete(id);
         }
       }
       // A seat's own Pass immediately clears its own `lastPlaysBySeat` entry too, not only `passed`

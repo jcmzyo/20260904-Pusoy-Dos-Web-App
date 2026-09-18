@@ -352,7 +352,7 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     }
   });
 
-  it('shows "View Session Results" instead of "Next Round" once the Basic Session\'s own official result exists, and calls onSessionComplete rather than continuing', async () => {
+  it('shows no continuation button once the Basic Session\'s own official result exists, and automatically replaces itself with Session Summary rather than continuing (ui-ux.md §12/§13 follow-up: M4-T13 UI refinement)', async () => {
     const presentation = fixture(5);
     for (let round = 1; round <= 5; round++) {
       await driveToRoundEnd(presentation);
@@ -362,14 +362,23 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     expect(presentation.getSnapshot().sessionResult).not.toBeNull();
     expect(presentation.getSnapshot().roundCheckpoint).not.toBeNull();
 
-    const onSessionComplete = vi.fn();
     const continueToNextRoundSpy = vi.spyOn(presentation, 'continueToNextRound');
-    render(<SessionTable presentation={presentation} onSessionComplete={onSessionComplete} revealDurationMs={0} resultStageDelayMs={0} />);
+    render(
+      <SessionTable
+        presentation={presentation}
+        revealDurationMs={0}
+        resultStageDelayMs={0}
+        summaryAutoAdvanceDelayMs={0}
+      />,
+    );
 
-    expect(await screen.findByRole('button', { name: 'View Session Results' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'Round 5 Result' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'View Session Results' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Next Round' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'View Session Results' }));
-    expect(onSessionComplete).toHaveBeenCalledOnce();
+
+    // No click required - the settled overlay replaces itself with Session Summary on its own.
+    expect(await screen.findByRole('dialog', { name: 'Session Summary' })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Round 5 Result' })).toBeNull();
     expect(continueToNextRoundSpy).not.toHaveBeenCalled();
   });
 });

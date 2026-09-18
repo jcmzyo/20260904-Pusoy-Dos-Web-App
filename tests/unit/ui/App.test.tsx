@@ -1,12 +1,56 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionConfiguration, startSession } from '../../../src/application/startSession';
 import type { StartedSession } from '../../../src/application/startSession';
 import { SessionPresentation } from '../../../src/application/SessionPresentation';
-import type { PlayerController } from '../../../src/orchestrator';
+import { createSession, defaultRuleset, getPublicView, startRound } from '../../../src/engine';
+import type { Move } from '../../../src/domain';
+import { GameRunner } from '../../../src/orchestrator';
+import type { PlayerController, PlayerTurnRequest } from '../../../src/orchestrator';
 import { App, SessionTable } from '../../../src/ui/App';
+
+const AUTOPLAY_IDS = ['south', 'west', 'north', 'east'];
+
+/** A fully-automatic `StartedSession` (every seat, including South, resolves its own Turn the same way
+ *  a bot does - `session-summary.test.tsx`'s own `buildAutomaticSession` proved this out first) so a
+ *  whole five-Round Session can be driven end-to-end through `<App>` itself without a human UI to click
+ *  through - used below to reach `sessionResult !== null` for the unload-warning follow-up test. */
+function buildAutomaticSession(seed: number): StartedSession {
+  let state = seed;
+  const engineRng = { next: () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; } };
+  const created = createSession(AUTOPLAY_IDS);
+  const started = startRound(created.state, engineRng);
+  const preferPlay = (request: PlayerTurnRequest): Move =>
+    request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!;
+  const controllers = AUTOPLAY_IDS.map((playerId) => ({ playerId, chooseMove: async (request: PlayerTurnRequest) => preferPlay(request) }));
+  return {
+    runner: new GameRunner(started.state, defaultRuleset, new Map(controllers.map((controller) => [controller.playerId, controller])), true),
+    humanController: controllers[0]!, engineRng, initialView: getPublicView(started.state),
+    startupEvents: [...created.events, ...started.events], names: { south: 'You', west: 'Ana', north: 'Bo', east: 'Cy' },
+  };
+}
+
+/** Waits for, and clicks through, every Round Result overlay in turn until Session Summary itself
+ *  appears - `session-summary.test.tsx`'s own `clickThroughRoundResult` proved this exact polling
+ *  approach out first (Rounds 1-4 need an explicit click; Round 5 replaces itself with Session Summary
+ *  entirely on its own, with no button of its own to click). */
+async function driveToSessionSummary(): Promise<void> {
+  for (let guard = 0; guard < 5; guard++) {
+    const outcome = await waitFor(() => {
+      const nextRoundButton = screen.queryByRole('button', { name: 'Next Round' });
+      if (nextRoundButton) return { kind: 'more' as const, button: nextRoundButton };
+      const summary = screen.queryByRole('dialog', { name: 'Session Summary' });
+      if (summary) return { kind: 'done' as const };
+      throw new Error('Neither the Next Round button nor Session Summary has appeared yet.');
+    }, { timeout: 10000 });
+    if (outcome.kind === 'done') return;
+    // eslint-disable-next-line no-await-in-loop
+    await act(async () => { fireEvent.click(outcome.button); });
+  }
+  throw new Error('Session Summary was not reached within the expected number of Rounds.');
+}
 
 afterEach(cleanup);
 
@@ -228,6 +272,22 @@ describe('Best-effort browser unload warning (M4-T11; ui-ux.md §10)', () => {
     const duringSession = new Event('beforeunload', { cancelable: true });
     expect(window.dispatchEvent(duringSession)).toBe(false); // prevented: unfinished Session progress
   });
+
+  it('stops warning once the Session\'s own official result exists (M4-T13 UI refinement follow-up: no more unload warning once Session Summary is reachable)', async () => {
+    const start = vi.fn(() => buildAutomaticSession(5));
+    render(<App start={start} botTurnDelayMs={1} revealDurationMs={0} resultStageDelayMs={0} roundTransitionDurationMs={0} summaryAutoAdvanceDelayMs={0} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+
+    const duringSession = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(duringSession)).toBe(false); // still prevented: Round 1 in progress
+
+    await driveToSessionSummary();
+
+    const afterSummary = new Event('beforeunload', { cancelable: true });
+    expect(window.dispatchEvent(afterSummary)).toBe(true); // no longer prevented: nothing left to lose
+  }, 20000);
 });
 
 describe('Leave Game abandons the Session (M4-T11 follow-up)', () => {

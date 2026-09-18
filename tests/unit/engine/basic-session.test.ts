@@ -54,6 +54,45 @@ describe('Basic Session tiebreaks', () => {
     expect(resolveBasicSessionResult([...ids].reverse(), rounds).winnerIds).toEqual(['north', 'south']);
   });
 
+  describe('official 1st-4th ranking (M4-T13; ui-ux.md §13)', () => {
+    it('places every standing 1st-4th with no ties, matching the single-winner tiebreak result', () => {
+      // Same fixture as the parameterized "resolves by totalScore" case above.
+      const rounds = history([[2, 1, 0, 3], [1, 2, 3, 0], [2, 3, 0, 1], [1, 3, 0, 2], [2, 1, 0, 3]]);
+      const result = resolveBasicSessionResult(ids, rounds);
+      expect(result.winnerIds).toEqual(['north']);
+      expect(result.placements).toEqual([
+        { playerId: 'north', placement: 1 }, { playerId: 'west', placement: 2 },
+        { playerId: 'east', placement: 3 }, { playerId: 'south', placement: 4 },
+      ]);
+    });
+
+    it('gives every player tied for the Session win the same placement 1 (standard competition ranking, not a seating tiebreak)', () => {
+      const rounds = history([[0, 1, 2, 3], [2, 3, 1, 0], [0, 3, 2, 1], [1, 3, 0, 2], [2, 1, 0, 3]]);
+      const result = resolveBasicSessionResult(ids, rounds);
+      expect(result.winnerIds).toEqual(['south', 'north']);
+      // west/east are not tied with each other (13 vs 9), so they resume normal placements after the
+      // two co-1st players - the next distinct placement is 3, not 2 (standard competition ranking).
+      expect(result.placements).toEqual([
+        { playerId: 'south', placement: 1 }, { playerId: 'north', placement: 1 },
+        { playerId: 'west', placement: 3 }, { playerId: 'east', placement: 4 },
+      ]);
+    });
+
+    it('also applies standard competition ranking to a tie that is NOT for the Session win, skipping the placement it consumes', () => {
+      // west wins outright; north and east tie exactly on every criterion (totalScore 13, roundWins 1,
+      // averagePlacement 2.4, highestRoundScore 5) for 2nd; south is clearly 4th - the placement after
+      // the two-way tie for 2nd is 4, not 3, since two players already occupy placement 2.
+      const rounds = history([[1, 2, 0, 3], [3, 2, 0, 1], [0, 1, 3, 2], [2, 3, 1, 0], [1, 3, 2, 0]]);
+      const result = resolveBasicSessionResult(ids, rounds);
+      expect(result.winnerIds).toEqual(['west']);
+      expect(result.decidedBy).toBe('totalScore');
+      expect(result.placements).toEqual([
+        { playerId: 'west', placement: 1 }, { playerId: 'north', placement: 2 },
+        { playerId: 'east', placement: 2 }, { playerId: 'south', placement: 4 },
+      ]);
+    });
+  });
+
   it('checks all possible five-Round placement profiles: earlier ties imply equal best scores', () => {
     const bestByEarlierCriteria = new Map<string, number>();
     for (let encoded = 0; encoded < 4 ** 5; encoded += 1) {

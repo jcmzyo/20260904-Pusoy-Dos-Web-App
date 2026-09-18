@@ -1,12 +1,13 @@
 import type { Card, PlayerId } from '../../domain';
 import { createDeck } from '../cards/createDeck';
-import type { BasicSessionStanding } from '../sessions/basicSessionResult';
+import type { BasicSessionPlacement, BasicSessionStanding } from '../sessions/basicSessionResult';
 import type { BasicSessionState } from '../sessions/resolveBasicSession';
 import type { CompletedRoundReveal, PlayerView, PublicGameView, PublicTrickView } from './PublicGameView';
 
 const copyCard = ({ rank, suit }: Card): Card => ({ rank, suit });
 const copyStanding = ({ playerId, totalScore, roundWins, averagePlacement, highestRoundScore }: BasicSessionStanding): BasicSessionStanding =>
   ({ playerId, totalScore, roundWins, averagePlacement, highestRoundScore });
+const copyPlacement = ({ playerId, placement }: BasicSessionPlacement): BasicSessionPlacement => ({ playerId, placement });
 
 /** Explicit field projection prevents internal metadata from crossing the information boundary. */
 export function getPublicView(state: BasicSessionState): PublicGameView {
@@ -40,6 +41,7 @@ export function getPublicView(state: BasicSessionState): PublicGameView {
     standings: state.standings.map(copyStanding),
     result: state.result === null ? null : {
       standings: state.result.standings.map(copyStanding), winnerIds: [...state.result.winnerIds], decidedBy: state.result.decidedBy,
+      placements: state.result.placements.map(copyPlacement),
     },
   };
 }

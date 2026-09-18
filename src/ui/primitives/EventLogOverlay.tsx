@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import type { Card } from '../../domain';
+import type { Card, PlayerId } from '../../domain';
 import type { GameEvent } from '../../engine';
 import { CardIndex } from './Card';
 import { COMBINATION_LABELS, getDisplayCards } from './combinationLabels';
+import { HUMAN_PLAYER_ID } from './humanPlayer';
 import { Overlay } from './Overlay';
 import styles from './EventLogOverlay.module.css';
 
@@ -18,6 +19,12 @@ export interface EventLogEntry {
    *  trails, so a Straight/Straight Flush shows its own ascending sequence rather than submission order.
    *  `null` for every other event category, which has no cards of its own to show. */
   readonly cards: readonly Card[] | null;
+  /** This entry's own primary actor, if it has one (the player named first in `text`) — used only to
+   *  give the human's own entries a restrained highlight (ui-ux.md §13 follow-up, M4-T13 UI refinement),
+   *  the same identity-based convention Session Summary/Round Result now use, rather than fragile
+   *  string-matching against the rendered "You" text. `null` for the one entry type with no single actor
+   *  of its own (`ROUND_STARTED`). */
+  readonly playerId: PlayerId | null;
 }
 
 /**
@@ -43,7 +50,7 @@ export interface EventLogEntry {
 export function describeEvent(event: GameEvent, names: Readonly<Record<string, string>>): Omit<EventLogEntry, 'key'> | null {
   switch (event.type) {
     case 'ROUND_STARTED':
-      return { text: `Round ${event.roundNumber} started.`, cards: null };
+      return { text: `Round ${event.roundNumber} started.`, cards: null, playerId: null };
     case 'CARDS_PLAYED':
       // Combination *type* only here (no rank/suit text) - unlike `describeCombination`'s own M4-T08
       // Play/Pass reason text, which still needs the rank/suit spelled out in words since it has no
@@ -53,22 +60,22 @@ export function describeEvent(event: GameEvent, names: Readonly<Record<string, s
       // person's own follow-up concern once card visuals were added here.
       return {
         text: `${names[event.playerId] ?? event.playerId} played ${COMBINATION_LABELS[event.combination.type]}.`,
-        cards: getDisplayCards(event.combination),
+        cards: getDisplayCards(event.combination), playerId: event.playerId,
       };
     case 'PLAYER_PASSED':
-      return { text: `${names[event.playerId] ?? event.playerId} passed.`, cards: null };
+      return { text: `${names[event.playerId] ?? event.playerId} passed.`, cards: null, playerId: event.playerId };
     case 'TRICK_ENDED':
       // Past tense, consistent with every other entry ("played", "passed", "finished") - the person's
       // own follow-up report of "You wins the Trick" reading as a grammar mistake. Base text only:
       // `describeEvents` below appends " Free lead!" when this same Trick end genuinely continues the
       // Round, rather than also being the Round's own completion.
-      return { text: `${names[event.lastSuccessfulPlayerId] ?? event.lastSuccessfulPlayerId} won the Trick.`, cards: null };
+      return { text: `${names[event.lastSuccessfulPlayerId] ?? event.lastSuccessfulPlayerId} won the Trick.`, cards: null, playerId: event.lastSuccessfulPlayerId };
     case 'PLAYER_FINISHED':
-      return { text: `${names[event.playerId] ?? event.playerId} finished ${PLACEMENT_LABELS[event.placement]}.`, cards: null };
+      return { text: `${names[event.playerId] ?? event.playerId} finished ${PLACEMENT_LABELS[event.placement]}.`, cards: null, playerId: event.playerId };
     case 'ROUND_ENDED': {
       const fourth = event.result.placements.find((placement) => placement.placement === 4);
       return fourth
-        ? { text: `${names[fourth.playerId] ?? fourth.playerId} finished 4th — Round ${event.roundNumber} complete.`, cards: null }
+        ? { text: `${names[fourth.playerId] ?? fourth.playerId} finished 4th — Round ${event.roundNumber} complete.`, cards: null, playerId: fourth.playerId }
         : null;
     }
     default:
@@ -98,7 +105,7 @@ export function describeEvents(events: readonly GameEvent[], names: Readonly<Rec
     const freeLeadGoesToWinner = event.type === 'TRICK_ENDED'
       && next?.type === 'TURN_CHANGED' && next.playerId === event.lastSuccessfulPlayerId;
     const text = freeLeadGoesToWinner ? `${described.text} Free lead!` : described.text;
-    entries.push({ key: index, text, cards: described.cards });
+    entries.push({ key: index, text, cards: described.cards, playerId: described.playerId });
   });
   return entries;
 }
@@ -138,17 +145,46 @@ export function EventLogOverlay({ events, names, onClose }: EventLogOverlayProps
     <Overlay title="Event Log" onClose={onClose}>
       <ol ref={listRef} className={styles.list} aria-label="Session event history">
         {entries.length === 0 && <li className={styles.empty}>No events yet this Session.</li>}
-        {entries.map((entry) => (
-          <li key={entry.key} className={styles.entry}>
-            <span className={styles.entryText}>{entry.text}</span>
-            {entry.cards !== null && (
-              <span className={styles.entryCards}>
-                {entry.cards.map((card) => <CardIndex key={`${card.rank}-${card.suit}`} card={card} />)}
-              </span>
-            )}
-          </li>
-        ))}
+        {entries.map((entry) => {
+          // ROUND_STARTED is the only entry with no actor of its own (`playerId: null`, describeEvent
+          // above) - a Round-boundary marker rather than an ordinary event, so it gets its own more
+          // prominent, centered treatment (the person's own follow-up request: "i think its better if
+          // the round 1 started is more highlighted"), distinct from both an ordinary entry and the
+          // human's own `.you` name highlight.
+          const isRoundMarker = entry.playerId === null;
+          return (
+            <li key={entry.key} className={isRoundMarker ? `${styles.entry} ${styles.roundMarker}` : styles.entry}>
+              <span className={styles.entryText}>{renderEntryText(entry, names)}</span>
+              {entry.cards !== null && (
+                <span className={styles.entryCards}>
+                  {entry.cards.map((card) => <CardIndex key={`${card.rank}-${card.suit}`} card={card} />)}
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </Overlay>
+  );
+}
+
+/**
+ * Restrained highlight for just the human's own NAME within an entry, not the whole entry (the person's
+ * own follow-up report on top of M4-T13's earlier full-row/full-entry treatment: "I only meant to
+ * highlight the name, not the whole event"). Every entry's own actor name (`names[entry.playerId]`) sits
+ * literally at the start of `entry.text` (`describeEvent`'s own convention - "X played...", "X passed.",
+ * etc.) except `ROUND_STARTED`, which has no actor of its own (`playerId: null`) and is never highlighted.
+ * Splits on that known-length prefix rather than a fragile match against the literal rendered "You" text,
+ * consistent with this file's own identity-based (`playerId`) highlighting convention elsewhere.
+ */
+export function renderEntryText(entry: EventLogEntry, names: Readonly<Record<string, string>>) {
+  if (entry.playerId !== HUMAN_PLAYER_ID) return entry.text;
+  const actorName = names[entry.playerId] ?? entry.playerId;
+  if (!entry.text.startsWith(actorName)) return entry.text;
+  return (
+    <>
+      <span className={styles.you}>{actorName}</span>
+      {entry.text.slice(actorName.length)}
+    </>
   );
 }

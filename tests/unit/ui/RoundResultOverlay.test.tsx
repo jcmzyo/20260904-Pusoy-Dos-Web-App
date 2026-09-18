@@ -155,15 +155,56 @@ describe('RoundResultOverlay (M4-T12; ui-ux.md §12)', () => {
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
-  it('shows "View Session Results" instead of "Next Round" once isFinalRound is set (Round 5, ui-ux.md §12)', () => {
-    const onContinue = vi.fn();
+  it('shows no continuation button once isFinalRound is set (Round 5, ui-ux.md §12 follow-up: M4-T13 UI refinement) and instead calls onContinue automatically once settled', () => {
+    vi.useFakeTimers();
+    try {
+      const onContinue = vi.fn();
+      render(
+        // A long stageDelayMs plus an explicit skip click (rather than waiting out the 4-stage
+        // animation's own chained timers) isolates this test to the new settled->auto-advance behavior
+        // itself, independent of the animation-sequencing mechanics the earlier tests already cover.
+        <RoundResultOverlay roundNumber={5} seats={seats} placements={placements} isFinalRound onContinue={onContinue} stageDelayMs={10_000} autoAdvanceDelayMs={500} />,
+      );
+      expect(screen.queryByRole('button', { name: 'View Session Results' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Next Round' })).toBeNull();
+      expect(screen.queryByRole('button')).toBeNull();
+
+      fireEvent.click(screen.getByRole('dialog'));
+      expect(onContinue).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(499); });
+      expect(onContinue).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(onContinue).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an ordinary Round (isFinalRound false) never auto-advances, regardless of autoAdvanceDelayMs', () => {
+    vi.useFakeTimers();
+    try {
+      const onContinue = vi.fn();
+      render(
+        <RoundResultOverlay roundNumber={1} seats={seats} placements={placements} isFinalRound={false} onContinue={onContinue} stageDelayMs={0} autoAdvanceDelayMs={0} />,
+      );
+      act(() => { vi.advanceTimersByTime(10_000); });
+      expect(onContinue).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Next Round' })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('highlights the human player\'s own seat (South) but no other row (ui-ux.md §13 follow-up: M4-T13 UI refinement)', () => {
     render(
-      <RoundResultOverlay roundNumber={5} seats={seats} placements={placements} isFinalRound onContinue={onContinue} stageDelayMs={0} />,
+      <RoundResultOverlay roundNumber={1} seats={seats} placements={placements} isFinalRound={false} onContinue={vi.fn()} stageDelayMs={0} />,
     );
-    expect(screen.getByRole('button', { name: 'View Session Results' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Next Round' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'View Session Results' }));
-    expect(onContinue).toHaveBeenCalledOnce();
+    const rows = screen.getAllByRole('row').slice(1);
+    const southRow = rows.find((row) => within(row).getAllByRole('cell')[0]!.textContent === 'You')!;
+    expect(southRow.className).toContain('you');
+    for (const row of rows) {
+      if (row !== southRow) expect(row.className).not.toContain('you');
+    }
   });
 
   it('is not dismissible: no Close control, and Escape neither closes it nor continues', () => {

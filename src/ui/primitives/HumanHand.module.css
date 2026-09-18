@@ -15,12 +15,20 @@
   width: calc(clamp(40px, 8vw, 88px) * 9.4);
 }
 
+/* Fixed (not min-) height, exactly matching a held card's own rendered height (Card.module.css's
+ * `width: clamp(40px, 8vw, 88px)` at its own `aspect-ratio: 5 / 7`) - the person's own follow-up
+ * report: an empty hand (no cards to establish the row's own content height) fell back to an
+ * approximate `min-height` a few px shorter than a real card at wider viewports, so Sort Rank/Sort
+ * Suit (below, in the same `.handArea` column) visibly shifted vertically the instant the last card
+ * was played. A `height` derived from the exact same formula Card.module.css itself uses holds this
+ * row - and everything anchored beneath it - at one fixed position regardless of how many cards (if
+ * any) are actually held. */
 .handRow {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 28px 16px 6px;
-  min-height: 120px;
+  height: calc(clamp(40px, 8vw, 88px) * 7 / 5);
 }
 
 .cardSlot {

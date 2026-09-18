@@ -6,7 +6,10 @@
   justify-content: center;
   padding: clamp(16px, 4vw, 48px);
   background: rgba(6, 20, 16, 0.72);
-  z-index: 40;
+  /* Higher than RoundResultOverlay's/SessionSummary's own backdrops (45) - Session Summary's own Event
+   * Log button (M4-T13 UI refinement follow-up) opens this same overlay on top of itself, so it must be
+   * able to stack above a Session Summary panel that is already open, not just the live table. */
+  z-index: 50;
 }
 
 .panel {

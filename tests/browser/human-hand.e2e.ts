@@ -100,6 +100,40 @@ test('a drag is bounded to the hand region and cannot be pulled outside it', asy
   await page.mouse.up();
 });
 
+test('the hand row holding Sort Rank/Sort Suit is sized purely from the viewport, never from held card count (person\'s own follow-up report: they visibly shifted once the hand emptied)', async ({ page }) => {
+  await startGame(page);
+  const hand = page.getByRole('group', { name: 'Your hand' });
+  await expect(hand.locator('[data-card-key]')).toHaveCount(13);
+
+  // `.handRow`'s own height is a fixed CSS expression derived only from the viewport - the same
+  // `clamp(40px, 8vw, 88px)` width formula Card.module.css's own `.card` uses, at that card's own
+  // `aspect-ratio: 5 / 7` (HumanHand.module.css's `.handRow` docstring). Comparing the real computed
+  // height against that same formula, independently evaluated here from the viewport alone, proves the
+  // row's height cannot vary with how many cards are actually held (0 included) - an unwanted
+  // dependency on card count (e.g. a content-driven `min-height`) would make this assertion fail
+  // without ever needing to actually empty the hand through real gameplay, which - per
+  // round-result.e2e.ts's own docstring - the human seat's own minimal-Pass-when-legal strategy can
+  // almost never reliably reach.
+  const { actualHeightPx, expectedHeightPx } = await page.evaluate(() => {
+    const row = document.querySelector('[aria-label="Your hand"]') as HTMLElement;
+    const cardWidthPx = Math.min(88, Math.max(40, window.innerWidth * 0.08));
+    return { actualHeightPx: row.getBoundingClientRect().height, expectedHeightPx: (cardWidthPx * 7) / 5 };
+  });
+  expect(actualHeightPx).toBeCloseTo(expectedHeightPx, 0);
+
+  // Sort Rank/Sort Suit sit centered directly beneath that same row, within their shared reserved-width
+  // container (`.handArea`'s own column layout, HumanHand.module.css) - confirm the pair's own combined
+  // midpoint lands on that container's true horizontal center, not merely somewhere below the hand.
+  const handArea = page.locator('[aria-label="Your hand"] >> xpath=..');
+  const areaBox = (await handArea.boundingBox())!;
+  const sortRank = page.getByRole('button', { name: 'Sort Rank', exact: true });
+  const sortSuit = page.getByRole('button', { name: 'Sort Suit', exact: true });
+  const rankBox = (await sortRank.boundingBox())!;
+  const suitBox = (await sortSuit.boundingBox())!;
+  const sortMidpointX = (rankBox.x + (suitBox.x + suitBox.width)) / 2;
+  expect(sortMidpointX).toBeCloseTo(areaBox.x + areaBox.width / 2, 0);
+});
+
 test(`overlapped cards stay independently targetable at the small supported landscape viewport (>= ${MINIMUM_EXPOSED_CARD_WIDTH_PX}px exposed)`, async ({ page }) => {
   const spec = VIEWPORT_MATRIX.find((entry) => entry.name === 'small-phone-landscape');
   if (!spec) throw new Error('Viewport matrix is missing its small-phone-landscape entry.');
