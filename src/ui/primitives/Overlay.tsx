@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import styles from './Overlay.module.css';
+import { useBodyScrollLock } from './useBodyScrollLock';
 
 export interface OverlayProps {
   readonly title: string;
@@ -27,6 +28,8 @@ export interface OverlayProps {
  * only when currently justified").
  */
 export function Overlay({ title, onClose, children, maxWidthPx }: OverlayProps) {
+  useBodyScrollLock();
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();

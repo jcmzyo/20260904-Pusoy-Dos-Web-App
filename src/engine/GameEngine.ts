@@ -92,6 +92,7 @@ export function submitMove(previous: BasicSessionState, move: Move, ruleset: Rul
     });
     if (state.result) events.push({ type: 'SESSION_ENDED', roundNumber, result: {
       standings: state.result.standings.map((entry) => ({ ...entry })), winnerIds: [...state.result.winnerIds], decidedBy: state.result.decidedBy,
+      placements: state.result.placements.map(({ playerId, placement }) => ({ playerId, placement })),
     } });
   }
   return { ...transition, events };

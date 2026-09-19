@@ -15,21 +15,21 @@ describe('describeEvent / describeEvents (M4-T10; ui-ux.md §9.2)', () => {
     // reason text, `describeCombination`) - the entry's own `cards` field, asserted below, is the rank/
     // suit source once card visuals are shown alongside it (the person's own follow-up request).
     const single: Combination = { type: 'single', cards: [{ rank: '3', suit: 'clubs' }] };
-    expect(describeEvent({ type: 'ROUND_STARTED', roundNumber: 2 }, NAMES)).toEqual({ text: 'Round 2 started.', cards: null });
+    expect(describeEvent({ type: 'ROUND_STARTED', roundNumber: 2 }, NAMES)).toEqual({ text: 'Round 2 started.', cards: null, playerId: null });
     expect(describeEvent({ type: 'CARDS_PLAYED', roundNumber: 2, playerId: 'west', combination: single }, NAMES))
-      .toEqual({ text: 'Ana played Single.', cards: single.cards });
-    expect(describeEvent({ type: 'PLAYER_PASSED', roundNumber: 2, playerId: 'north' }, NAMES)).toEqual({ text: 'Bo passed.', cards: null });
+      .toEqual({ text: 'Ana played Single.', cards: single.cards, playerId: 'west' });
+    expect(describeEvent({ type: 'PLAYER_PASSED', roundNumber: 2, playerId: 'north' }, NAMES)).toEqual({ text: 'Bo passed.', cards: null, playerId: 'north' });
     // Past tense ("won", not "wins") - consistent with every other entry's own past tense (the person's
     // own follow-up report of "You wins the Trick" reading as a grammar mistake).
-    expect(describeEvent({ type: 'TRICK_ENDED', roundNumber: 2, lastSuccessfulPlayerId: 'east' }, NAMES)).toEqual({ text: 'Cy won the Trick.', cards: null });
-    expect(describeEvent({ type: 'PLAYER_FINISHED', roundNumber: 2, playerId: 'south', placement: 1 }, NAMES)).toEqual({ text: 'You finished 1st.', cards: null });
+    expect(describeEvent({ type: 'TRICK_ENDED', roundNumber: 2, lastSuccessfulPlayerId: 'east' }, NAMES)).toEqual({ text: 'Cy won the Trick.', cards: null, playerId: 'east' });
+    expect(describeEvent({ type: 'PLAYER_FINISHED', roundNumber: 2, playerId: 'south', placement: 1 }, NAMES)).toEqual({ text: 'You finished 1st.', cards: null, playerId: 'south' });
     expect(describeEvent({
       type: 'ROUND_ENDED', roundNumber: 2,
       result: { placements: [
         { playerId: 'south', placement: 1, points: 5 }, { playerId: 'west', placement: 2, points: 3 },
         { playerId: 'north', placement: 3, points: 2 }, { playerId: 'east', placement: 4, points: 0 },
       ] },
-    }, NAMES)).toEqual({ text: 'Cy finished 4th — Round 2 complete.', cards: null });
+    }, NAMES)).toEqual({ text: 'Cy finished 4th — Round 2 complete.', cards: null, playerId: 'east' });
   });
 
   it("a CARDS_PLAYED entry's cards use the same canonical Straight/Straight Flush sequence as the center table and seat trails, not submission order", () => {
@@ -103,7 +103,7 @@ describe('describeEvent / describeEvents (M4-T10; ui-ux.md §9.2)', () => {
     expect(describeEvent({ type: 'SESSION_STARTED', mode: 'basic', playerIds: ['south', 'west', 'north', 'east'] }, NAMES)).toBeNull();
     expect(describeEvent({
       type: 'SESSION_ENDED', roundNumber: 5,
-      result: { standings: [], winnerIds: [], decidedBy: 'totalScore' },
+      result: { standings: [], winnerIds: [], decidedBy: 'totalScore', placements: [] },
     }, NAMES)).toBeNull();
   });
 
@@ -132,6 +132,17 @@ describe('EventLogOverlay (M4-T10)', () => {
     expect(items.map((item) => item.textContent)).toEqual(['Round 1 started.', 'Ana passed.', 'Bo passed.']);
   });
 
+  it('gives a Round-boundary marker ("Round 1 started.") its own more prominent, distinct treatment from an ordinary entry (the person\'s own follow-up request: "i think its better if the round 1 started is more highlighted")', () => {
+    const events: readonly GameEvent[] = [
+      { type: 'ROUND_STARTED', roundNumber: 1 },
+      { type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'west' },
+    ];
+    render(<EventLogOverlay events={events} names={NAMES} onClose={() => {}} />);
+    const [roundEntry, passEntry] = screen.getAllByRole('listitem');
+    expect(roundEntry!.className).toContain('roundMarker');
+    expect(passEntry!.className).not.toContain('roundMarker');
+  });
+
   it('shows a placeholder message for an empty Session history', () => {
     render(<EventLogOverlay events={[]} names={NAMES} onClose={() => {}} />);
     expect(screen.getByText('No events yet this Session.')).toBeTruthy();
@@ -151,5 +162,24 @@ describe('EventLogOverlay (M4-T10)', () => {
     const events: readonly GameEvent[] = [{ type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'west' }];
     render(<EventLogOverlay events={events} names={NAMES} onClose={() => {}} />);
     expect(within(screen.getByRole('listitem')).queryAllByRole('img')).toHaveLength(0);
+  });
+
+  it('highlights only the human player\'s own NAME within an entry, not the whole entry (the person\'s own follow-up report: "I only meant to highlight the name, not the whole event")', () => {
+    const events: readonly GameEvent[] = [
+      { type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'south' },
+      { type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'west' },
+    ];
+    render(<EventLogOverlay events={events} names={NAMES} onClose={() => {}} />);
+    const [southEntry, westEntry] = screen.getAllByRole('listitem');
+    // The human's own entry: exactly the "You" text is wrapped in its own highlighted span, not the
+    // whole <li> (no `you` class on the entry itself), and the rest of the sentence stays plain text.
+    expect(southEntry!.className).not.toContain('you');
+    const southName = within(southEntry!).getByText('You');
+    expect(southName.tagName).toBe('SPAN');
+    expect(southName.className).toContain('you');
+    expect(southEntry!.textContent).toBe('You passed.');
+    // An ordinary (non-human) entry gets no highlighted span at all.
+    expect(westEntry!.className).not.toContain('you');
+    expect(within(westEntry!).queryByText('Ana')?.className ?? '').not.toContain('you');
   });
 });

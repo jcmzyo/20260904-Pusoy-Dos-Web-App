@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { PlayerId } from '../../domain';
+import { HUMAN_PLAYER_ID } from './humanPlayer';
+import { useBodyScrollLock } from './useBodyScrollLock';
 import styles from './RoundResultOverlay.module.css';
 
 export interface RoundResultSeatInput {
@@ -25,14 +27,20 @@ export interface RoundResultOverlayProps {
   /** This Round's own authoritative placements/points (SessionPresentation's `roundCheckpoint.placements`,
    *  `resolveBasicRound`'s Engine-owned scoring) — never recomputed here. */
   readonly placements: readonly RoundResultPlacement[];
-  /** Round 5's checkpoint (SessionPresentation's `sessionResult !== null`) shows "View Session Results"
-   *  instead of "Next Round" (ui-ux.md §12). */
+  /** Round 5's checkpoint (SessionPresentation's `sessionResult !== null`): no continuation button at
+   *  all — once the scoring animation settles, `onContinue` fires automatically after `autoAdvanceDelayMs`
+   *  (ui-ux.md §12 follow-up, M4-T13 UI refinement — this replaces the earlier explicit "View Session
+   *  Results" button). Every other Round still shows the explicit **Next Round** button. */
   readonly isFinalRound: boolean;
   readonly onContinue: () => void;
   /** Delay between each scoring-animation stage below (ui-ux.md §12's "short" animation). Tests pass 0
    *  for a deterministic/instant sequence, mirroring `SessionPresentation.startAutoPlay`'s own convention
    *  ("Callers needing a fast/deterministic loop (tests) should pass 0"). */
   readonly stageDelayMs?: number;
+  /** How long the settled Round 5 overlay waits before automatically calling `onContinue` (ui-ux.md §12
+   *  follow-up). Only relevant when `isFinalRound`; ignored otherwise, since every other Round waits for
+   *  its own explicit **Next Round** click instead. Tests pass 0, same convention as `stageDelayMs`. */
+  readonly autoAdvanceDelayMs?: number;
 }
 
 /**
@@ -82,8 +90,17 @@ function stableDescendingOrder(rows: readonly RoundResultRow[], score: (row: Rou
  * to its settled state (ui-ux.md §12: "skipping completes the visual state but must not trigger Next
  * Round").
  */
-export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRound, onContinue, stageDelayMs = 650 }: RoundResultOverlayProps) {
+export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRound, onContinue, stageDelayMs = 650, autoAdvanceDelayMs = 900 }: RoundResultOverlayProps) {
+  useBodyScrollLock();
+
   const [stageIndex, setStageIndex] = useState(0);
+
+  // Always the latest `onContinue` without resetting the auto-advance timer below on every parent
+  // re-render (a fresh `onContinue` function identity from the parent, e.g. SessionTable's own
+  // `handleContinue`, is not itself a reason to restart the wait) — the effect's own dependency array
+  // intentionally excludes `onContinue` itself, only ever reading it through this ref at fire time.
+  const onContinueRef = useRef(onContinue);
+  onContinueRef.current = onContinue;
 
   // A freshly mounted overlay always starts its own animation from the first stage. App.tsx mounts a new
   // instance per Round Result (it is only rendered while `roundCheckpoint` is set), so `roundNumber`
@@ -98,6 +115,17 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
     const timer = setTimeout(() => setStageIndex((index) => Math.min(index + 1, FINAL_STAGE_INDEX)), stageDelayMs);
     return () => clearTimeout(timer);
   }, [stageIndex, stageDelayMs]);
+
+  // Round 5 has no continuation button (ui-ux.md §12 follow-up, M4-T13 UI refinement): once the
+  // animation reaches its own settled stage, wait `autoAdvanceDelayMs` and call `onContinue` on this
+  // overlay's own behalf. Re-armed only when `isFinalRound`/`stage`/`autoAdvanceDelayMs` actually change —
+  // reaching 'settled' via the backdrop's own skip (`handleSkip` below) still sets `stageIndex` the same
+  // way, so this fires identically whether the animation ran its full course or was skipped.
+  useEffect(() => {
+    if (!isFinalRound || STAGES[stageIndex] !== 'settled') return;
+    const timer = setTimeout(() => onContinueRef.current(), autoAdvanceDelayMs);
+    return () => clearTimeout(timer);
+  }, [isFinalRound, stageIndex, autoAdvanceDelayMs]);
 
   const stage: Stage = STAGES[stageIndex]!;
   const pointsByPlayer = new Map(placements.map((entry) => [entry.playerId, entry] as const));
@@ -150,7 +178,11 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
           </thead>
           <tbody>
             {displayOrder.map((row) => (
-              <tr key={row.playerId}>
+              // Restrained highlight for the human's own seat (ui-ux.md §13 follow-up, M4-T13 UI
+              // refinement, extended here to Round Result too) - `row.name` is already literally "You"
+              // (SessionPresentation's own seat naming), so this is purely an additional glance-able cue,
+              // not what carries the meaning (§15's label-plus-color rule).
+              <tr key={row.playerId} className={row.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
                 <td>{row.name}</td>
                 <td className={settled ? styles.settledHidden : undefined}>{row.previousTotal}</td>
                 <td className={settled ? styles.settledHidden : undefined}>{showRoundPoints ? `+${row.points}` : '—'}</td>
@@ -159,9 +191,11 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
             ))}
           </tbody>
         </table>
-        <button type="button" className={styles.continueButton} onClick={handleContinueClick}>
-          {isFinalRound ? 'View Session Results' : 'Next Round'}
-        </button>
+        {/* Round 5 has no continuation button at all (ui-ux.md §12 follow-up, M4-T13 UI refinement) - the
+         *  settled-stage effect above calls `onContinue` on its own after a short additional delay. */}
+        {!isFinalRound && (
+          <button type="button" className={styles.continueButton} onClick={handleContinueClick}>Next Round</button>
+        )}
       </section>
     </div>
   );

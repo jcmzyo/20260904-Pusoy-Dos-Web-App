@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { SessionPresentation } from '../application/SessionPresentation';
 import type { PresentedSeat, SessionPresentationSnapshot } from '../application/SessionPresentation';
 import { createSessionConfiguration, startSession } from '../application/startSession';
@@ -13,13 +13,12 @@ import { cardKey, compareByRank } from './primitives/handOrdering';
 import { HumanHand } from './primitives/HumanHand';
 import { LeaveConfirmOverlay } from './primitives/LeaveConfirmOverlay';
 import { PlayerPanel } from './primitives/PlayerPanel';
+import { HUMAN_PLAYER_ID } from './primitives/humanPlayer';
 import { PlayPassControls } from './primitives/PlayPassControls';
 import { RoundResultOverlay } from './primitives/RoundResultOverlay';
+import { SessionSummary } from './primitives/SessionSummary';
 import { useLayoutSupport } from './primitives/useLayoutSupport';
 import styles from './App.module.css';
-
-/** Fixed Phase 1 human seat (requirements.md §1, ui-ux.md §4: "Human South"). */
-const HUMAN_PLAYER_ID = 'south';
 
 /** How long the 4th-place reveal shows before the Round Result overlay appears, absent an earlier
  *  click/tap skip (M4-T12; ui-ux.md §11: "roughly 1.5-2 seconds"). Tests pass 0 for a deterministic/
@@ -38,12 +37,30 @@ const ROUND_RESULT_STAGE_DELAY_MS = 650;
  *  presentation-timing constant here. */
 const ROUND_TRANSITION_DURATION_MS = 1300;
 
+/** Default `RoundResultOverlay.autoAdvanceDelayMs` (ui-ux.md §12 follow-up, M4-T13 UI refinement): how
+ *  long Round 5's settled Round Result overlay waits before automatically giving way to Session Summary.
+ *  Same short/tunable-delay convention as every other presentation-timing constant here. */
+const SUMMARY_AUTO_ADVANCE_DELAY_MS = 900;
+
 interface AppProps {
   readonly start?: (configuration: SessionConfiguration) => StartedSession | Promise<StartedSession>;
   readonly botNames?: BotNameProvider;
+  // Test-only presentation-timing overrides, forwarded straight through to `SessionPresentation.
+  // startAutoPlay`/`SessionTable`'s own identically-named props (see each one's own "pass 0 for a
+  // deterministic/instant sequence" convention) - production usage below never passes any of these, so
+  // every one keeps its own real production default. Exists so a full-Session integration test (M4-T13's
+  // own "Play Again fresh startup"/"Home navigation" Automated Tests) can drive `<App>` itself through a
+  // complete five-Round Session in real time without waiting out real bot/animation pacing, the same way
+  // `SessionTable`-level tests already could before Session Summary moved the Play-Again/Home behavior up
+  // to this component.
+  readonly botTurnDelayMs?: number;
+  readonly revealDurationMs?: number;
+  readonly resultStageDelayMs?: number;
+  readonly roundTransitionDurationMs?: number;
+  readonly summaryAutoAdvanceDelayMs?: number;
 }
 
-export function App({ start = startSession, botNames }: AppProps) {
+export function App({ start = startSession, botNames, botTurnDelayMs, revealDurationMs, resultStageDelayMs, roundTransitionDurationMs, summaryAutoAdvanceDelayMs }: AppProps) {
   const started = useRef(false);
   const [session, setSession] = useState<SessionPresentation | null>(null);
   const [starting, setStarting] = useState(false);
@@ -62,20 +79,38 @@ export function App({ start = startSession, botNames }: AppProps) {
     return () => session.resume();
   }, [session, layout]);
 
+  // Subscribes only for `sessionResult` below (the beforeunload guard's own gate) - SessionTable is
+  // still what actually renders the live table from its own separate subscription; this is a second,
+  // independent read of the same store, the same `useSyncExternalStore` pattern SessionTable itself
+  // uses. Wrapped in `useCallback` so the subscribe/getSnapshot pair stays referentially stable across
+  // renders that do not themselves change `session` (React's own guidance for this hook).
+  const subscribeToSession = useCallback(
+    (listener: () => void) => (session ? session.subscribe(listener) : () => {}),
+    [session],
+  );
+  const getSessionResult = useCallback(() => session?.getSnapshot().sessionResult ?? null, [session]);
+  const sessionResult = useSyncExternalStore(subscribeToSession, getSessionResult);
+
   // Best-effort browser unload warning while a Session is unfinished (M4-T11; ui-ux.md §10: "Browser
   // refresh/tab/window close uses supported unload warnings where available; browser wording is not
   // guaranteed"). Modern browsers ignore any custom message and show their own fixed wording; setting
   // `returnValue` (rather than relying on the return value alone) is what actually triggers the prompt
   // across the widest range of browsers.
+  //
+  // Stops once `sessionResult` exists (the person's own follow-up request, M4-T13 UI refinement: no
+  // more unload warning once Session Summary is reachable) - the Session's own official outcome is
+  // already decided by then (Round 5's own checkpoint), so closing the tab from that point on loses
+  // nothing the warning is meant to protect, whether the person is still watching Round 5's own settled
+  // Result overlay auto-advance or already at Session Summary itself.
   useEffect(() => {
-    if (!session) return;
+    if (!session || sessionResult !== null) return;
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = '';
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [session]);
+  }, [session, sessionResult]);
 
   async function handleStart() {
     if (started.current) return;
@@ -86,8 +121,9 @@ export function App({ start = startSession, botNames }: AppProps) {
       const presentation = new SessionPresentation(await start(createSessionConfiguration(botNames)));
       // Drives bot Turns automatically so a human Turn actually becomes reachable; presentation
       // pacing/stale-input safety across Turn transitions remains M4-T09's job (SessionPresentation
-      // docstring on startAutoPlay).
-      presentation.startAutoPlay();
+      // docstring on startAutoPlay). `botTurnDelayMs` is `undefined` in real production usage, which
+      // `startAutoPlay`'s own default parameter resolves to its real production delay.
+      presentation.startAutoPlay(botTurnDelayMs);
       setSession(presentation);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -97,15 +133,28 @@ export function App({ start = startSession, botNames }: AppProps) {
     }
   }
 
-  // Confirmed Leave Game (M4-T11; ui-ux.md §10). Progress is not saved, so this abandons the Session
-  // outright via `destroy()` — which stops its background Turn-advancement loop for good and lets it be
-  // garbage-collected — rather than leaving it running unseen (or merely parked forever) once the person
-  // has navigated away from it, and re-arms Start Game for a fresh Session the same way Home's own
-  // initial state does.
+  // Confirmed Leave Game (M4-T11; ui-ux.md §10), and also Session Summary's own Home action (M4-T13):
+  // both abandon whatever Session currently exists (mid-Session or already complete) outright via
+  // `destroy()` — which stops its background Turn-advancement loop for good and lets it be garbage-
+  // collected — rather than leaving it running unseen (or merely parked forever) once the person has
+  // navigated away from it, and re-arms Start Game/Home for a fresh Session the same way the initial
+  // state does. `destroy()` is a safe no-op once a Session is already complete (SessionPresentation's
+  // own docstring), so reusing this one handler for both callers needs no extra guard.
   function handleLeave() {
     session?.destroy();
     setSession(null);
     started.current = false;
+  }
+
+  // Play Again (M4-T13; ui-ux.md §13): starts a brand-new Session through the exact same T01 startup
+  // boundary as Home's own Start Game (`handleStart`) rather than resetting/reusing the completed one -
+  // "without persistence assumptions" (this task's own Definition of Done). The finished Session is
+  // torn down first, the same way Home does, so nothing from it lingers once the fresh one starts.
+  function handlePlayAgain() {
+    session?.destroy();
+    setSession(null);
+    started.current = false;
+    void handleStart();
   }
 
   // Replaces Home/the table outright rather than overlaying it (M4-T11; ui-ux.md §14): unlike Discard
@@ -115,7 +164,19 @@ export function App({ start = startSession, botNames }: AppProps) {
   }
 
   if (session) {
-    return <SessionTable presentation={session} onLeave={handleLeave} showInitialTransition />;
+    return (
+      <SessionTable
+        presentation={session}
+        onLeave={handleLeave}
+        onPlayAgain={handlePlayAgain}
+        onHome={handleLeave}
+        showInitialTransition
+        {...(revealDurationMs !== undefined ? { revealDurationMs } : {})}
+        {...(resultStageDelayMs !== undefined ? { resultStageDelayMs } : {})}
+        {...(roundTransitionDurationMs !== undefined ? { roundTransitionDurationMs } : {})}
+        {...(summaryAutoAdvanceDelayMs !== undefined ? { summaryAutoAdvanceDelayMs } : {})}
+      />
+    );
   }
 
   return (
@@ -291,13 +352,14 @@ export function SessionTable({
   // exercise unrelated M4-T06/T07/T08/T10 behavior (and never click Leave Game) do not all need a prop
   // they don't care about; App.tsx's own real usage always passes its actual `handleLeave`.
   onLeave = () => {},
-  // Optional, defaulting to a no-op — Session Summary itself is M4-T13 scope. Round 5's Round Result
-  // overlay already needs its own distinct "View Session Results" continuation action now (M4-T12's own
-  // Definition of Done: "R5 uses View Session Results"), so this is the seam that action calls; for now
-  // it is an inert placeholder, the same established pattern this codebase already uses for a control
-  // that exists ahead of the task that gives it real behavior (Discard Pile's button before M4-T10;
-  // Event Log/Leave Game's before M4-T10/M4-T11) — reported in this task's own completion report.
-  onSessionComplete = () => {},
+  // Optional, defaulting to no-ops — Session Summary itself is M4-T13 scope. Round 5's Round Result
+  // overlay auto-advances into Session Summary on its own (ui-ux.md §12 follow-up, M4-T13 UI refinement)
+  // once its own scoring animation settles; these are the seams Session Summary's own Play Again/Home
+  // actions call, following the same established pattern this codebase already uses for a control that
+  // exists ahead of the task that gives it real behavior (Discard Pile's button before M4-T10; Event
+  // Log/Leave Game's before M4-T10/M4-T11).
+  onPlayAgain = () => {},
+  onHome = () => {},
   // Test-only presentation-timing overrides (both mirror `SessionPresentation.startAutoPlay`'s own
   // "pass 0 for a deterministic/instant sequence" convention); App.tsx's real usage always leaves both
   // at their production defaults (`ROUND_REVEAL_DURATION_MS`, `ROUND_RESULT_STAGE_DELAY_MS`).
@@ -306,6 +368,9 @@ export function SessionTable({
   // Test-only override, same convention as the two props above; App.tsx's real usage leaves it at
   // `ROUND_TRANSITION_DURATION_MS`.
   roundTransitionDurationMs = ROUND_TRANSITION_DURATION_MS,
+  // Test-only override for `RoundResultOverlay`'s own `autoAdvanceDelayMs` (ui-ux.md §12 follow-up);
+  // App.tsx's real usage leaves it at `SUMMARY_AUTO_ADVANCE_DELAY_MS`.
+  summaryAutoAdvanceDelayMs = SUMMARY_AUTO_ADVANCE_DELAY_MS,
   // Shows the same Round-start transition screen for this component's own very first mount (person's own
   // follow-up report: Round 1 got no "dim, then Round X, then lit" treatment, only Rounds 2+ did). Defaults
   // to false so the many existing tests that render `SessionTable` directly and expect it immediately
@@ -315,10 +380,12 @@ export function SessionTable({
 }: {
   readonly presentation: SessionPresentation;
   readonly onLeave?: () => void;
-  readonly onSessionComplete?: () => void;
+  readonly onPlayAgain?: () => void;
+  readonly onHome?: () => void;
   readonly revealDurationMs?: number;
   readonly resultStageDelayMs?: number;
   readonly roundTransitionDurationMs?: number;
+  readonly summaryAutoAdvanceDelayMs?: number;
   readonly showInitialTransition?: boolean;
 }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
@@ -341,7 +408,11 @@ export function SessionTable({
   // `ROUND_RESULT`, since the Basic Session's own official result becomes available in that same Engine
   // transaction; `roundCheckpoint`/`reveal` stay populated regardless, so this gate covers Round 5 too).
   const roundComplete = snapshot.roundCheckpoint !== null;
-  const [resultPhase, setResultPhase] = useState<'reveal' | 'result'>('reveal');
+  // 'summary' (M4-T13; ui-ux.md §13 follow-up) is only ever reached from 'result' once Round 5's own
+  // Round Result overlay auto-advances (`handleContinue` below) - Rounds 1-4 never reach it, since
+  // `handleContinue` for them instead starts the next Round and this whole phase machine resets via
+  // `handledRound` below once that Round's own `roundComplete` goes false again.
+  const [resultPhase, setResultPhase] = useState<'reveal' | 'result' | 'summary'>('reveal');
   const [handledRound, setHandledRound] = useState<number | null>(null);
 
   // A newly-completed Round always restarts at the reveal phase. This runs during render, not a
@@ -383,8 +454,8 @@ export function SessionTable({
   // Round throughout the transition, so lifting the dim only ever brightens it rather than replacing
   // anything - `isTableInert` below (via `startingRound !== null`) is exactly what keeps that already-
   // dealt Round hidden/inert until this screen's own timer or an explicit skip ends it. Round 5 has no
-  // next Round to transition into, so `handleContinue` below never sets this for it - `onSessionComplete`
-  // still fires immediately.
+  // next Round to transition into, so `handleContinue` below never sets this for it - it moves straight
+  // to `resultPhase === 'summary'` instead (ui-ux.md §12/§13 follow-up, M4-T13 UI refinement).
   //
   // `showInitialTransition` extends the exact same screen to Round 1's own very first start (a further
   // follow-up report: the person expected the same "dim, then Round X, then lit" treatment there too,
@@ -418,6 +489,9 @@ export function SessionTable({
   // this just keeps the condition explicit/self-documenting rather than relying on that ordering.
   const isRevealing = roundComplete && resultPhase === 'reveal' && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID;
   const isResultOverlayOpen = roundComplete && resultPhase === 'result' && startingRound === null;
+  // Session Summary (M4-T13; ui-ux.md §13 follow-up) - only ever reachable once Round 5's own official
+  // result exists, matching `handleContinue`'s own `sessionResult !== null` branch below.
+  const isSummaryOpen = roundComplete && resultPhase === 'summary' && snapshot.sessionResult !== null;
   // Once the 4th-place player's own hand has been revealed, it stays revealed through the Result
   // overlay too (person's own follow-up report: it was flipping back to face-down the instant the
   // Result overlay/scoreboard opened, reading as if the reveal never happened at all). Distinct from
@@ -425,7 +499,7 @@ export function SessionTable({
   // this instead covers the seat's own revealed-cards display across both `resultPhase` values, only
   // clearing once the round-start transition to the next Round actually begins.
   const isHandRevealed = roundComplete && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID && startingRound === null;
-  const isTableInert = isResultOverlayOpen || startingRound !== null;
+  const isTableInert = isResultOverlayOpen || isSummaryOpen || startingRound !== null;
 
   function skipReveal() {
     setResultPhase('result');
@@ -439,7 +513,9 @@ export function SessionTable({
   function handleContinue() {
     // Round 5's Round Result has no next Round to continue to - the Basic Session's own official result
     // (`sessionResult`) is exactly what distinguishes it, rather than a hardcoded "roundNumber === 5".
-    if (snapshot.sessionResult !== null) { onSessionComplete(); return; }
+    // `RoundResultOverlay` itself calls this automatically once its own settled stage's short delay
+    // elapses (ui-ux.md §12 follow-up, M4-T13 UI refinement) - there is no button for Round 5 to click.
+    if (snapshot.sessionResult !== null) { setResultPhase('summary'); return; }
     // Deals the next Round now, before the transition screen even opens (see that screen's own
     // docstring above) - `snapshot` here is still this render's own pre-continuation value, so
     // `snapshot.roundNumber + 1` is exactly the Round `continueToNextRound()` just started.
@@ -528,6 +604,20 @@ export function SessionTable({
           isFinalRound={snapshot.sessionResult !== null}
           onContinue={handleContinue}
           stageDelayMs={resultStageDelayMs}
+          autoAdvanceDelayMs={summaryAutoAdvanceDelayMs}
+        />
+      )}
+      {/* Replaces the Round Result overlay in place once it auto-advances (ui-ux.md §13 follow-up,
+       *  M4-T13 UI refinement) - `isTableInert` above already keeps the same dimmed table underneath. */}
+      {isSummaryOpen && snapshot.sessionResult && (
+        <SessionSummary
+          seats={snapshot.seats}
+          result={snapshot.sessionResult}
+          completedRounds={snapshot.completedRounds}
+          events={snapshot.events}
+          names={names}
+          onPlayAgain={onPlayAgain}
+          onHome={onHome}
         />
       )}
       {startingRound !== null && <RoundTransitionOverlay roundNumber={startingRound} onSkip={skipRoundTransition} />}

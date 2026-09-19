@@ -139,6 +139,8 @@ Phase 1 supports bounded manual rearrangement by mouse/touch drag within the han
 - Sort by Rank: Rank 3 → ... → A → 2; ties Clubs → Spades → Hearts → Diamonds.
 - Sort by Suit: Clubs → Spades → Hearts → Diamonds; within suit Rank 3 → ... → A → 2.
 
+**Follow-up (person's own follow-up report):** the row holding the cards themselves reserved only a `min-height` approximation, not an exact one — at wider viewports a real card's own rendered height exceeded that approximation, so an emptied hand (nothing left to establish the row's own content height) fell back to the shorter approximate floor, visibly shifting **Sort Rank**/**Sort Suit** (stacked directly beneath, in the same reserved-width column, §5.2) out of their earlier position. That row's height is now a fixed expression derived only from the viewport — the same card-width formula the cards themselves already use, at their own fixed aspect ratio — so it, and everything anchored beneath it, holds one constant position regardless of how many cards (including zero) are actually held.
+
 # 7. Play, Pass, and Validation Feedback
 
 The large Play control carries selection feedback. No selection/invalid/non-beating selection keeps Play disabled/gray. Where practical, show a specific Engine-derived reason such as **Invalid combination**, **Wrong number of cards**, **Must include 3♣**, or **Doesn't beat Pair of 9s**. A valid legal selection shows the recognized combination and enables Play.
@@ -173,9 +175,13 @@ Record useful public gameplay events such as Round start/opener, exact Play + re
 
 Both overlays derive from authoritative public Engine history/events. While either overlay is open, Orchestrator progression is paused so bot actions do not occur unseen. Closing resumes from the same execution point.
 
+**Follow-up (M4-T13 UI refinement):** the human player's own restrained highlight (§13's own follow-up) colors only their own name within an entry's text, not the whole entry. A Round-start boundary marker ("Round 1 started.") gets its own more prominent, centered treatment distinct from an ordinary Play/Pass/finish entry, so it reads clearly as a Round divider rather than another event in the list. The list's own scrollbar keeps a small, deliberate gap from its content (both a reserved gutter and real padding) rather than sitting flush against it. While this overlay (or any full-viewport modal — Round Result, Session Summary) is open, the page behind it cannot itself be scrolled by a wheel/trackpad gesture that starts outside the modal's own scrollable content.
+
 # 10. Leave Game
 
 Leave Game is a secondary left-side action. During an unfinished Session it opens an application confirmation overlay explaining that progress is not saved, with **Yes/Leave Game** and **Return/Stay** actions. The confirmation pauses progression. Browser refresh/tab/window close uses supported unload warnings where available; browser wording is not guaranteed.
+
+**Follow-up (M4-T13 UI refinement):** the browser unload warning stops once the Session's own official result exists (Round 5's own checkpoint, §12/§13) — from that point on (including while still watching Round 5's own settled Result overlay auto-advance into Session Summary, §12) there is no further unsaved progress left to lose, so closing the tab needs no confirmation (the person's own follow-up request: "you can remove the prompt for asking if the tab can be exited through closing the tab" at Session Summary).
 
 # 11. End-of-Round Reveal
 
@@ -197,9 +203,9 @@ The scoring presentation sequence is:
 4. rows smoothly rearrange by the new cumulative total;
 5. the heading/column presentation settles on **Total** rather than permanently retaining a Previous Total column.
 
-The animation is short and skippable by click/tap; skipping completes the visual state but must not trigger Next Round. Ties during an unfinished Session retain stable previous relative order rather than inventing a final ranking.
+The animation is short and skippable by click/tap; skipping completes the visual state but must not trigger Next Round (or, for Round 5, the automatic Session Summary transition below). Ties during an unfinished Session retain stable previous relative order rather than inventing a final ranking.
 
-Rounds 1–4 show **Next Round**. Round 5 shows **View Session Results**.
+Rounds 1–4 show **Next Round**, requiring an explicit click. Round 5 shows no continuation button at all: once the scoring animation settles, the overlay automatically replaces itself in place with the Session Summary (§13) after a short additional presentational delay, matching the same brief/skippable-animation convention used elsewhere (§8, §11) rather than a longer ceremony (Follow-up, M4-T13 UI refinement — replaces the earlier explicit **View Session Results** button; a click/tap on the settled overlay before that delay elapses is harmless and has no effect, since the animation is already at its settled state).
 
 ## 12.1 Round-Start Transition Screen
 
@@ -215,9 +221,11 @@ This is presentation only, layered on the same authoritative Round-boundary stat
 
 # 13. Session Summary
 
-After Round 5, Session Summary shows the official final ranking ordered by final Session result, final scores, all five Round results, and tiebreak explanation when relevant. Apply the official Basic tiebreak rules here.
+After Round 5, Session Summary shows the official final ranking ordered by final Session result, final scores, all five Round results (labeled **Round-by-Round Summary**, with plain point values — no +/- prefix, since Basic Mode has no loser deductions to distinguish from a gain), and tiebreak explanation when relevant. Apply the official Basic tiebreak rules here.
 
 Give 1st/2nd/3rd restrained gold/silver/bronze background/border treatment while retaining explicit placement text so meaning is not color-only. Provide **Play Again** and **Home**.
+
+**Follow-up (M4-T13 UI refinement):** Session Summary presents as a popup/overlay over the same dimmed completed table Round Result used (§12), replacing the Round Result overlay in place rather than opening as a separate full screen, and is reached automatically once Round 5's own scoring animation settles (§12) — no explicit action is required. Both the Final Ranking and Round-by-Round Summary tables center their own cell text/numbers, and each fits within the panel without its own inner scrollbar. The human player's own seat gets a restrained visual highlight wherever their name appears — here, in the Round Result overlay (§12), and in the Event Log (§9.2) — distinct from the gold/silver/bronze medal colors; the existing "You" name text already carries the identity, so this is purely an additional glance-able cue, consistent with §15's label-plus-color rule. In a table row this colors only the name cell's own text, not the row's background (a background tint visibly fought with a medal-colored row it shared, e.g. a tied 1st-place human row); in the Event Log it colors only the actor's own name within an entry's text, not the whole entry. Session Summary provides its own **Event Log** button, ordered **Event Log**, **Home**, **Play Again** (left to right), that opens the same dismissible Event Log overlay (§9.2, including its card-icon badges, and this overlay's own follow-up note on the human's own name-only highlight/Round-marker emphasis) over Session Summary, showing the whole Session's own chronological history — not an always-visible embedded panel of its own.
 
 # 14. Responsive and Orientation Contract
 

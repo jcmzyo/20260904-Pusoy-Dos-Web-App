@@ -76,9 +76,18 @@ describe('production Session presentation', () => {
     await presentation.runTurn();
     expect(presentation.getSnapshot().seats.every((seat) => !seat.passed)).toBe(true);
     pass = true;
-    for (let index = 0; index < 3; index++) await presentation.runTurn();
+    let closingPasser: string | null = null;
+    for (let index = 0; index < 3; index++) {
+      closingPasser = presentation.getSnapshot().currentPlayerId;
+      // eslint-disable-next-line no-await-in-loop
+      await presentation.runTurn();
+    }
     expect(presentation.getSnapshot().center).toEqual({ kind: 'freeLead' });
-    expect(presentation.getSnapshot().seats.every((seat) => !seat.passed)).toBe(true);
+    // The 3rd of these Passes is what closes the response cycle (GameEngine.submitMove emits
+    // PLAYER_PASSED and TRICK_ENDED together in that same Turn) - that seat's own PASS status still
+    // shows through the reset (M4-T13 UI refinement follow-up: "the player passed but no Pass
+    // indicator on the seat panel"), unlike an ordinary Play/reset which clears it for everyone.
+    expect(presentation.getSnapshot().seats.filter((seat) => seat.passed).map((seat) => seat.playerId)).toEqual([closingPasser]);
     expect(listener).toHaveBeenCalledTimes(6);
     expect(initial.playedCards).toEqual([]);
     expect(Reflect.set(initial.humanHand[0]!, 'rank', '2')).toBe(false);
@@ -433,6 +442,31 @@ describe('production Session presentation', () => {
       expect(passedSeat.lastPlay).toBeNull();
     }
     expect(sawLaterPlay).toBe(true);
+  });
+
+  it('still shows PASS for the seat whose own Pass closes the response cycle, not only a mid-cycle one (M4-T13 UI refinement follow-up: "the player passed but no Pass indicator on the seat panel ... it doesn\'t happen always")', async () => {
+    // Every responder always Passes when Pass is legal (opening a fresh trick never allows Pass, so
+    // the current leader is always forced to Play instead) - guaranteed to close the very first
+    // response cycle on its 3rd responder's own Pass (GameEngine.submitMove emits PLAYER_PASSED and
+    // TRICK_ENDED together in that Pass's own Turn event batch), the exact scenario `project()`'s own
+    // passed-Set cleanup used to immediately wipe out again before any snapshot ever showed it.
+    const { presentation } = fixture((request) =>
+      request.legalMoves.find((move) => move.kind === 'pass') ?? request.legalMoves.find((move) => move.kind === 'play')!);
+
+    let closingPasser: string | null = null;
+    let guard = 0;
+    while (presentation.getSnapshot().center.kind !== 'freeLead' && guard++ < 20) {
+      const before = presentation.getSnapshot();
+      await presentation.runTurn();
+      const after = presentation.getSnapshot();
+      if (before.center.kind !== 'freeLead' && after.center.kind === 'freeLead') {
+        // This exact Turn is what closed the cycle - only a responder's own Pass can flip `center`
+        // straight from 'hand' to 'freeLead' (the opener's own Play only ever produces 'hand').
+        closingPasser = before.currentPlayerId;
+        expect(after.seats.find((seat) => seat.playerId === closingPasser)?.passed).toBe(true);
+      }
+    }
+    expect(closingPasser).not.toBeNull();
   });
 
   it('keeps every seat\'s own Play/Pass trail visible through Round completion itself, only clearing on the next actual Round (round-5 follow-up)', async () => {
