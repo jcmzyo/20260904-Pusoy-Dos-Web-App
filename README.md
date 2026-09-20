@@ -66,18 +66,20 @@ M4 gameplay is landscape-first (see `md files/ui-ux.md` §14 and `md files/requi
 | laptop | 1440 x 900 | supported landscape |
 | windowed-desktop | 1280 x 800 | supported landscape (non-fullscreen window) |
 | tablet-landscape | 1024 x 768 | supported landscape |
-| large-phone-landscape | 844 x 390 | supported landscape |
-| small-phone-landscape | 667 x 375 | supported landscape (minimum supported) |
+| large-phone-landscape | 844 x 390 | supported landscape (minimum supported) |
+| small-phone-landscape | 667 x 375 | unsupported landscape (below minimum since M4-T14; formerly the minimum) |
 | portrait-unsupported | 390 x 844 | unsupported orientation |
 | undersized-landscape | 560 x 320 | unsupported landscape (below minimum) |
 
-Minimum supported landscape dimensions: **667 x 375**. A landscape viewport smaller than this must show resize/unsupported guidance; portrait orientation must show rotate guidance. Neither guidance screen is implemented yet (both are scoped to `M4-T11`), so today the Playwright matrix only proves the app loads without crashing at every dimension. The two guidance checks are registered with `test.fixme` so they are not forgotten once `M4-T11` lands.
+Minimum supported landscape dimensions: **844 x 390** (raised from 667 x 375 in `M4-T14`). A landscape viewport smaller than this shows resize/unsupported guidance; a portrait viewport on a touch device shows rotate guidance (`M4-T11`).
 
 Frozen minimum readable/targetable sizing constraints for later hardening tasks (T05-T14):
 
 - minimum core body/control text size: **14px**
 - minimum critical control/touch target size: **44 x 44px**
 - minimum exposed card width for reliable overlapped-hand tap targeting: **28px**
+
+The 14px and 44px constants hold literally on *rendered* sizes wherever the play area renders at scale 1 or larger: viewports of at least **896 x 656** (the play area's design size in `src/ui/primitives/playAreaScale.ts`; `FULL_SCALE_LANDSCAPE_*` in `layoutThresholds.ts`). Anywhere from there up to a 1440 x 900 window the play area is laid out at natural size (scale 1) in the whole window, with the extra room spread between the seats rather than zooming everything in; only a window larger than that scales up. Between 896 x 656 and the 844 x 390 minimum (the phone tier) the play area is scaled down to fit, so those two constants are exempt there; the 28px exposed-card constant applies at every supported size. `tests/browser/responsive-hardening.e2e.ts` asserts both tiers.
 
 The canonical matrix/constants live in `tests/browser/viewportMatrix.ts` and are consumed by `tests/browser/viewport-matrix.e2e.ts`. Run the browser harness (requires `npx playwright install chromium` once, then):
 

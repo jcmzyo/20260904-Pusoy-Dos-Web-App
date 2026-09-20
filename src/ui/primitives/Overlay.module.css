@@ -39,6 +39,8 @@
 }
 
 .close {
+  min-width: 44px;
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid #ead8a7;
   border-radius: 8px;

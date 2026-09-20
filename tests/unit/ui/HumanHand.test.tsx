@@ -154,6 +154,45 @@ describe('Drag reorder does not affect selection (M4-T07)', () => {
   });
 });
 
+describe('Drag under a scaled play area (M4-T14)', () => {
+  /** jsdom performs no layout: give the dragged slot a layout width (`offsetWidth`, unaffected by
+   *  transforms) and a rendered rect (`getBoundingClientRect`, affected by the play area's own scale)
+   *  whose ratio is the play-area scale, and the hand row a rect wide enough not to clamp. */
+  function dragOnScaledArea(layoutWidth: number, renderedWidth: number, pointerDelta: number): string {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const dragged = slotOf('3', 'Clubs');
+    Object.defineProperty(dragged, 'offsetWidth', { configurable: true, value: layoutWidth });
+    dragged.getBoundingClientRect = () => ({ left: 100, right: 100 + renderedWidth, width: renderedWidth, top: 0, bottom: 40, height: 40, x: 100, y: 0, toJSON() {} });
+    screen.getByRole('group', { name: 'Your hand' }).getBoundingClientRect = () => ({ left: 0, right: 1000, width: 1000, top: 0, bottom: 40, height: 40, x: 0, y: 0, toJSON() {} });
+    fireEvent.pointerDown(dragged, { pointerId: 10, clientX: 100, button: 0 });
+    fireEvent.pointerMove(dragged, { pointerId: 10, clientX: 100 + pointerDelta });
+    const transform = dragged.style.transform;
+    fireEvent.pointerUp(dragged, { pointerId: 10, clientX: 100 + pointerDelta });
+    return transform;
+  }
+
+  it('compensates the pointer delta for a play area scaled below 1 so the card tracks the pointer', () => {
+    // scale = 28 / 56 = 0.5: the card must move 120 layout px to travel 60 screen px.
+    expect(dragOnScaledArea(56, 28, 60)).toBe('translateX(120px)');
+  });
+
+  it('compensates for a play area scaled above 1', () => {
+    // scale = 112 / 56 = 2: 60 screen px is only 30 layout px.
+    expect(dragOnScaledArea(56, 112, 60)).toBe('translateX(30px)');
+  });
+
+  it('applies the delta unchanged at scale 1, and when no layout width is available (scale falls back to 1)', () => {
+    expect(dragOnScaledArea(56, 56, 60)).toBe('translateX(60px)');
+    cleanup();
+    expect(dragOnScaledArea(0, 56, 60)).toBe('translateX(60px)');
+  });
+
+  it('keeps the bounded-drag clamp in screen space: it can never leave the hand row, at any scale', () => {
+    // Row right edge 1000, card right edge 100 + 28 = 128 -> at most 872 screen px = 1744 layout px at scale 0.5.
+    expect(dragOnScaledArea(56, 28, 5000)).toBe('translateX(1744px)');
+  });
+});
+
 describe('Selection cap (M4-T08)', () => {
   it('blocks selecting beyond maxSelectable while leaving existing selections and other cards clickable', () => {
     render(<HumanHand cards={hand} maxSelectable={2} />);

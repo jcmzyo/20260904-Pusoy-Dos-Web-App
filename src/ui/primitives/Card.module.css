@@ -1,6 +1,7 @@
 .card {
-  width: clamp(40px, 8vw, 88px);
+  width: var(--card-width, 56px);
   aspect-ratio: 5 / 7;
+  container-type: inline-size;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -42,7 +43,7 @@
   align-items: center;
   line-height: 1;
   font-weight: 700;
-  font-size: clamp(9px, 1.8vw, 16px);
+  font-size: 25cqw;
 }
 
 .cornerBottom {
@@ -54,14 +55,14 @@
 }
 
 .cornerSuit {
-  font-size: 0.85em;
+  font-size: 1em;
 }
 
 /* Large center suit symbol, shown only where `PlayingCard`'s `showCenterPip` opts in (the human's own
  * held hand, round-4 follow-up) - centered automatically since it's the only non-absolutely-positioned
  * child of `.card`'s own flex centering; the corners remain absolutely positioned above/below it. */
 .pip {
-  font-size: clamp(18px, 4.5vw, 36px);
+  font-size: 48cqw;
   line-height: 1;
 }
 
@@ -81,13 +82,13 @@
   justify-content: center;
   line-height: 1;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 14px;
   /* Keeps every rank's own digit width consistent (particularly "10" against every single-character
    * rank), on top of the fixed badge `width` above, so `text-align: center` below has an equally-sized
    * line box to center within regardless of which rank is shown (the person's own follow-up report that
    * "10" and "K" looked off-center). */
   font-variant-numeric: tabular-nums;
-  width: 22px;
+  width: 24px;
   padding: 2px 0;
   border-radius: 4px;
   background: #faf7ee;
@@ -96,7 +97,7 @@
 }
 
 .indexSuit {
-  font-size: 0.85em;
+  font-size: 1em;
 }
 
 .back {

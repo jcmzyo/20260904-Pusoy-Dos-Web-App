@@ -31,10 +31,10 @@ for (const viewport of VIEWPORT_MATRIX) {
   });
 }
 
-// Pixel-level overlap/clipping verification across this matrix is M4-T14 (Full Responsive
-// Hardening). This check only confirms the M4-T06 table hierarchy's core elements (all four
-// seats and the Discard Pile button) are actually visible, not just present, at every viewport
-// this milestone currently supports.
+// Pixel-level overlap/clipping/fit verification across this matrix lives in
+// `responsive-hardening.e2e.ts` (M4-T14, Full Responsive Hardening). This check only confirms the
+// M4-T06 table hierarchy's core elements (all four seats and the Discard Pile button) are actually
+// visible, not just present, at every supported viewport.
 for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
   test(`Game Table core elements are visible at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -56,17 +56,6 @@ for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'sup
 // this verifies the card stack's own layout box stays within the table's horizontal bounds.
 for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
   test(`West/East card stacks stay within the table border at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
-    // Known gap, not yet fixed (M4-T13 UI refinement follow-up, person's own decision 2026-09-19):
-    // at this one viewport, West/East's own seat content (bot-hand column + gap + PlayerPanel's own
-    // fixed 168px width, §5.7) needs 236px but the table's West/East grid columns only guarantee a
-    // 96px floor (App.module.css's own `grid-template-columns`), so the seat overflows the table's
-    // border by ~20px. The obvious fix (widening that floor to 236px) was tried and rejected - it
-    // trades this for a worse regression, the table itself then overflowing the 667px viewport (a
-    // horizontal scrollbar at a viewport ui-ux.md §14 lists as supported without one). A real fix
-    // needs the proportional viewport-scaling logic §14 already calls for, which is M4-T14's own
-    // scope ("Full Responsive Hardening") - tracked there, not fixed here, per the person's own
-    // explicit instruction not to pull that work forward into this cleanup round.
-    test.fixme(viewport.name === 'small-phone-landscape', 'Known gap tracked for M4-T14 - see comment above.');
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
     await page.getByRole('button', { name: 'Start Game', exact: true }).click();

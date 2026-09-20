@@ -105,19 +105,22 @@ test('the hand row holding Sort Rank/Sort Suit is sized purely from the viewport
   const hand = page.getByRole('group', { name: 'Your hand' });
   await expect(hand.locator('[data-card-key]')).toHaveCount(13);
 
-  // `.handRow`'s own height is a fixed CSS expression derived only from the viewport - the same
-  // `clamp(40px, 8vw, 88px)` width formula Card.module.css's own `.card` uses, at that card's own
-  // `aspect-ratio: 5 / 7` (HumanHand.module.css's `.handRow` docstring). Comparing the real computed
-  // height against that same formula, independently evaluated here from the viewport alone, proves the
-  // row's height cannot vary with how many cards are actually held (0 included) - an unwanted
-  // dependency on card count (e.g. a content-driven `min-height`) would make this assertion fail
-  // without ever needing to actually empty the hand through real gameplay, which - per
-  // round-result.e2e.ts's own docstring - the human seat's own minimal-Pass-when-legal strategy can
-  // almost never reliably reach.
+  // `.handRow`'s own height is a fixed CSS expression derived only from the play area's shared
+  // `--card-width` (HumanHand.module.css's `.handRow` docstring): that card width at the card's own
+  // `aspect-ratio: 5 / 7`, plus the fixed room reserved for a raised card. Comparing the real computed
+  // height against that same formula, independently evaluated here from the live `--card-width` and the
+  // play area's own `data-play-area-scale`, proves the row's height cannot vary with how many cards are
+  // actually held (0 included) - an unwanted dependency on card count (e.g. a content-driven
+  // `min-height`) would make this assertion fail without ever needing to actually empty the hand through
+  // real gameplay, which - per round-result.e2e.ts's own docstring - the human seat's own
+  // minimal-Pass-when-legal strategy can almost never reliably reach. The play area is uniformly scaled
+  // (M4-T14), so the on-screen height is the design-unit height times that scale.
   const { actualHeightPx, expectedHeightPx } = await page.evaluate(() => {
     const row = document.querySelector('[aria-label="Your hand"]') as HTMLElement;
-    const cardWidthPx = Math.min(88, Math.max(40, window.innerWidth * 0.08));
-    return { actualHeightPx: row.getBoundingClientRect().height, expectedHeightPx: (cardWidthPx * 7) / 5 };
+    const playArea = row.closest('[data-play-area-scale]') as HTMLElement;
+    const scale = Number(playArea.dataset.playAreaScale);
+    const cardWidthPx = parseFloat(getComputedStyle(playArea).getPropertyValue('--card-width'));
+    return { actualHeightPx: row.getBoundingClientRect().height, expectedHeightPx: ((cardWidthPx * 7) / 5 + 18) * scale };
   });
   expect(actualHeightPx).toBeCloseTo(expectedHeightPx, 0);
 
@@ -134,9 +137,9 @@ test('the hand row holding Sort Rank/Sort Suit is sized purely from the viewport
   expect(sortMidpointX).toBeCloseTo(areaBox.x + areaBox.width / 2, 0);
 });
 
-test(`overlapped cards stay independently targetable at the small supported landscape viewport (>= ${MINIMUM_EXPOSED_CARD_WIDTH_PX}px exposed)`, async ({ page }) => {
-  const spec = VIEWPORT_MATRIX.find((entry) => entry.name === 'small-phone-landscape');
-  if (!spec) throw new Error('Viewport matrix is missing its small-phone-landscape entry.');
+test(`overlapped cards stay independently targetable at the minimum supported landscape viewport (>= ${MINIMUM_EXPOSED_CARD_WIDTH_PX}px exposed)`, async ({ page }) => {
+  const spec = VIEWPORT_MATRIX.find((entry) => entry.name === 'large-phone-landscape');
+  if (!spec) throw new Error('Viewport matrix is missing its large-phone-landscape entry.');
   await page.setViewportSize({ width: spec.width, height: spec.height });
   await startGame(page);
   const hand = page.getByRole('group', { name: 'Your hand' });

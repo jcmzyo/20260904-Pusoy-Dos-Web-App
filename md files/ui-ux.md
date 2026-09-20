@@ -1,9 +1,9 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.10)
+## UI / UX Document (v1.11)
 
 **Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 18, 2026  
+**Last Modified:** September 19, 2026  
 **Parent document:** `requirements.md` v1.16  
 **Committed scope:** Phase 1 — Minimal Playable Basic Game UI
 
@@ -45,9 +45,10 @@ The table must show current Round context, current turn, cumulative scores, play
 
 The center contains:
 
-- a **Discard Pile** button;
 - the current hand to beat with actual cards, recognized type/rank where useful, and the player who made that Play;
 - explicit **FREE LEAD** when appropriate.
+
+**Follow-up (M4-T14):** the **Discard Pile** button no longer sits in the center; it moved to the bottom area's left container (§5.2). At the frozen minimum touch-target height (§14) it no longer fit above the hand to beat without making the smallest play area about 50px taller, which would shrink everything on a phone-sized screen.
 
 The current hand to beat remains visible through Passes until beaten/reset. Every successfully played card immediately belongs to the public Discard Pile, including cards from the current Trick.
 
@@ -68,19 +69,25 @@ Card face detail (corner index vs. center pip) is defined in §5.6.
 
 The bottom area is three aligned horizontal containers, sharing one row:
 
-- **left container:** the Event Log button and Leave Game, stacked vertically and centered within the container, both the same fixed length regardless of their own label length;
+- **left container:** the Event Log button, the **Check Discard Pile** button (§9.1), and Leave Game, stacked vertically against the row's left edge, all the same fixed size regardless of their own label length (M4-T14: the frozen minimum touch-target height, §14, with the longest label wrapping onto two lines). Leave Game is red, as the one destructive action; its label carries the meaning without the color (§15);
 - **middle container:** human cards on top, Sort by Rank / Sort by Suit side by side and centered beneath them. Its own width is reserved for the maximum possible 13-card hand and held constant as cards are played away during a Round — a smaller hand simply stays centered within that reserved width rather than narrowing it. Height still sizes to its own content (the cards plus the Sort buttons), so the card size (and headroom for a selected/raised card) always takes priority;
-- **right container:** Play stacked above Pass, large primary controls. Each shows its own recognized-combination/invalid-reason/"No valid plays" text as a smaller second line inside the button itself; the Play/Pass label itself reads as clearly primary (roughly three-quarters of its own text weight) against that smaller second line, and both buttons keep a fixed size regardless of whether the second line is present.
+- **right container:** Play stacked above Pass against the row's right edge, large primary controls. Each shows its own recognized-combination/invalid-reason/"No valid plays" text as a smaller second line inside the button itself; the Play/Pass label itself reads as clearly primary (roughly three-quarters of its own text weight) against that smaller second line, and both buttons keep a fixed size regardless of whether the second line is present.
 
-The three containers share one row and read as one coherent, evenly-aligned band; which container ends up tallest in practice does not change that. This is a responsive relationship, not fixed pixel positioning.
+The three containers share one row and read as one coherent, evenly-aligned band; which container ends up tallest in practice does not change that. The left and right containers are equal in width, so the hand stays centered however wide the play area is (§14). The whole row, like the title row above the table, is inset from the play area's edges to where the table's rounded corners end and its straight edge begins (56 design px), so Event Log/Leave Game line up with the title and Play/Pass with the Round line rather than hugging the window edge; on a play area too narrow for that, the inset shrinks (to the table's own 8px margin) so the row still fits. This is a responsive relationship, not fixed pixel positioning.
 
-The Event Log and Leave Game buttons render now as inert placeholders — pressing them currently does nothing — the same way the center table's own Discard Pile button (§5.1) has since its own introduction. Their actual overlay/confirmation behavior is separate, later work (§9.2, §10).
+Check Discard Pile, Event Log, and Leave Game open their own overlay or confirmation (§9.1, §9.2, §10). (M4-T14 update: an earlier version of this section described them as inert placeholders, which has not been true since those overlays shipped.)
 
 ## 5.3 Bot seat layout (West/East)
 
 West and East bot hands stack lengthwise (vertically) along the seat's outer edge, with that player's details (name, remaining-card count, score, turn/PASS/DONE status) positioned toward the center table rather than the outer edge — the same details-near-center relationship North and South already have. Read left to right: **Lengthwise cards | West details | Center table | East details | Lengthwise cards.** This keeps a full 13-card overlapping hand contained within the table border rather than spilling past it, at every supported viewport (§14).
 
 West and East render each face-down card **rotated 90° to match the seat's own vertical stacking axis**, at the same physical card size as North/South's cards (not shrunk to fit the rotation), rather than upright cards stacked sideways. The rotated footprint must not exceed the space a same-size card's rotation naturally produces, preserving the existing full-hand-stays-within-the-table-border guarantee at every supported viewport (§14).
+
+**Follow-up (M4-T14):** North's bot-hand cards stay stacked directly above North's details and centered over them, as in every earlier version. West/East's outer columns are never narrower than their own content (the bot-hand column plus the fixed-width panel), so the seat contents can never spill past the table border; beyond that minimum the three table columns share the width 1:2:1 with each seat centered in its own column. These are consequences of authoring the play area in design units with a minimum design size and scaling it as a unit (§14), not separate per-viewport rules. The bot-hand overlap is tighter than before (12px rather than 20px in design units) so a 13-card fan still fits that column.
+
+**Title row (M4-T14):** "Pusoy Dos" and the Basic/Round line sit in their own row above the table (title left, Round right), never over it.
+
+**Card-to-panel gap (M4-T14):** every bot's cards sit the same small distance (4px in design units) from its own panel: North's cards above it, West's and East's beside theirs.
 
 ## 5.4 Per-seat Play/Pass trail
 
@@ -126,6 +133,8 @@ Within a panel, content is vertically centered as a block, and the status badge 
 
 **Further follow-up correction (post-M4-T12.5):** the fixed panel width set by (1) above was itself too narrow for two of the panel's own worst-case contents it was meant to cover: a full 5-card Play trail (§5.4) wrapped its last card onto its own second row instead of one line, and the widest status text ("DONE · 2nd" and every other placement, all the same length) line-wrapped and visibly overlapped the row below it — both reported by the person ("Make sure the seat width can fit the 5 hands"; "'Done . 2nd' doesn't fit in one line and blocks text"). The panel's fixed width is now sized to fit both without wrapping, and the status badge itself never line-wraps regardless of available width.
 
+**Follow-up (M4-T14):** the panel's own fixed height is now 122px (previously 152px) with a 34px trail slot, and Play/Pass are fixed at 150×72px (previously 140×96px), all in the play area's own design units (§14). Everything is still reserved at its own worst case and held constant through a Round; only its absolute size changed, to fit the whole play area on one screen without scrolling. The trail's card badges and every other piece of text are at least 14px in those units, so they meet the frozen text minimum wherever the play area renders at scale 1 or larger.
+
 # 6. Human Hand, Selection, Sorting, and Manual Arrangement
 
 Human cards remain on one horizontal baseline. When space is constrained, cards overlap horizontally while enough of each card remains exposed for reliable click/tap and drag targeting.
@@ -140,6 +149,8 @@ Phase 1 supports bounded manual rearrangement by mouse/touch drag within the han
 - Sort by Suit: Clubs → Spades → Hearts → Diamonds; within suit Rank 3 → ... → A → 2.
 
 **Follow-up (person's own follow-up report):** the row holding the cards themselves reserved only a `min-height` approximation, not an exact one — at wider viewports a real card's own rendered height exceeded that approximation, so an emptied hand (nothing left to establish the row's own content height) fell back to the shorter approximate floor, visibly shifting **Sort Rank**/**Sort Suit** (stacked directly beneath, in the same reserved-width column, §5.2) out of their earlier position. That row's height is now a fixed expression derived only from the viewport — the same card-width formula the cards themselves already use, at their own fixed aspect ratio — so it, and everything anchored beneath it, holds one constant position regardless of how many cards (including zero) are actually held.
+
+**Follow-up (M4-T14):** the card width that the hand row's own height and overlap derive from is now the play area's one shared design-unit card width (60px), scaled with the whole play area (§14) rather than a separate viewport-relative clamp. The row's height is still a fixed expression independent of how many cards are held, and the exposed part of every card is still at least 70% of its width, widened when the play area is scaled down so that at least 28px of every card stays visible on screen. A card on the center table is the same size as a card in the hand. **Sort by Rank** and **Sort by Suit** are at least the minimum touch-target height. Dragging compensates for the play area's scale, so a dragged card tracks the pointer 1:1 at every size.
 
 # 7. Play, Pass, and Validation Feedback
 
@@ -227,17 +238,21 @@ Give 1st/2nd/3rd restrained gold/silver/bronze background/border treatment while
 
 **Follow-up (M4-T13 UI refinement):** Session Summary presents as a popup/overlay over the same dimmed completed table Round Result used (§12), replacing the Round Result overlay in place rather than opening as a separate full screen, and is reached automatically once Round 5's own scoring animation settles (§12) — no explicit action is required. Both the Final Ranking and Round-by-Round Summary tables center their own cell text/numbers, and each fits within the panel without its own inner scrollbar. The human player's own seat gets a restrained visual highlight wherever their name appears — here, in the Round Result overlay (§12), and in the Event Log (§9.2) — distinct from the gold/silver/bronze medal colors; the existing "You" name text already carries the identity, so this is purely an additional glance-able cue, consistent with §15's label-plus-color rule. In a table row this colors only the name cell's own text, not the row's background (a background tint visibly fought with a medal-colored row it shared, e.g. a tied 1st-place human row); in the Event Log it colors only the actor's own name within an entry's text, not the whole entry. Session Summary provides its own **Event Log** button, ordered **Event Log**, **Home**, **Play Again** (left to right), that opens the same dismissible Event Log overlay (§9.2, including its card-icon badges, and this overlay's own follow-up note on the human's own name-only highlight/Round-marker emphasis) over Session Summary, showing the whole Session's own chronological history — not an always-visible embedded panel of its own.
 
+**Follow-up (M4-T14):** at viewport heights of 660px or less, Final Ranking and Round-by-Round Summary sit side by side instead of stacked, so the whole Summary (including **Play Again**/**Home**) fits without an inner scrollbar or clipping at the shortest supported landscape viewports; taller viewports keep the stacked layout. All text in the overlay is at least 14px and its actions at least 44px tall. Each table is one solid rounded card (its outline, background and clipping belong to the card, so the caption and medal rows never show square corners past the rounded edge), and each action button's label is centered in the button.
+
 # 14. Responsive and Orientation Contract
 
-Gameplay is landscape-first and must support large desktop, normal laptop, smaller/windowed desktop, tablet landscape, large phone landscape, and a defined small supported phone landscape. Portrait is unsupported gameplay orientation: pause/prevent interaction and show **Rotate your device to continue** — but only on a touch/coarse-pointer device that can actually be physically rotated (a phone or tablet); a portrait-shaped window on a mouse/trackpad (fine-pointer) desktop or laptop cannot be rotated, so it instead gets the same resize/unsupported guidance as too-small landscape (M4-T11 follow-up). Returning to landscape, or to a supported size, restores coherent state. Too-small landscape shows resize/unsupported guidance rather than an unreadable table.
+Gameplay is landscape-first and must support large desktop, normal laptop, smaller/windowed desktop, tablet landscape, and phone landscape down to the frozen minimum supported viewport (**844×390**; raised from 667×375 in M4-T14). Portrait is unsupported gameplay orientation: pause/prevent interaction and show **Rotate your device to continue** — but only on a touch/coarse-pointer device that can actually be physically rotated (a phone or tablet); a portrait-shaped window on a mouse/trackpad (fine-pointer) desktop or laptop cannot be rotated, so it instead gets the same resize/unsupported guidance as too-small landscape (M4-T11 follow-up). Returning to landscape, or to a supported size, restores coherent state. Too-small landscape shows resize/unsupported guidance rather than an unreadable table.
 
 Use a bounded ratio-controlled play area rather than assuming fullscreen or exact 16:9. Cards preserve a constant aspect ratio. Text uses bounded readable sizing and critical controls retain usable click/touch targets. Secondary UI compresses/reflows before core gameplay becomes unusable.
 
-The play area (table plus the bottom action bar) scales as a single proportional unit rather than each element resizing independently, so relative proportions — table, seats, cards, controls — stay visually consistent from large screens down to small ones, and the whole area fits within the viewport height without requiring a scrollbar at any supported size. When a real device's available height is unusually short relative to its width (a real mobile browser's own address bar/chrome can leave noticeably less usable height than device-emulated estimates assume), height is the binding constraint: the scale is derived from available height first, and width follows from that scale, producing a narrower but fully height-fit table rather than one that fills available width and overflows vertically. M4-T14 (Full Responsive Hardening) owns applying this scaling approach across the frozen viewport matrix.
+The play area (table plus the bottom action bar) scales as a single proportional unit rather than each element resizing independently, so relative proportions — table, seats, cards, controls — stay visually consistent from large screens down to small ones, and the whole area fits within the viewport height without requiring a scrollbar at any supported size. When a real device's available height is unusually short relative to its width (a real mobile browser's own address bar/chrome can leave noticeably less usable height than device-emulated estimates assume), height is the binding constraint: the scale is derived from available height first, and width follows from that scale, producing a narrower but fully height-fit table rather than one that fills available width and overflows vertically. **As implemented (M4-T14):** every card, panel, control, and gap in the play area (the table plus the bottom bar) is sized in design units, and the play area itself is fluid: it is never laid out smaller than 896×656 design units, and otherwise fills the viewport. The one uniform scale factor is 1 for any viewport from that size up to 1440×900, so a desktop or laptop window shows everything at natural size with the extra room spread between the seats instead of zoomed in. Below 896×656 in either dimension the whole area is scaled down to fit, `min(viewport width / 896, viewport height / 656)`; above 1440×900 it is scaled up to keep the laid-out area at that size, capped at 2× (bounded typography). Full-viewport overlays (Discard Pile, Event Log, Leave, Round Result, Session Summary, the Round-start screen) are rendered outside the scaled area, at real pixel sizes.
+
+**Two sizing tiers (M4-T14 decision):** the frozen minimum text size (14px) and touch-target size (44×44px) hold literally, on rendered sizes, wherever the scale is 1 or larger — viewports of at least 896×656 (`FULL_SCALE_LANDSCAPE_*`, `layoutThresholds.ts`). From there down to the minimum supported viewport (844×390) the play area is scaled down to fit (the *phone tier*, scale about 0.59–0.94), so those two constants are exempt there. The exposed-card width (28px) applies at every supported size: in the phone tier the hand's card overlap loosens as the scale drops so that at least 28px of each card stays visible on screen. Landscape phones are supported at the minimum size and above; smaller phones, and windows below the minimum, get the resize guidance.
 
 Human cards remain on the same baseline; constrained layouts increase horizontal overlap rather than vertically staggering unselected cards. Selected cards alone rise.
 
-Exact representative CSS viewport dimensions and minimum supported dimensions are frozen during M4 implementation task T04 and reused for automated/manual QA.
+Exact representative CSS viewport dimensions and minimum supported dimensions are frozen during M4 implementation task T04 and reused for automated/manual QA. (M4-T14 raised the minimum from 667×375 to 844×390; the README's matrix table and `tests/browser/viewportMatrix.ts` carry the current values.)
 
 # 15. Visual Foundation
 

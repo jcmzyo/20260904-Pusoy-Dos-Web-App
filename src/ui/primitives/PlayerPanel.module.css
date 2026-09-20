@@ -26,9 +26,9 @@
    * one on one line (the person's own follow-up report: a 5-card Straight's last card wrapping onto its
    * own second row, and "DONE · 2nd" itself wrapping and overlapping the row below). */
   width: 168px;
-  height: 152px;
+  height: 122px;
   overflow: hidden;
-  padding: 8px 14px;
+  padding: 6px 14px;
   border: 2px solid transparent;
   border-radius: 12px;
   background: rgba(11, 40, 34, 0.55);
@@ -51,7 +51,7 @@
  * Play trail badge row is actually present - sized for the taller of the two (a single-row, up to
  * 5-card trail; `.panel`'s own fixed width above keeps it from ever wrapping onto a second row). */
 .trailSlot {
-  min-height: 60px;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;

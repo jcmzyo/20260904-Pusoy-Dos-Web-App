@@ -106,57 +106,61 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
 
         {tiebreakExplanation !== null && <p className={styles.tiebreak}>{tiebreakExplanation}</p>}
 
-        <table className={styles.rankingTable}>
-          <caption className={styles.tableCaption}>Final Ranking</caption>
-          <thead>
-            <tr>
-              <th scope="col">Place</th>
-              <th scope="col">Player</th>
-              <th scope="col">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.placements.map((entry) => {
-              const tied = (placementCounts.get(entry.placement) ?? 0) > 1;
-              return (
-                <tr key={entry.playerId} className={[medalClass(entry.placement), entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined].filter(Boolean).join(' ') || undefined}>
-                  <td>
-                    <span className={styles.placementLabel}>{PLACEMENT_LABELS[entry.placement]}</span>
-                    {tied && <span className={styles.tiedNote}> (tied)</span>}
-                  </td>
+        <div className={styles.tableCard}>
+          <table className={styles.rankingTable}>
+            <caption className={styles.tableCaption}>Final Ranking</caption>
+            <thead>
+              <tr>
+                <th scope="col">Place</th>
+                <th scope="col">Player</th>
+                <th scope="col">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.placements.map((entry) => {
+                const tied = (placementCounts.get(entry.placement) ?? 0) > 1;
+                return (
+                  <tr key={entry.playerId} className={[medalClass(entry.placement), entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined].filter(Boolean).join(' ') || undefined}>
+                    <td>
+                      <span className={styles.placementLabel}>{PLACEMENT_LABELS[entry.placement]}</span>
+                      {tied && <span className={styles.tiedNote}> (tied)</span>}
+                    </td>
+                    <td>{nameOf(entry.playerId)}</td>
+                    <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className={styles.tableCard}>
+          <table className={styles.roundsTable}>
+            <caption className={styles.tableCaption}>Round-by-Round Summary</caption>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                {completedRounds.map((_, index) => <th scope="col" key={index}>R{index + 1}</th>)}
+                <th scope="col">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.placements.map((entry) => (
+                <tr key={entry.playerId} className={entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
                   <td>{nameOf(entry.playerId)}</td>
+                  {completedRounds.map((round, index) => {
+                    const points = round.placements.find((placement) => placement.playerId === entry.playerId)?.points;
+                    if (points === undefined) throw new Error(`Round ${index + 1} is missing a result for ${entry.playerId}.`);
+                    // Plain point value, no +/- prefix - Basic Mode has no loser deductions to distinguish
+                    // a gain from (ui-ux.md §13 follow-up, M4-T13 UI refinement).
+                    return <td className={styles.numeric} key={index}>{points}</td>;
+                  })}
                   <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <table className={styles.roundsTable}>
-          <caption className={styles.tableCaption}>Round-by-Round Summary</caption>
-          <thead>
-            <tr>
-              <th scope="col">Player</th>
-              {completedRounds.map((_, index) => <th scope="col" key={index}>R{index + 1}</th>)}
-              <th scope="col">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.placements.map((entry) => (
-              <tr key={entry.playerId} className={entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
-                <td>{nameOf(entry.playerId)}</td>
-                {completedRounds.map((round, index) => {
-                  const points = round.placements.find((placement) => placement.playerId === entry.playerId)?.points;
-                  if (points === undefined) throw new Error(`Round ${index + 1} is missing a result for ${entry.playerId}.`);
-                  // Plain point value, no +/- prefix - Basic Mode has no loser deductions to distinguish
-                  // a gain from (ui-ux.md §13 follow-up, M4-T13 UI refinement).
-                  return <td className={styles.numeric} key={index}>{points}</td>;
-                })}
-                <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* Event Log, Home, Play Again, in that order (the person's own follow-up request) - Play Again
          *  last/rightmost as the primary/default action. */}

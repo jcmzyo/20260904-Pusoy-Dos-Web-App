@@ -134,9 +134,10 @@ describe('Home and immediate Session startup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
     expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull();
     // "Check Discard Pile" (M4-T10 follow-up), not bare "Discard Pile" - the person's own follow-up
-    // report that the noun phrase alone read as if clicking it would discard the player's own cards.
+    // report that the noun phrase alone read as if clicking it would discard the player's own cards. It
+    // now sits in the bottom bar's left container between Event Log and Leave Game (M4-T14).
     expect(screen.getAllByRole('button').map((button) => button.textContent))
-      .toEqual(['Check Discard Pile', 'Event Log', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Play', 'Pass']);
+      .toEqual(['Event Log', 'Check Discard Pile', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Play', 'Pass']);
   });
 
   it('guards pending asynchronous startup and samples names only once', async () => {

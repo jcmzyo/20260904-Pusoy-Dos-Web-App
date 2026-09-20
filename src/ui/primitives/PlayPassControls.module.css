@@ -4,7 +4,7 @@
 .controls {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   gap: 8px;
 }
@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  align-items: center;
+  align-items: flex-end;
 }
 
 .play,
@@ -29,9 +29,9 @@
    * text is, so Play and Pass never change size as a recognized-combination/reason/glow state appears,
    * disappears, or changes (the person's own follow-up report) - content is centered within this
    * reserved box either way, and a longer sub-label wraps (`.subLabel` below) rather than growing it. */
-  width: 140px;
-  min-height: 96px;
-  padding: 16px 20px;
+  width: 150px;
+  height: 72px;
+  padding: 6px 10px;
   border: none;
   border-radius: 12px;
   font: inherit;
@@ -42,7 +42,7 @@
  * the sub-label the remaining 1/4 (the person's own round-4 follow-up request: "Maybe 3/4 of the
  * button is for the Play/Pass text while 1/4 for the undertext"), within the fixed box above. */
 .mainLabel {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1;
 }
@@ -51,7 +51,7 @@
  * (the person's own follow-up request) rather than as separate text beneath it. Wraps within the
  * button's own fixed width instead of growing it. */
 .subLabel {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.2;
   text-align: center;

@@ -18,7 +18,8 @@
  * compact the things inside without making a scrollable view") - no `overflow-y`/tall fixed `max-height`
  * of its own; a single Basic Session's content (two small fixed-size 4-row tables plus actions) fits
  * comfortably within `.backdrop`'s own clamp()'d padding at any of the M4 layout matrix's supported
- * viewport sizes. */
+ * viewport sizes - the shorter ones via the compact side-by-side layout at the end of this file
+ * (M4-T14; this single-column stack needs more height than a landscape phone has). */
 .panel {
   display: flex;
   flex-direction: column;
@@ -46,7 +47,7 @@
 
 .eyebrow {
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.16em;
   color: #c8d8cd;
 }
@@ -59,24 +60,32 @@
   border-radius: 10px;
   background: rgba(11, 40, 34, 0.55);
   color: #ead8a7;
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
+}
+
+/* One rounded card per table. A `border-collapse: collapse` table ignores its own `border-radius` and
+ * `overflow: hidden`, so the caption's and the medal rows' square corners used to show past the rounded
+ * outline (they looked like a second shape drawn on top). The card owns the outline, background and
+ * clipping instead, so every row and the caption are cut to one solid rounded shape. */
+.tableCard {
+  width: min(560px, 100%);
+  border: 1px solid #66866b;
+  border-radius: 12px;
+  background: rgba(11, 40, 34, 0.55);
+  overflow: hidden;
 }
 
 .rankingTable,
 .roundsTable {
-  width: min(560px, 100%);
+  width: 100%;
   border-collapse: collapse;
-  background: rgba(11, 40, 34, 0.55);
-  border: 1px solid #66866b;
-  border-radius: 12px;
-  overflow: hidden;
 }
 
 .tableCaption {
   padding: 8px 14px;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -97,7 +106,7 @@
 .rankingTable thead th,
 .roundsTable thead th {
   border-bottom: 1px solid #66866b;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -124,7 +133,7 @@
 
 .tiedNote {
   color: #c8d8cd;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* Same medal-color convention as PlayerPanel.module.css's own `.glowGold`/`.glowSilver`/`.glowBronze`
@@ -164,10 +173,16 @@
 
 .primaryButton,
 .secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
   padding: 12px 28px;
   border-radius: 10px;
   font: inherit;
   font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -195,4 +210,64 @@
 .secondaryButton:focus-visible {
   outline: 3px solid white;
   outline-offset: 3px;
+}
+
+/* Short viewports (M4-T14; ui-ux.md §14): the single-column stack above needs roughly 540px of height,
+ * more than the frozen matrix's landscape phones have (down to 375px), which pushed the panel's own top
+ * edge - and the heading with it - past the top of the screen. The two tables sit side by side instead
+ * (the grid reuses the same children, in the same order), so the whole Summary and its Play Again/Home
+ * actions stay inside the viewport without an inner scrollbar. Width is never the constraint here: the
+ * frozen minimum supported landscape width (667px) already fits two ~300px tables. */
+@media (max-height: 660px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .panel {
+    display: grid;
+    width: min(760px, 100%);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 8px 12px;
+    padding: 12px 16px;
+  }
+
+  .header,
+  .tiebreak,
+  .actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .header h2 {
+    font-size: 20px;
+  }
+
+  .tiebreak {
+    padding: 4px 12px;
+  }
+
+  .tableCard {
+    width: 100%;
+  }
+
+  .tableCaption {
+    padding: 4px 8px;
+  }
+
+  .rankingTable th,
+  .rankingTable td,
+  .roundsTable th,
+  .roundsTable td {
+    padding: 3px 6px;
+  }
+
+  .actions {
+    margin-top: 0;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    padding: 8px 24px;
+  }
 }
