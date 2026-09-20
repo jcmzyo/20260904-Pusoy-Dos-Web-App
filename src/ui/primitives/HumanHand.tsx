@@ -32,6 +32,11 @@ interface DragState {
   readonly startClientX: number;
   readonly cardRect: DOMRect;
   readonly containerRect: DOMRect;
+  /** On-screen size of the card relative to its own layout size (`PlayArea`'s uniform scale, M4-T14):
+   *  pointer deltas and rects are in screen pixels, while `translateX` below is in the card's own
+   *  (pre-scale) layout pixels, so the two must be converted or the card would track the pointer at
+   *  the wrong speed. `1` wherever there is no layout (jsdom). */
+  readonly scale: number;
   dragged: boolean;
 }
 
@@ -126,9 +131,11 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     // Pointer Capture is unsupported in jsdom (Vitest/RTL) even though every real target browser
     // supports it; feature-detect rather than branching on environment.
     if (typeof cardEl.setPointerCapture === 'function') cardEl.setPointerCapture(event.pointerId);
+    const cardRect = cardEl.getBoundingClientRect();
     dragStateRef.current = {
       key, pointerId: event.pointerId, startClientX: event.clientX,
-      cardRect: cardEl.getBoundingClientRect(), containerRect: containerEl.getBoundingClientRect(),
+      cardRect, containerRect: containerEl.getBoundingClientRect(),
+      scale: cardEl.offsetWidth > 0 ? cardRect.width / cardEl.offsetWidth : 1,
       dragged: false,
     };
     setDragKey(key);
@@ -146,7 +153,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     // dragged card's visual offset so it never leaves the hand container's own bounding box.
     const minDelta = state.containerRect.left - state.cardRect.left;
     const maxDelta = state.containerRect.right - state.cardRect.right;
-    cardEl.style.transform = `translateX(${clamp(deltaX, minDelta, maxDelta)}px)`;
+    cardEl.style.transform = `translateX(${clamp(deltaX, minDelta, maxDelta) / state.scale}px)`;
   }
 
   function endDrag(event: ReactPointerEvent<HTMLDivElement>) {

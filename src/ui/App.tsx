@@ -12,6 +12,7 @@ import { EventLogOverlay } from './primitives/EventLogOverlay';
 import { cardKey, compareByRank } from './primitives/handOrdering';
 import { HumanHand } from './primitives/HumanHand';
 import { LeaveConfirmOverlay } from './primitives/LeaveConfirmOverlay';
+import { PlayArea } from './primitives/PlayArea';
 import { PlayerPanel } from './primitives/PlayerPanel';
 import { HUMAN_PLAYER_ID } from './primitives/humanPlayer';
 import { PlayPassControls } from './primitives/PlayPassControls';
@@ -296,17 +297,14 @@ function Seat({ seat, overlayOpen, revealedCards }: { readonly seat: PresentedSe
   );
 }
 
-/** Center table per ui-ux.md §5.1: a Discard Pile button (the overlay itself is M4-T10) plus the current
- *  hand to beat (cards/type/player), an explicit FREE LEAD, or the Opening Move's distinct 3♣ requirement.
- *  The current hand remains visible through Passes until authoritative beat/reset (SessionPresentation, T03). */
-function CenterTable({ center, seats, onOpenDiscardPile }: { readonly center: SessionPresentationSnapshot['center']; readonly seats: readonly PresentedSeat[]; readonly onOpenDiscardPile: () => void }) {
+/** Center table per ui-ux.md §5.1: the current hand to beat (cards/type/player), an explicit FREE LEAD, or
+ *  the Opening Move's distinct 3♣ requirement. The current hand remains visible through Passes until
+ *  authoritative beat/reset (SessionPresentation, T03). The Discard Pile button lives in the bottom bar's
+ *  left container with Event Log/Leave Game (M4-T14): at full-size touch-target height it no longer fit
+ *  above the hand to beat without making the whole play area taller. */
+function CenterTable({ center, seats }: { readonly center: SessionPresentationSnapshot['center']; readonly seats: readonly PresentedSeat[] }) {
   return (
     <div className={styles.center}>
-      {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
-       *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
-       *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
-       *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
-      <button type="button" className={styles.discardButton} onClick={onOpenDiscardPile}>Check Discard Pile</button>
       <div className={styles.currentHand} role="region" aria-label="Current hand to beat">
         {center.kind === 'freeLead' && <p className={styles.freeLead}>FREE LEAD</p>}
         {center.kind === 'opening' && <p className={styles.opening}>OPENING · 3♣ required</p>}
@@ -317,7 +315,7 @@ function CenterTable({ center, seats, onOpenDiscardPile }: { readonly center: Se
             <div className={styles.handInfo}>
               <p className={styles.handMeta}>{player.name} played {COMBINATION_LABELS[center.combination.type]}</p>
               <div className={styles.handCards}>
-                {getDisplayCards(center.combination).map((card) => <PlayingCard key={`${card.rank}-${card.suit}`} card={card} widthPx={48} />)}
+                {getDisplayCards(center.combination).map((card) => <PlayingCard key={`${card.rank}-${card.suit}`} card={card} />)}
               </div>
             </div>
           );
@@ -536,7 +534,8 @@ export function SessionTable({
   const names = Object.fromEntries(snapshot.seats.map((seat) => [seat.playerId, seat.name]));
 
   return (
-    <main className={styles.shell}>
+    <main className={styles.sessionShell}>
+      <PlayArea>
       <header className={styles.header}>
         <h1>Pusoy Dos</h1>
         <p>Basic · Round {snapshot.roundNumber} of 5</p>
@@ -546,7 +545,7 @@ export function SessionTable({
        *  the same treatment to its own brief window) - `pointer-events: none` also keeps every control
        *  underneath (Play/Pass, Discard Pile/Event Log/Leave Game, hand selection) inert while either is
        *  up, matching the Result overlay's own non-dismissible, explicit-continuation-only contract. */}
-      <div className={isTableInert ? styles.tableDimmed : undefined}>
+      <div className={isTableInert ? `${styles.playContent} ${styles.tableDimmed}` : styles.playContent}>
         <section className={styles.table} aria-label="Game Table">
           {snapshot.seats.map((seat) => (
             <Seat
@@ -556,7 +555,7 @@ export function SessionTable({
               {...(isHandRevealed && snapshot.reveal!.playerId === seat.playerId ? { revealedCards: snapshot.reveal!.cards } : {})}
             />
           ))}
-          <CenterTable center={snapshot.center} seats={snapshot.seats} onOpenDiscardPile={() => setOverlay('discardPile')} />
+          <CenterTable center={snapshot.center} seats={snapshot.seats} />
         </section>
         {/* Three aligned containers (App.module.css's `.bottomBar`, round-4 follow-up): left (Event Log,
          *  M4-T10; Leave Game, M4-T11), middle (the human hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md
@@ -567,7 +566,12 @@ export function SessionTable({
              *  center table's own current hand to beat already shows the latest Play, and a variable-length
              *  preview line was changing this button's own height as events came in. */}
             <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
-            <button type="button" className={styles.sideButton} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
+            {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
+             *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
+             *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
+             *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
+            <button type="button" className={styles.sideButton} onClick={() => setOverlay('discardPile')}>Check Discard Pile</button>
+            <button type="button" className={`${styles.sideButton} ${styles.leaveButton}`} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
           </div>
           <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
           <PlayPassControls
@@ -580,6 +584,7 @@ export function SessionTable({
           />
         </div>
       </div>
+      </PlayArea>
       {/* Full-screen click/tap-to-skip control for the 4th-hand reveal (ui-ux.md §11: "A click/tap may
        *  finish the reveal immediately") - a real (keyboard-reachable) button rather than a decorative
        *  click-catcher div, so the same skip is available without a mouse/touch. This only ever advances

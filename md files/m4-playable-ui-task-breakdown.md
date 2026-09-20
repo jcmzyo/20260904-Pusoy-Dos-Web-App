@@ -1,9 +1,9 @@
 # Pusoy Dos --- M4 Minimal Playable UI
 
-## Milestone Design + Task Breakdown (v1.4)
+## Milestone Design + Task Breakdown (v1.5)
 
 **Status:** Approved milestone design and implementation task plan  
-**Last Modified:** September 18, 2026  
+**Last Modified:** September 19, 2026  
 **Milestone:** M4 --- Minimal Playable UI  
 **Phase:** Phase 1 --- Initial Playable Basic Game  
 **Parent requirements:** `requirements.md` v1.15  
@@ -524,10 +524,22 @@ Run the human viewport checklist on each supported class. Confirm readability, t
 One coherent landscape-first product works from supported phone landscape through desktop/windowed browser, scaling as a proportional whole without requiring the person to scroll to reach core controls.
 
 ### Definition of Done
-- [ ] Frozen matrix passes browser checks.
-- [ ] Human checklist has no blocking viewport defect.
-- [ ] Card ratio/selection baseline invariant preserved.
-- [ ] Play area fits the viewport (no scrollbar) at every supported size, including real-device landscape heights narrower than their nominal/emulated estimate.
+- [x] Frozen matrix passes browser checks.
+- [ ] Human checklist has no blocking viewport defect. *(Manual verification pending: a person must run it.)*
+- [x] Card ratio/selection baseline invariant preserved.
+- [x] Play area fits the viewport (no scrollbar) at every supported size, including real-device landscape heights narrower than their nominal/emulated estimate.
+
+### Implementation Notes (M4-T14)
+
+- **Scaling:** the table plus bottom bar is a fluid play area in design units that is never smaller than 896×656 and is scaled uniformly onto the viewport: scale 1 from that size up to 1440×900 (extra room is spread between the seats, nothing is zoomed in), `min(width/896, height/656)` below it, and scaled up above 1440×900 (capped at 2×); overlays stay outside it at real pixel sizes (ui-ux.md §14). Card sizes derive from one shared `--card-width`.
+- **Two sizing tiers (person's decision):** 14px text and 44×44px targets hold literally wherever the scale is 1 or larger (viewports of at least 896×656); the phone tier down to the minimum is scaled to fit and is exempt from those two constants. The frozen minimum supported viewport was raised from 667×375 to **844×390**; 667×375 is now an unsupported (resize-guidance) entry in the matrix. `FULL_SCALE_LANDSCAPE_*` in `layoutThresholds.ts` holds the tier boundary.
+- **Layout consequences (person delegated the specifics):** the Check Discard Pile button moved from the center table to the bottom bar's left container; panel height 152→122, trail slot 60→34, Play/Pass 140×96→150×72, all in design units; Session Summary is side by side at heights of 660px or less; every text and control under 14px/44px at full scale was raised (card indices, trail badges, Sort buttons, overlay close/confirm buttons, table headers, and eyebrow text).
+- **Follow-up from the person's review of the first pass:** the table looked cramped, the title row overlapped the table, North's cards sat beside its panel instead of over it, and hand cards looked larger than center-table cards. Resolved by making the play area fluid with scale 1 at natural size for ordinary desktop windows (rather than zooming a small fixed canvas in), moving the title row above the table, stacking North's cards over its panel as before, and pinning center-table and held cards to the same `--card-width` (asserted by a browser test). The hand's card overlap now loosens on a scaled-down phone screen to keep 28px of each card visible, and the bottom bar is a three-column grid with equal side columns so the hand stays centered at any width. The Check Discard Pile button stays in the bottom bar's left container; putting it back in the center would add about 50px to the smallest play area.
+- **Second follow-up from the person's review:** Leave Game is red; West/East's bot-card-to-panel gap is now 4px like North's (their columns' minimum width is 228px, was 236px); Session Summary's two tables each sit in a rounded card that clips them into one solid shape (a collapsed-border table ignores its own radius, which left square caption/row corners showing past the outline), its action buttons center their label with flex, and the compact side-by-side layout is wider (760px) so the Round-by-Round table is not cut off by its card.
+- **Third follow-up from the person's review:** the title row and the bottom bar are inset horizontally to where the table's corner curve ends (`--edge-inset` in `App.module.css`: 56 design px, shrinking to 8px on the narrowest play areas), with the title, Event Log/Check Discard Pile/Leave Game, Round line and Play/Pass sharing those two edges (asserted by a browser test).
+- **Fourth-follow-up item 2 resolved:** the West/East overflow at the narrowest viewport is fixed structurally and its `test.fixme` is removed.
+- **Tests:** `tests/browser/responsive-hardening.e2e.ts` (fit, resize, controls, overlap, card ratio/baseline, 13-card targeting, drag under scale, overlays, Round Result/Session Summary, guidance, and both sizing tiers); `tests/unit/ui/playAreaScale.test.ts`, `PlayArea.test.tsx`, and the drag-under-scale cases in `HumanHand.test.tsx`.
+- **Known exemption:** face-up cards in a bot's 4th-place reveal fan are overlapped slivers and were not audited for the 14px text minimum.
 
 # M4-T14.5 — Pre-M4-Completion Issue Sweep
 

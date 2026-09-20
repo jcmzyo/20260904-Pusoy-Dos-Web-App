@@ -12,6 +12,7 @@
 
 .stay,
 .leave {
+  min-height: 44px;
   padding: 10px 20px;
   border-radius: 8px;
   border: 1px solid #ead8a7;
