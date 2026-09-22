@@ -8,6 +8,7 @@ import {
   MINIMUM_TOUCH_TARGET_SIZE_PX,
   VIEWPORT_MATRIX,
 } from './viewportMatrix';
+import { currentSelectionCap, waitForSelectableTurn, waitForYourTurn } from './turnHelpers';
 
 /**
  * Real-browser coverage for M4-T14 (Full Responsive Hardening; ui-ux.md §14): the frozen T04 viewport
@@ -460,38 +461,6 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
       expect(ratio, `${card.kind} card ${card.width.toFixed(1)}x${card.height.toFixed(1)}`).toBeCloseTo(7 / 5, 1);
     }
   });
-}
-
-/**
- * Whichever seat holds the 3♣ a Round opens with (and what it leads with) is not something this file can
- * assume - the production RNG this file drives has no seed hook, by design (round-result.e2e.ts's own
- * comment). So a test that needs to select more than one held card waits for a Turn whose live Play
- * selection cap (App.tsx's own `maxSelectableCards`, mirrored here from the rendered center state) is
- * actually large enough, Passing through any Turn that falls short - Pass is always legal while
- * responding. Bounded the same way round-result.e2e.ts's own `driveRoundToResult` is, so a genuine
- * regression fails with a diagnostic instead of hanging.
- */
-const SELECTION_TURN_BUDGET = 40;
-
-async function waitForYourTurn(page: Page) {
-  await expect(page.getByRole('region', { name: 'You panel' })).toHaveAttribute('aria-current', 'true', { timeout: 20_000 });
-}
-
-async function currentSelectionCap(page: Page): Promise<number> {
-  const count = await page.locator('[aria-label="Current hand to beat"] [role="img"]').count();
-  return count > 0 ? count : 5;
-}
-
-async function waitForSelectableTurn(page: Page, minCap: number): Promise<number> {
-  const passButton = page.getByRole('button', { name: 'Pass', exact: true });
-  for (let turn = 0; turn < SELECTION_TURN_BUDGET; turn++) {
-    await waitForYourTurn(page);
-    const cap = await currentSelectionCap(page);
-    if (cap >= minCap) return cap;
-    await expect(passButton, `Turn ${turn}: selection cap ${cap} is below ${minCap} but Pass is unavailable (an Opening/free-lead Turn always caps at 5)`).toBeEnabled();
-    await passButton.click();
-  }
-  throw new Error(`No Turn with a selection cap >= ${minCap} arrived within ${SELECTION_TURN_BUDGET} of this seat's own Turns.`);
 }
 
 for (const viewport of SUPPORTED_VIEWPORTS) {
