@@ -13,6 +13,12 @@ import type { StartedSession } from './startSession';
 interface HumanInputExtras {
   readonly getPendingRequest?: () => PlayerTurnRequest | null;
   readonly resolveMove?: (requestId: TurnRequestId, move: Move) => boolean;
+  /** HumanController's own pause/resume/destroy primitives (M4-P1 review finding), forwarded to from
+   *  this class's own like-named methods below so the Engine-submission boundary itself - not only this
+   *  class's own publication - actually observes lifecycle state; see `pause()`/`destroy()`'s docstrings. */
+  readonly pause?: () => void;
+  readonly resume?: () => void;
+  readonly destroy?: () => void;
 }
 
 export interface PresentedSeat {
@@ -190,17 +196,30 @@ export class SessionPresentation {
    * as each other or as an open Discard Pile/Event Log overlay — e.g. the window is resized to an
    * unsupported size while Leave confirmation is already open. Each `pause()` must be matched by exactly
    * one `resume()`; advancement only actually resumes once every caller that paused it has resumed.
+   *
+   * Also forwarded to `humanController.pause()` when it exposes one (M4-P1 review finding), on every
+   * call rather than only the 0→1 edge — HumanController's own `paused` flag is a plain idempotent
+   * boolean, not reference-counted, so it only actually needs to go true once, but calling it
+   * unconditionally here keeps this method a single, simple forward with no edge-detection to get wrong.
+   * This is what actually closes the deeper race this review finding reported: without it, a Move a
+   * human already resolved a moment before this call could still reach Engine submission once its
+   * Promise continuation ran, regardless of `pauseCount` here — see `HumanController.resolveMove()`'s own
+   * docstring for the exact mechanism.
    */
   pause(): void {
     this.pauseCount += 1;
+    (this.session.humanController as HumanInputExtras).pause?.();
   }
 
   /** Resumes automatic Turn advancement once every `pause()` call has been matched by a `resume()`.
-   *  A `resume()` with no outstanding `pause()` is a no-op rather than going negative. */
+   *  A `resume()` with no outstanding `pause()` is a no-op rather than going negative. Only forwards to
+   *  `humanController.resume()` on the actual 1→0 edge (unlike `pause()` above) - as long as any other
+   *  independent pause source here is still active, the human input boundary must stay paused too. */
   resume(): void {
     if (this.pauseCount === 0) return;
     this.pauseCount -= 1;
     if (this.pauseCount > 0) return;
+    (this.session.humanController as HumanInputExtras).resume?.();
     const waiters = this.pauseWaiters.splice(0);
     waiters.forEach((resolve) => resolve());
   }
@@ -221,10 +240,21 @@ export class SessionPresentation {
    *
    * Idempotent — a repeat call is a safe no-op — and safe regardless of pause state or whether
    * `startAutoPlay` was ever called at all.
+   *
+   * Also forwards to `humanController.destroy()` when it exposes one (M4-P1 review finding): a pending or
+   * `resolveMove()`-accepted-but-undelivered human response left dangling here would otherwise be able to
+   * still reach Engine submission afterward (the exact gap `pause()`'s own forwarding above closes for a
+   * temporary pause), and would also leave GameRunner's own suspended `await controller.chooseMove()`
+   * hanging forever - itself keeping this instance (and the human request that summoned it) unreachable
+   * for garbage collection, the very leak this method exists to avoid. `driveTurns` below rejects in
+   * response (via `runTurnForAutoplay`'s own `runner.runTurn()` call) and exits without logging it as a
+   * genuine Controller failure, since a destroy-triggered rejection here is an expected, deliberate part
+   * of this same shutdown, not one.
    */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    (this.session.humanController as HumanInputExtras).destroy?.();
     const waiters = this.pauseWaiters.splice(0);
     waiters.forEach((resolve) => resolve());
     const roundWaiters = this.roundWaiters.splice(0);
@@ -279,7 +309,11 @@ export class SessionPresentation {
       try {
         result = await this.runTurnForAutoplay();
       } catch (cause) {
-        console.error('Automatic Turn advancement stopped after a Controller failure.', cause);
+        // destroy()'s own forwarding to humanController.destroy() (M4-P1 review finding) deliberately
+        // rejects a pending/deferred human response so this await settles instead of hanging forever -
+        // an expected, intentional part of this same shutdown (e.g. Leave Game), not a genuine Controller
+        // defect, so it is not logged as one; any other rejection reaching here still is.
+        if (!this.destroyed) console.error('Automatic Turn advancement stopped after a Controller failure.', cause);
         return;
       }
       if (!result.accepted) return;
@@ -291,9 +325,20 @@ export class SessionPresentation {
    * finding: a controller response already in flight - e.g. a human Move resolved a moment before
    * pause()/destroy() lands - could still commit to the Engine and advance this loop's own published
    * history, since `resolveHumanMove`'s own guard above only closes the window before that commit, not
-   * after it). Suspends publishing an already-accepted response while paused (full event fidelity is
-   * preserved - it is only delayed until `resume()`), and drops it entirely once destroyed, so this loop's
-   * own advancement never surfaces a paused/destroyed Session's history no matter how narrowly the race
+   * after it).
+   *
+   * For a human-originated Move this is now largely a non-issue by the time this method's own `await`
+   * below ever settles: `pause()`/`destroy()` forward directly to `HumanController`'s own primitives
+   * (see their docstrings), which hold back or reject the Move's actual delivery to `chooseMove()`'s
+   * Promise itself - so `this.session.runner.runTurn()` below typically does not even resolve until
+   * `resume()` lets it, meaning the Engine has not committed the Move at all yet, not merely not
+   * published it. What remains here is the still-necessary fallback for every OTHER controller (bots
+   * have no external resolution point for `pause()`/`destroy()` to intercept the same way, so a bot's own
+   * Turn always commits to the Engine as soon as it decides one) and a last line of defense for the
+   * narrow gap between `resume()` delivering a held human Move and this method's own re-check below.
+   * Suspends publishing an already-accepted response while paused (full event fidelity is preserved - it
+   * is only delayed until `resume()`), and drops it entirely once destroyed, so this loop's own
+   * advancement never surfaces a paused/destroyed Session's history no matter how narrowly any such race
    * lands. `runTurn()` itself deliberately stays unconditional (its own docstring); this exists as a
    * private, identically-shaped variant purely so this loop's own timing is otherwise unaffected.
    */

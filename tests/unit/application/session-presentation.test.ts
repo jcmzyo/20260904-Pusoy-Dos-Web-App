@@ -676,7 +676,7 @@ describe('production Session presentation', () => {
   });
 
   describe('pending human input cannot advance a paused or destroyed Session (M4→P1 review finding)', () => {
-    function humanRequestFixture() {
+    function humanRequestFixture(botChooseMove?: (request: PlayerTurnRequest) => Promise<Move>) {
       let seed = 11;
       const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
       const created = createSession(ids);
@@ -684,28 +684,44 @@ describe('production Session presentation', () => {
       const human = new HumanController('south');
       const bots: readonly PlayerController[] = ids
         .filter((id) => id !== 'south')
-        .map((playerId) => ({ playerId, chooseMove: async (request: PlayerTurnRequest) => request.legalMoves[0]! }));
+        .map((playerId) => ({ playerId, chooseMove: botChooseMove ?? (async (request: PlayerTurnRequest) => request.legalMoves[0]!) }));
       const controllers = new Map<string, PlayerController>([human, ...bots].map((controller) => [controller.playerId, controller]));
       const session: StartedSession = {
         runner: new GameRunner(started.state, defaultRuleset, controllers, true),
         humanController: human, engineRng, initialView: getPublicView(started.state),
         startupEvents: [...created.events], names: { south: 'You', west: 'W', north: 'N', east: 'E' },
       };
-      return new SessionPresentation(session);
+      return { session, human, presentation: new SessionPresentation(session) };
     }
 
-    it.each(['pause', 'destroy'] as const)('ordering 1 - %s called before resolveHumanMove: the pending request is refused outright, left untouched, and public history never advances', async (action) => {
-      const presentation = humanRequestFixture();
+    // The Engine's own authoritative state, read directly off `GameRunner` rather than through
+    // `SessionPresentation`'s own published snapshot - the exact distinction this escalated finding turns
+    // on: a fix that only ever suppresses `SessionPresentation`'s own publication could pass every
+    // snapshot-only assertion while the underlying Engine Turn had already committed and the current
+    // player had already advanced (the finding's own reproduction: "South → West"). Compared by full
+    // serialized content rather than only `currentPlayerId`: with a 0ms-delay autoplay loop still running
+    // in the background after a resume(), several further bot Turns can legitimately cycle the current
+    // player all the way back around (the existing production fixture test above notes the same thing:
+    // "bots may legally pass all the way back around to South") - a bare `currentPlayerId` equality check
+    // would then be flaky in exactly the direction that could mask a real regression. The full view can
+    // only ever repeat bit-for-bit by returning to a byte-identical game state, which real Card play
+    // never does.
+    const authoritativeState = (session: StartedSession) => JSON.stringify(session.runner.getPlayerView('south'));
+
+    it.each(['pause', 'destroy'] as const)('ordering 1 - %s called before resolveHumanMove: the pending request is refused outright, left untouched, and authoritative Engine state never advances', async (action) => {
+      const { session, human, presentation } = humanRequestFixture();
       presentation.startAutoPlay(0);
       await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
       const request = presentation.getPendingHumanRequest()!;
       const before = presentation.getSnapshot();
+      const authBefore = authoritativeState(session);
 
       presentation[action]();
       // The finding's own reproduction: this used to return `true` and commit the Move regardless.
       expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(false);
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(presentation.getSnapshot()).toBe(before);
+      expect(authoritativeState(session)).toBe(authBefore);
 
       if (action === 'pause') {
         // Left genuinely untouched (not consumed/cancelled) - the exact same request is still legitimately
@@ -714,41 +730,56 @@ describe('production Session presentation', () => {
         presentation.resume();
         expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
         await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(before));
+        expect(authoritativeState(session)).not.toBe(authBefore);
       } else {
+        // Pending-request invalidation: destroy() must not merely refuse the request at the presentation
+        // boundary - the underlying HumanController input itself is gone, not left dangling.
+        expect(human.getPendingRequest()).toBeNull();
+        expect(human.resolveMove(request.requestId, request.legalMoves[0]!)).toBe(false);
+        expect(human.cancelPendingRequest(request.requestId)).toBe(false);
         presentation.resume(); // a stray resume after destroy must not resurrect it either
         await new Promise((resolve) => setTimeout(resolve, 30));
         expect(presentation.getSnapshot()).toBe(before);
+        expect(authoritativeState(session)).toBe(authBefore);
       }
     });
 
-    it('ordering 2 - pause() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: the already-in-flight response is suspended, then published in full once resumed', async () => {
-      const presentation = humanRequestFixture();
+    it('ordering 2 - pause() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: authoritative Engine state is held until resume(), then applied in full', async () => {
+      const { session, presentation } = humanRequestFixture();
       presentation.startAutoPlay(0);
       await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
       const request = presentation.getPendingHumanRequest()!;
       const before = presentation.getSnapshot();
+      const authBefore = authoritativeState(session);
 
-      // No `await` between these two calls - resolveHumanMove settles HumanController's own Promise
-      // synchronously, but the Engine submission it triggers only happens once GameRunner's suspended
-      // `await controller.chooseMove()` continuation actually runs as a later microtask, which pause()
-      // here still lands strictly before.
+      // No `await` between these two calls. resolveHumanMove settles HumanController's own internal
+      // acceptance synchronously, but (M4-P1 review finding fix) its actual delivery to GameRunner's
+      // suspended `await controller.chooseMove()` continuation - what lets Engine submission happen at
+      // all - is itself deferred by one microtask specifically so that a same-tick pause()/destroy() like
+      // this one is always observed first; see HumanController.resolveMove()'s own docstring. A pause()
+      // arriving even one tick later than this can no longer intercept it - that is an inherent boundary
+      // of deferring by exactly one microtask, not a gap this fix claims to close, so this test only
+      // exercises the guaranteed (same-tick) case, matching the finding's own reproduction.
       expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
       presentation.pause();
 
       await new Promise((resolve) => setTimeout(resolve, 30));
-      // The Engine has already committed this Move internally, but it must not be visible yet.
+      // Not merely unpublished - the Engine has not committed this Move at all yet.
       expect(presentation.getSnapshot()).toBe(before);
+      expect(authoritativeState(session)).toBe(authBefore);
       presentation.resume();
-      // Nothing is lost - the already-accepted result is published in full once resumed.
+      // Nothing is lost - the already-accepted result is committed and published in full once resumed.
       await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(before));
+      expect(authoritativeState(session)).not.toBe(authBefore);
     });
 
-    it('ordering 2 - destroy() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: the already-in-flight response is never published', async () => {
-      const presentation = humanRequestFixture();
+    it('ordering 2 - destroy() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: authoritative Engine state is never committed, and the in-flight response is invalidated rather than left dangling', async () => {
+      const { session, human, presentation } = humanRequestFixture();
       presentation.startAutoPlay(0);
       await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
       const request = presentation.getPendingHumanRequest()!;
       const before = presentation.getSnapshot();
+      const authBefore = authoritativeState(session);
 
       expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
       presentation.destroy();
@@ -756,6 +787,62 @@ describe('production Session presentation', () => {
       presentation.resume(); // a stray resume must not resurrect a destroyed Session's suspended publish
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(presentation.getSnapshot()).toBe(before);
+      expect(authoritativeState(session)).toBe(authBefore);
+      // Invalidated, not merely dangling: the resolved-but-undelivered input cannot resurface later, and
+      // driveTurns' own loop actually exited (rather than leaking a Promise that never settles) because
+      // HumanController rejected it - see the private `deliver()`/`destroy()` docstrings.
+      expect(human.getPendingRequest()).toBeNull();
+      expect(human.cancelPendingRequest(request.requestId)).toBe(false);
+    });
+
+    it('destroy() while the human request is still genuinely unresolved (nobody ever called resolveHumanMove) invalidates it outright rather than leaving it dangling', async () => {
+      const { human, presentation } = humanRequestFixture();
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+      const request = presentation.getPendingHumanRequest()!;
+
+      presentation.destroy();
+      expect(human.getPendingRequest()).toBeNull();
+      // The identical request the human was about to answer can no longer be resolved or cancelled again -
+      // it was actually rejected (invalidating GameRunner's own suspended await), not silently dropped.
+      expect(human.resolveMove(request.requestId, request.legalMoves[0]!)).toBe(false);
+      expect(human.cancelPendingRequest(request.requestId)).toBe(false);
+    });
+
+    it('a delayed bot response (still in flight when pause() lands) is never published until resume() - matching every other automatic Turn - even though, unlike a human response, a bot has no external resolution point for pause() to intercept before Engine submission', async () => {
+      // Only the one bot Turn immediately following South's own Move is delayed - every earlier bot Turn
+      // (reaching South's own Turn in the first place requires driving past whichever bots open the
+      // Round before South, per seed 11) resolves immediately, exactly like every other test above.
+      let delayNextBotMove = false;
+      let releaseBotMove: (() => void) | undefined;
+      const botDelay = new Promise<void>((resolve) => { releaseBotMove = resolve; });
+      const botChooseMove = async (request: PlayerTurnRequest): Promise<Move> => {
+        if (delayNextBotMove) { delayNextBotMove = false; await botDelay; }
+        return request.legalMoves[0]!;
+      };
+      const { session, presentation } = humanRequestFixture(botChooseMove);
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+      const request = presentation.getPendingHumanRequest()!;
+      delayNextBotMove = true;
+      expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
+      // South's own Move publishes (exposing the next player already on the clock) well before the next
+      // bot's own (delayed) Turn is even attempted - driveTurns processes Turns strictly one at a time.
+      await vi.waitFor(() => expect(presentation.getSnapshot().currentPlayerId).not.toBe(request.playerId));
+      const before = presentation.getSnapshot();
+
+      // Pauses while the very next bot's own Turn is still genuinely in flight (its chooseMove() has not
+      // resolved yet), then lets it resolve - a bot's own decision has no `resolveHumanMove`-style
+      // external gate for pause() to intercept before Engine submission (out of Phase 1 scope for this
+      // finding: HumanController cancellation integration, not bot controllers), so the Engine does commit
+      // it - but publication must still wait for resume(), the same as every other automatic Turn.
+      presentation.pause();
+      releaseBotMove!();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(before);
+      presentation.resume();
+      await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(before));
+      expect(session.runner.getPlayerView('south').round!.currentPlayerId).toBe(presentation.getSnapshot().currentPlayerId);
     });
   });
 });

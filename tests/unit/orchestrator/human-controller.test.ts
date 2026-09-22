@@ -93,6 +93,64 @@ describe('HumanController input boundary', () => {
     await nextResult;
   });
 
+  describe('deferred delivery vs. pause()/destroy() (M4-P1 review finding: a Move already accepted by resolveMove() must not be able to reach the Engine if pause()/destroy() lands before its own delivery)', () => {
+    it('defers delivering an accepted Move by one microtask, holding it - not dropping it - if pause() lands before that microtask runs, then delivers it once resumed', async () => {
+      const turn = request();
+      const human = new HumanController(turn.playerId);
+      const settled = vi.fn();
+      const result = human.chooseMove(turn);
+      void result.then(settled);
+      const move = turn.legalMoves[0]!;
+      // No `await` between these two calls - resolveMove's own acceptance is synchronous, but its actual
+      // delivery (settling this Promise) is deferred by one microtask specifically so a same-tick pause()
+      // like this one is always observed first.
+      expect(human.resolveMove(turn.requestId, move)).toBe(true);
+      human.pause();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(settled).not.toHaveBeenCalled();
+      human.resume();
+      await expect(result).resolves.toEqual(move);
+      expect(settled).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an accepted Move instead of ever delivering it if destroy() lands before its own deferred delivery microtask runs', async () => {
+      const turn = request();
+      const human = new HumanController(turn.playerId);
+      const result = human.chooseMove(turn);
+      expect(human.resolveMove(turn.requestId, turn.legalMoves[0]!)).toBe(true);
+      human.destroy();
+      await expect(result).rejects.toThrow(`cancelled for request ${turn.requestId}`);
+    });
+
+    it('destroy() rejects a genuinely unresolved pending request outright and permanently refuses further resolution/cancellation of it', async () => {
+      const turn = request();
+      const human = new HumanController(turn.playerId);
+      const result = human.chooseMove(turn);
+      const rejected = expect(result).rejects.toThrow(`cancelled for request ${turn.requestId}`);
+      human.destroy();
+      expect(human.getPendingRequest()).toBeNull();
+      await rejected;
+      expect(human.resolveMove(turn.requestId, turn.legalMoves[0]!)).toBe(false);
+      expect(human.cancelPendingRequest(turn.requestId)).toBe(false);
+      expect(() => human.destroy()).not.toThrow();
+    });
+
+    it('cancelPendingRequest also cancels an accepted-but-undelivered Move still held back by a pause, not only a genuinely unresolved one', async () => {
+      const turn = request();
+      const human = new HumanController(turn.playerId);
+      const result = human.chooseMove(turn);
+      expect(human.resolveMove(turn.requestId, turn.legalMoves[0]!)).toBe(true);
+      human.pause();
+      await Promise.resolve();
+      await Promise.resolve();
+      const rejected = expect(result).rejects.toThrow(`cancelled for request ${turn.requestId}`);
+      expect(human.cancelPendingRequest(turn.requestId)).toBe(true);
+      await rejected;
+      human.resume(); // nothing left to resurrect once cancelled
+    });
+  });
+
   it('detaches submitted cards so later UI edits cannot change the delivered intent', async () => {
     const turn = request();
     const human = new HumanController(turn.playerId);
