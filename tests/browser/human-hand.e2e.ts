@@ -17,6 +17,38 @@ async function startGame(page: import('@playwright/test').Page) {
   await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
 }
 
+/**
+ * Whichever seat holds the 3♣ a Round opens with (and what it leads with) is not something this file
+ * can assume - the production RNG this file drives has no seed hook, by design (round-result.e2e.ts's
+ * own comment). So a test that needs to select more than one held card waits for a Turn whose live Play
+ * selection cap (App.tsx's own `maxSelectableCards`, mirrored here from the rendered center state) is
+ * actually large enough, Passing through any Turn that falls short - Pass is always legal while
+ * responding. Bounded the same way round-result.e2e.ts's own `driveRoundToResult` is, so a genuine
+ * regression fails with a diagnostic instead of hanging.
+ */
+const SELECTION_TURN_BUDGET = 40;
+
+async function waitForYourTurn(page: import('@playwright/test').Page) {
+  await expect(page.getByRole('region', { name: 'You panel' })).toHaveAttribute('aria-current', 'true', { timeout: 20_000 });
+}
+
+async function currentSelectionCap(page: import('@playwright/test').Page): Promise<number> {
+  const count = await page.locator('[aria-label="Current hand to beat"] [role="img"]').count();
+  return count > 0 ? count : 5;
+}
+
+async function waitForSelectableTurn(page: import('@playwright/test').Page, minCap: number): Promise<number> {
+  const passButton = page.getByRole('button', { name: 'Pass', exact: true });
+  for (let turn = 0; turn < SELECTION_TURN_BUDGET; turn++) {
+    await waitForYourTurn(page);
+    const cap = await currentSelectionCap(page);
+    if (cap >= minCap) return cap;
+    await expect(passButton, `Turn ${turn}: selection cap ${cap} is below ${minCap} but Pass is unavailable (an Opening/free-lead Turn always caps at 5)`).toBeEnabled();
+    await passButton.click();
+  }
+  throw new Error(`No Turn with a selection cap >= ${minCap} arrived within ${SELECTION_TURN_BUDGET} of this seat's own Turns.`);
+}
+
 test('every dealt card is selectable independently, and selection survives Sort Rank/Sort Suit', async ({ page }) => {
   await startGame(page);
   const hand = page.getByRole('group', { name: 'Your hand' });
@@ -24,6 +56,9 @@ test('every dealt card is selectable independently, and selection survives Sort 
   const slots = hand.locator('[data-card-key]');
   await expect(cards).toHaveCount(13);
 
+  // Selecting a second card (rather than one) is what this test needs to prove the first survives it,
+  // so this Turn's own live cap must allow at least two (see `waitForSelectableTurn`'s own docstring).
+  await waitForSelectableTurn(page, 2);
   const first = cards.nth(0);
   const firstSlot = slots.nth(0);
   const lastSlot = slots.nth(12);
@@ -51,6 +86,9 @@ test('dragging a card reorders the hand without changing what is selected', asyn
   const slots = hand.locator('[data-card-key]');
   await expect(slots).toHaveCount(13);
 
+  // Selecting two cards (rather than one) is what this test needs to prove the drag disturbs neither,
+  // so this Turn's own live cap must allow at least two (see `waitForSelectableTurn`'s own docstring).
+  await waitForSelectableTurn(page, 2);
   // Select a card that will not be dragged, so we can confirm the drag never disturbs selection.
   await hand.getByRole('img').nth(6).click();
   const untouchedKey = await slots.nth(6).getAttribute('data-card-key');
@@ -148,12 +186,15 @@ test(`overlapped cards stay independently targetable at the minimum supported la
   await expect(cards).toHaveCount(13);
   // Every card must be independently hit-testable/targetable regardless of overlap (ui-ux.md §6) — a
   // click landing on the wrong (neighboring) card would still show up as a selection mismatch below.
-  // Only the first 5 clicks can actually select anything: at Session start the Trick is the Opening
-  // Move, so the Play selection cap is 5 (M4-T08's "up to 5 cards if free play"); the remaining clicks
-  // still prove their own card was correctly targeted by staying reliably deselected.
-  const FREE_PLAY_CAP = 5;
+  // Only the first `cap` clicks can actually select anything (the live Play selection cap, M4-T08); the
+  // remaining clicks still prove their own card was correctly targeted by staying reliably deselected.
+  // `cap` is read from this Turn's own live state rather than assumed to always be the free-Play 5,
+  // since Session start does not guarantee this seat is the one opening (`waitForYourTurn`'s own
+  // docstring above).
+  await waitForYourTurn(page);
+  const cap = await currentSelectionCap(page);
   for (let index = 0; index < 13; index++) {
     await cards.nth(index).click();
-    await expect(slots.nth(index)).toHaveAttribute('data-selected', index < FREE_PLAY_CAP ? 'true' : 'false');
+    await expect(slots.nth(index)).toHaveAttribute('data-selected', index < cap ? 'true' : 'false');
   }
 });
