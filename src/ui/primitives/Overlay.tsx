@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import styles from './Overlay.module.css';
 import { useBodyScrollLock } from './useBodyScrollLock';
@@ -30,16 +30,32 @@ export interface OverlayProps {
 export function Overlay({ title, onClose, children, maxWidthPx }: OverlayProps) {
   useBodyScrollLock();
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  // The element that had focus when this overlay opened, captured during the first render - before the
+  // commit that mounts this overlay also makes the table beneath it inert (App.tsx), at which point the
+  // browser drops focus from that now-inert opener. Focus returns there on close, so keyboard use of
+  // Event Log/Discard Pile/Leave Game is not left at the top of the page each time.
+  const [opener] = useState(() => document.activeElement);
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      // An inert ancestor means this overlay is not what the person is currently interacting with
+      // (App.tsx keeps the table, and any open overlay in it, mounted but inert behind the unsupported-
+      // layout notice) - Escape there must not close it out from under the notice.
+      if (rootRef.current?.closest('[inert]')) return;
+      onClose();
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  useEffect(() => () => {
+    if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+  }, [opener]);
+
   return (
-    <div className={styles.backdrop} onClick={onClose}>
+    <div ref={rootRef} className={styles.backdrop} onClick={onClose}>
       <section
         className={styles.panel}
         style={maxWidthPx !== undefined ? { width: `min(${maxWidthPx}px, 100%)` } : undefined}

@@ -382,3 +382,90 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     expect(continueToNextRoundSpy).not.toHaveBeenCalled();
   });
 });
+
+async function seedWithBotFourthPlace(): Promise<number> {
+  for (let seed = 1; seed < 500; seed++) {
+    const presentation = fixture(seed);
+    await driveToRoundEnd(presentation);
+    const reveal = presentation.getSnapshot().reveal;
+    if (reveal && reveal.playerId !== 'south') return seed;
+  }
+  throw new Error('No seed within range produced a bot 4th-place finish.');
+}
+
+describe('Reveal and result isolation, and presentation timers under blocked layout (review fixes)', () => {
+  it('stops table interaction during the 4th-hand reveal without dimming it, then dims it once the Round Result opens', async () => {
+    const presentation = await fixtureWithBotFourthPlace();
+    render(<SessionTable presentation={presentation} revealDurationMs={20_000} resultStageDelayMs={0} />);
+    const playContent = screen.getByRole('region', { name: 'Game Table' }).parentElement!;
+    expect(playContent.hasAttribute('inert')).toBe(true);
+    // Revealed cards must stay fully visible, so no dimming filter during the reveal itself.
+    expect(playContent.className).not.toContain('tableDimmed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip reveal' }));
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+    expect(playContent.hasAttribute('inert')).toBe(true);
+    expect(playContent.className).toContain('tableDimmed');
+  });
+
+  it('keeps a Round Result that opens behind an Event Log from receiving input, so Next Round cannot start the next Round beneath it (reviewer repro)', async () => {
+    const presentation = fixture(await seedWithBotFourthPlace());
+    render(<SessionTable presentation={presentation} revealDurationMs={0} resultStageDelayMs={0} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+    expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+
+    // The Round finishes while the Event Log is open (e.g. a Turn that was already in flight when it opened).
+    // One act() per Turn: a whole Round of published snapshots inside a single act() exceeds React's nested-update cap.
+    for (let turns = 0; presentation.getSnapshot().status === 'ROUND_ACTIVE' && turns < 400; turns++) {
+      await act(async () => { await presentation.runTurn(); });
+    }
+    const result = await screen.findByRole('dialog', { name: 'Round 1 Result' });
+    expect(result.closest('[inert]')).not.toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Event Log' }).closest('[inert]')).toBeNull();
+
+    // `fireEvent` ignores `inert`, standing in for any activation that still reaches the handler.
+    fireEvent.click(screen.getByRole('button', { name: 'Next Round' }));
+    expect(presentation.getSnapshot().roundNumber).toBe(1);
+    expect(presentation.getSnapshot().status).toBe('ROUND_RESULT');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Event Log' }));
+    expect(screen.getByRole('dialog', { name: 'Round 1 Result' }).closest('[inert]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next Round' }));
+    expect(presentation.getSnapshot().roundNumber).toBe(2);
+  });
+
+  it('freezes the reveal timer while presentationPaused, then finishes the interrupted reveal once it clears', async () => {
+    vi.useFakeTimers();
+    try {
+      const presentation = await fixtureWithBotFourthPlace();
+      const { rerender } = render(<SessionTable presentation={presentation} revealDurationMs={1000} resultStageDelayMs={0} presentationPaused />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByRole('button', { name: 'Skip reveal' })).toBeTruthy();
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      rerender(<SessionTable presentation={presentation} revealDurationMs={1000} resultStageDelayMs={0} presentationPaused={false} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(999); });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(screen.getByRole('dialog')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('freezes the Round-start transition timer while presentationPaused, and keeps that screen up until it clears', async () => {
+    vi.useFakeTimers();
+    try {
+      const presentation = fixture(3);
+      const { rerender } = render(<SessionTable presentation={presentation} showInitialTransition roundTransitionDurationMs={1000} presentationPaused />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(screen.getByRole('button', { name: 'Starting Round 1' })).toBeTruthy();
+
+      rerender(<SessionTable presentation={presentation} showInitialTransition roundTransitionDurationMs={1000} presentationPaused={false} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

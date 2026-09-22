@@ -59,12 +59,13 @@
 
 /* Panel glow convention (the person's own follow-up request): who is finished is easy to lose track
  * of at a glance, so 1st/2nd/3rd placement each get a distinct medal-colored glow, and the current
- * Turn gets its own white glow - kept visually distinct from the gold "finished 1st" glow so the two
- * are never confused. Text status (DONE/placement, "Turn") still carries the same meaning without
- * color, per §15's label-plus-color rule; this is an additional glance-able cue, not a replacement. */
+ * Turn gets its own cyan glow - a hue none of the medal glows use, so it is never confused with the
+ * gold/silver/bronze finish glows (the earlier white read as too close to silver). Text status
+ * (DONE/placement, "Turn") still carries the same meaning without color, per §15's label-plus-color
+ * rule; this is an additional glance-able cue, not a replacement. */
 .glowTurn {
-  border-color: #f7f4e9;
-  box-shadow: 0 0 0 3px rgba(247, 244, 233, 0.55), 0 0 14px 3px rgba(247, 244, 233, 0.4);
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.55), 0 0 14px 3px rgba(34, 211, 238, 0.4);
 }
 
 .glowGold {

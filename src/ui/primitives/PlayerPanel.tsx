@@ -55,7 +55,7 @@ function resolveStatus({ isCurrentTurn, passed, done, placement }: PlayerPanelPr
 
 /**
  * The panel's own glow (border/box-shadow), separate from the text status above: 1st/2nd/3rd finish
- * each get their own medal-colored glow, and the current Turn gets a white glow — kept visually
+ * each get their own medal-colored glow, and the current Turn gets a cyan glow — kept visually
  * distinct from the gold "finished 1st" glow so the two are never confused at a glance (the person's
  * own follow-up request). A 4th-place finish and an idle seat get no glow.
  */

@@ -27,6 +27,12 @@ export interface RoundResultOverlayProps {
   /** This Round's own authoritative placements/points (SessionPresentation's `roundCheckpoint.placements`,
    *  `resolveBasicRound`'s Engine-owned scoring) — never recomputed here. */
   readonly placements: readonly RoundResultPlacement[];
+  /** Every EARLIER Round's own placements, oldest first (SessionPresentation's `completedRounds` minus this
+   *  Round's own checkpoint). Used only to reproduce the standings order the person was already shown
+   *  after each of those Rounds, so ties keep their previous relative order (ui-ux.md §12) instead of
+   *  falling back to seat order every time - never for scoring. Omitted (e.g. Round 1, or a caller with
+   *  no history) means seat order is the starting basis. */
+  readonly priorPlacements?: readonly (readonly RoundResultPlacement[])[];
   /** Round 5's checkpoint (SessionPresentation's `sessionResult !== null`): no continuation button at
    *  all — once the scoring animation settles, `onContinue` fires automatically after `autoAdvanceDelayMs`
    *  (ui-ux.md §12 follow-up, M4-T13 UI refinement — this replaces the earlier explicit "View Session
@@ -41,6 +47,10 @@ export interface RoundResultOverlayProps {
    *  follow-up). Only relevant when `isFinalRound`; ignored otherwise, since every other Round waits for
    *  its own explicit **Next Round** click instead. Tests pass 0, same convention as `stageDelayMs`. */
   readonly autoAdvanceDelayMs?: number;
+  /** Freezes the scoring-animation and auto-advance timers while true (App.tsx: unsupported-layout guidance
+   *  is hiding this still-mounted overlay), so the interrupted stage resumes - with its full delay - once
+   *  it clears rather than finishing where nobody can see it. */
+  readonly paused?: boolean;
 }
 
 /**
@@ -70,8 +80,8 @@ interface RoundResultRow extends RoundResultSeatInput {
 
 /** Stable descending sort: ties keep `rows`' own relative order (its index) rather than an arbitrary
  *  re-ranking (ui-ux.md §12: "Ties ... retain stable previous relative order rather than inventing a
- *  final ranking"). `rows` is always the same seat-ordered array (south/west/north/east) for both the
- *  before- and after-Round sorts here, so a tie's relative order is consistent between them too. */
+ *  final ranking"). The after-Round sort is always applied to the before-Round order rather than to seat
+ *  order, so a tie keeps exactly the relative order the person was just looking at. */
 function stableDescendingOrder(rows: readonly RoundResultRow[], score: (row: RoundResultRow) => number): RoundResultRow[] {
   return rows
     .map((row, index) => ({ row, index }))
@@ -90,7 +100,7 @@ function stableDescendingOrder(rows: readonly RoundResultRow[], score: (row: Rou
  * to its settled state (ui-ux.md §12: "skipping completes the visual state but must not trigger Next
  * Round").
  */
-export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRound, onContinue, stageDelayMs = 650, autoAdvanceDelayMs = 900 }: RoundResultOverlayProps) {
+export function RoundResultOverlay({ roundNumber, seats, placements, priorPlacements = [], isFinalRound, onContinue, stageDelayMs = 650, autoAdvanceDelayMs = 900, paused = false }: RoundResultOverlayProps) {
   useBodyScrollLock();
 
   const [stageIndex, setStageIndex] = useState(0);
@@ -111,10 +121,10 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
   }, [roundNumber]);
 
   useEffect(() => {
-    if (stageIndex >= FINAL_STAGE_INDEX) return;
+    if (paused || stageIndex >= FINAL_STAGE_INDEX) return;
     const timer = setTimeout(() => setStageIndex((index) => Math.min(index + 1, FINAL_STAGE_INDEX)), stageDelayMs);
     return () => clearTimeout(timer);
-  }, [stageIndex, stageDelayMs]);
+  }, [stageIndex, stageDelayMs, paused]);
 
   // Round 5 has no continuation button (ui-ux.md §12 follow-up, M4-T13 UI refinement): once the
   // animation reaches its own settled stage, wait `autoAdvanceDelayMs` and call `onContinue` on this
@@ -122,10 +132,10 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
   // reaching 'settled' via the backdrop's own skip (`handleSkip` below) still sets `stageIndex` the same
   // way, so this fires identically whether the animation ran its full course or was skipped.
   useEffect(() => {
-    if (!isFinalRound || STAGES[stageIndex] !== 'settled') return;
+    if (paused || !isFinalRound || STAGES[stageIndex] !== 'settled') return;
     const timer = setTimeout(() => onContinueRef.current(), autoAdvanceDelayMs);
     return () => clearTimeout(timer);
-  }, [isFinalRound, stageIndex, autoAdvanceDelayMs]);
+  }, [isFinalRound, stageIndex, autoAdvanceDelayMs, paused]);
 
   const stage: Stage = STAGES[stageIndex]!;
   const pointsByPlayer = new Map(placements.map((entry) => [entry.playerId, entry] as const));
@@ -138,9 +148,21 @@ export function RoundResultOverlay({ roundNumber, seats, placements, isFinalRoun
   const showRoundPoints = stage !== 'before';
   const showTotal = stage === 'totals' || stage === 'settled';
   const settled = stage === 'settled';
-  const displayOrder = settled
-    ? stableDescendingOrder(rows, (row) => row.totalScore)
-    : stableDescendingOrder(rows, (row) => row.previousTotal);
+  // The order shown before this Round's own score is applied: replays each earlier Round's own
+  // stable re-sort (ties keep their previous relative order, starting from seat order), so this Round's
+  // opening arrangement matches what the previous Round's own overlay settled on. The final sort then
+  // starts from that same order rather than from seat order, so a tie in the new totals does not
+  // suddenly rearrange the rows (ui-ux.md §12).
+  const priorOrder = priorPlacements.reduce<{ order: RoundResultRow[]; totals: Map<PlayerId, number> }>(
+    (state, roundPlacements) => {
+      const totals = new Map(state.totals);
+      for (const entry of roundPlacements) totals.set(entry.playerId, (totals.get(entry.playerId) ?? 0) + entry.points);
+      return { order: stableDescendingOrder(state.order, (row) => totals.get(row.playerId) ?? 0), totals };
+    },
+    { order: rows, totals: new Map() },
+  ).order;
+  const beforeOrder = stableDescendingOrder(priorOrder, (row) => row.previousTotal);
+  const displayOrder = settled ? stableDescendingOrder(beforeOrder, (row) => row.totalScore) : beforeOrder;
 
   function handleSkip() {
     setStageIndex(FINAL_STAGE_INDEX);

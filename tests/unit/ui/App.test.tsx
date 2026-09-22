@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSessionConfiguration, startSession } from '../../../src/application/startSession';
 import type { StartedSession } from '../../../src/application/startSession';
@@ -228,6 +228,103 @@ describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
     expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
     // Still the same Round of the same Session, not a fresh restart.
     expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
+  });
+
+  it('keeps the hand arrangement, selection, open overlay and started-Round state across an unsupported-layout interruption (review fix)', async () => {
+    mockCoarsePointer();
+    // A seeded LCG rather than `next: () => 0`: that constant deals an already fully sorted hand, which
+    // would make the Sort buttons below indistinguishable from a fresh mount.
+    let seed = 26;
+    const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng }));
+    render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+
+    const handKeys = () => Array.from(document.querySelectorAll('[data-card-key]')).map((slot) => slot.getAttribute('data-card-key'));
+    const selectedKeys = () => Array.from(document.querySelectorAll('[data-card-key][data-selected="true"]')).map((slot) => slot.getAttribute('data-card-key'));
+    const dealt = handKeys();
+    // Sort by suit and by rank: whichever differs from the dealt order proves a real, non-default arrangement.
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Suit' }));
+    const suitSorted = handKeys();
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Rank' }));
+    const rankSorted = handKeys();
+    expect(rankSorted).not.toEqual(suitSorted);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Suit' }));
+    expect(handKeys()).toEqual(suitSorted);
+    expect(suitSorted.length).toBe(dealt.length);
+
+    fireEvent.click(document.querySelectorAll('[data-card-key]')[2]!);
+    const selectionBefore = selectedKeys();
+    expect(selectionBefore).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+    expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+
+    act(() => resizeWindowTo(390, 844));
+    expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
+    // Nothing of the table (including the open Event Log) is reachable behind the notice, and Escape
+    // does not close an overlay the person cannot currently see.
+    expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Event Log' })).toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    act(() => resizeWindowTo(1024, 768));
+    expect(screen.getByRole('region', { name: 'Game Table' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+    expect(handKeys()).toEqual(suitSorted);
+    expect(selectedKeys()).toEqual(selectionBefore);
+    // Not a fresh mount: the Round-start transition is not replayed.
+    expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull();
+  });
+
+  it('freezes the Round Result scoring animation while the layout is unsupported and resumes the interrupted stage afterwards (review fix)', async () => {
+    vi.useFakeTimers();
+    try {
+      const start = vi.fn(() => buildAutomaticSession(5));
+      render(<App start={start} botTurnDelayMs={1} revealDurationMs={0} roundTransitionDurationMs={0} resultStageDelayMs={100_000} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+      let guard = 0;
+      while (!screen.queryByRole('dialog', { name: 'Round 1 Result' }) && guard++ < 200) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+      }
+      const roundPoints = () => within(screen.getByRole('dialog', { name: 'Round 1 Result' })).getAllByRole('row').slice(1)
+        .map((row) => within(row).getAllByRole('cell')[2]!.textContent);
+      // First stage: nothing scored yet.
+      expect(roundPoints()).toEqual(['—', '—', '—', '—']);
+
+      act(() => resizeWindowTo(560, 320));
+      expect(screen.getByText(/resize/i)).toBeTruthy();
+      // Far longer than every remaining stage delay put together: unpaused, the whole sequence would finish here.
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000_000); });
+      act(() => resizeWindowTo(1024, 768));
+      expect(roundPoints()).toEqual(['—', '—', '—', '—']);
+
+      // Still runs to completion afterwards, one full stage delay at a time.
+      await act(async () => { await vi.advanceTimersByTimeAsync(100_000); });
+      expect(roundPoints().every((points) => points !== '—')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the table inert behind an unsupported-layout notice and the notice itself visible', async () => {
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    const table = await screen.findByRole('region', { name: 'Game Table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+    expect(table.closest('[inert]')).toBeNull();
+    act(() => resizeWindowTo(560, 320));
+    expect(screen.getByText(/resize/i)).toBeTruthy();
+    // `hidden: true` because a hidden subtree is (correctly) excluded from the accessible role queries.
+    expect(screen.getByRole('region', { name: 'Game Table', hidden: true }).closest('[inert]')).not.toBeNull();
+    expect(screen.getByRole('region', { name: 'Game Table', hidden: true }).closest('[hidden]')).not.toBeNull();
+    expect(screen.getByText(/resize/i).closest('[inert], [hidden]')).toBeNull();
+    act(() => resizeWindowTo(1024, 768));
+    expect(table.closest('[inert]')).toBeNull();
+    expect(table.closest('[hidden]')).toBeNull();
   });
 
   it('pauses automatic Turn advancement while the layout is unsupported, and resumes it once supported again', async () => {

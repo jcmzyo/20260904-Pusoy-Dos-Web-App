@@ -17,8 +17,8 @@ function visibleCards(value: unknown): string[] {
 }
 const singleFirst = (request: PlayerTurnRequest): Move => request.legalMoves.find((move) => move.kind === 'play' && move.cards.length === 1) ?? request.legalMoves[0]!;
 
-function fixture(choose = singleFirst) {
-  let seed = 26;
+function fixture(choose = singleFirst, initialSeed = 26) {
+  let seed = initialSeed;
   const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
   const created = createSession(ids);
   const started = startRound(created.state, engineRng);
@@ -485,13 +485,50 @@ describe('production Session presentation', () => {
     expect(center.kind).toBe('hand');
     if (center.kind !== 'hand') throw new Error('Expected the Round-ending Play to remain the current hand.');
     const finisherSeat = final.seats.find((seat) => seat.playerId === center.playerId)!;
-    // The Round-ending Play itself is still visible at its own seat, not beaten (it's still the
-    // authoritative center hand), rather than wiped to null.
+    // The Round-ending Play itself is still visible at its own seat rather than wiped to null - as a
+    // retained display, so dimmed like every other finisher's trail (nothing is live on a completed
+    // table; `center` merely keeps showing the final hand). The cards themselves are preserved.
     expect(finisherSeat.lastPlay).not.toBeNull();
-    expect(finisherSeat.lastPlay!.beaten).toBe(false);
+    expect(finisherSeat.lastPlay!.beaten).toBe(true);
+    expect(finisherSeat.lastPlay!.combination).toEqual(center.combination);
+    expect(final.seats.every((seat) => seat.lastPlay === null || seat.lastPlay.beaten)).toBe(true);
     // Continuing to the next Round is the actual, deliberate reset boundary.
     presentation.continueToNextRound();
     expect(presentation.getSnapshot().seats.every((seat) => seat.lastPlay === null && !seat.passed)).toBe(true);
+  });
+
+  it.each([2, 4])('grays every Play that is no longer the live hand to beat, including a finisher\'s untopped final Play (seed %i)', async (seed) => {
+    // Regression: a finisher's final Play stayed at full brightness for the rest of the Round when nobody
+    // ever topped it (its `beaten` was frozen from "was it topped?"), but grayed when something did - so
+    // the same finisher's trail looked different depending on how its Trick ended, and an untopped one sat
+    // beside the live "Current Play" of every later Trick. `beaten` is now simply "not the live hand".
+    const { presentation } = fixture((request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves.find((move) => move.kind === 'pass')!, seed);
+    let staleFinisherSnapshots = 0;
+    let turns = 0;
+    while (presentation.getSnapshot().status === 'ROUND_ACTIVE' && turns++ < 400) {
+      await presentation.runTurn();
+      const { center, seats, roundCheckpoint } = presentation.getSnapshot();
+      for (const seat of seats) {
+        if (!seat.lastPlay) continue;
+        // On a completed Round's table `center` only retains the final hand for display - nothing is live.
+        const isLiveHand = roundCheckpoint === null && center.kind === 'hand' && center.playerId === seat.playerId;
+        expect(seat.lastPlay.beaten, `turn ${turns}: ${seat.playerId}`).toBe(!isLiveHand);
+        if (seat.done && !isLiveHand) staleFinisherSnapshots++;
+      }
+    }
+    // The scenario is actually exercised: a finished seat's Play was still showing while it was not the live hand.
+    expect(staleFinisherSnapshots).toBeGreaterThan(0);
+    // Once the Round has completed nothing is live: every retained trail (the Round-ending finisher's own
+    // included, even though `center` still shows that final hand) is dimmed, with its cards preserved.
+    const completed = presentation.getSnapshot();
+    expect(completed.roundCheckpoint).not.toBeNull();
+    const retained = completed.seats.filter((seat) => seat.lastPlay !== null);
+    expect(retained.length).toBeGreaterThan(0);
+    for (const seat of retained) expect(seat.lastPlay!.beaten, seat.playerId).toBe(true);
+    if (completed.center.kind === 'hand') {
+      const finisher = completed.seats.find((seat) => seat.playerId === (completed.center as { playerId: string }).playerId)!;
+      expect(finisher.lastPlay!.combination).toEqual(completed.center.combination);
+    }
   });
 
   it('keeps a 1st/2nd-place finisher\'s own final Play visible at its seat for the rest of the Round, not only the Round-ending 3rd-place finish (M4-T12.5 follow-up)', async () => {

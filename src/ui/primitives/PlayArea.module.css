@@ -17,4 +17,8 @@
   display: flex;
   flex-direction: column;
   transform-origin: top left;
+  /* A size container (its width/height are always set explicitly, PlayArea.tsx), so descendants can size
+   * against the play area's own laid-out height in design units (`cqh`) - App.module.css's
+   * `--seat-card-gap` - which viewport units cannot give them, since the whole area is scaled by transform. */
+  container-type: size;
 }

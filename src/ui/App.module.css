@@ -136,12 +136,12 @@
   position: relative;
   display: grid;
   /* West/East's own columns are never narrower than their seat's own content width (56px bot-hand column
-   * + 4px gap + PlayerPanel's own fixed 168px width = 228px) and span the table's full height, so their
+   * + `--seat-card-gap` (12-20px) + PlayerPanel's own fixed 168px width = 236-244px) and span the table's full height, so their
    * content can never overflow the table border at any viewport (M4-T14; previously a 96px floor here was
    * inconsistent with that seat width at the narrowest supported viewport). Beyond that floor the columns
    * share the table's width 1:2:1 with each seat centered in its own column, so a wide play area spreads
    * the seats around the center instead of pinning them to the border. */
-  grid-template-columns: minmax(228px, 1fr) minmax(0, 2fr) minmax(228px, 1fr);
+  grid-template-columns: minmax(calc(56px + var(--seat-card-gap) + 168px), 1fr) minmax(0, 2fr) minmax(calc(56px + var(--seat-card-gap) + 168px), 1fr);
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "west north east"
@@ -157,6 +157,17 @@
   background: #164b39;
   flex: 1 1 auto;
   min-height: 0;
+  /* Room between a bot's face-down cards and its PlayerPanel, so the panel's Turn/placement glow does not
+   * crowd the cards. At the play area's design height (PLAY_AREA_DESIGN_HEIGHT_PX, 656) there is only room
+   * for 12px; every 2px of extra height (`cqh`, design units) adds 1px, up to a comfortable 20px, so a short
+   * window keeps the tighter spacing and a taller one gets more. */
+  --seat-card-gap: 12px;
+}
+
+@supports (height: 1cqh) {
+  .table {
+    --seat-card-gap: clamp(12px, calc(12px + (100cqh - 656px) / 2), 20px);
+  }
 }
 
 .seat {
@@ -168,23 +179,25 @@
 
 .seatNorth {
   grid-area: north;
-  gap: 4px;
+  gap: var(--seat-card-gap);
 }
 
 /* West/East: cards lengthwise (stacked vertically) on the outer edge, details adjacent to
  * center - "Lengthwise cards | West Details | Center Table | East Details | Lengthwise Cards" -
  * so a 13-card hand overlaps within the seat's own row instead of spilling into the table border. The
- * card-to-panel gap matches North's (`.seatNorth`) - the person's own follow-up request. */
+ * card-to-panel gap matches North's (`.seatNorth`) - the person's own follow-up request - and is wide
+ * enough (`--seat-card-gap`, set on `.table`) that the panel's own Turn/placement glow (PlayerPanel.module.css,
+ * about 10px of visible fade past its 3px ring) no longer washes over the face-down cards. */
 .seatWest {
   grid-area: west;
   flex-direction: row;
-  gap: 4px;
+  gap: var(--seat-card-gap);
 }
 
 .seatEast {
   grid-area: east;
   flex-direction: row-reverse;
-  gap: 4px;
+  gap: var(--seat-card-gap);
 }
 
 .seatSouth {
@@ -416,6 +429,13 @@
  * above everything else so a click anywhere during the reveal advances it, without changing the table's
  * own visible appearance (the reveal itself, unlike the Round Result overlay above, is not specified as
  * dimmed - only the cards at the revealed seat change). */
+/* Wrapper for the layers that sit in front of the table (reveal-skip, Round Result, Session Summary,
+ * Round-start transition) so App.tsx can make them `inert` as one while a modal is open on top of them;
+ * `display: contents` keeps it out of layout entirely (their own `position: fixed` is unaffected). */
+.overlayLayer {
+  display: contents;
+}
+
 .revealSkipLayer {
   position: fixed;
   inset: 0;
