@@ -674,4 +674,88 @@ describe('production Session presentation', () => {
       expect(() => unsubscribe()).not.toThrow();
     });
   });
+
+  describe('pending human input cannot advance a paused or destroyed Session (M4→P1 review finding)', () => {
+    function humanRequestFixture() {
+      let seed = 11;
+      const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+      const created = createSession(ids);
+      const started = startRound(created.state, engineRng);
+      const human = new HumanController('south');
+      const bots: readonly PlayerController[] = ids
+        .filter((id) => id !== 'south')
+        .map((playerId) => ({ playerId, chooseMove: async (request: PlayerTurnRequest) => request.legalMoves[0]! }));
+      const controllers = new Map<string, PlayerController>([human, ...bots].map((controller) => [controller.playerId, controller]));
+      const session: StartedSession = {
+        runner: new GameRunner(started.state, defaultRuleset, controllers, true),
+        humanController: human, engineRng, initialView: getPublicView(started.state),
+        startupEvents: [...created.events], names: { south: 'You', west: 'W', north: 'N', east: 'E' },
+      };
+      return new SessionPresentation(session);
+    }
+
+    it.each(['pause', 'destroy'] as const)('ordering 1 - %s called before resolveHumanMove: the pending request is refused outright, left untouched, and public history never advances', async (action) => {
+      const presentation = humanRequestFixture();
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+      const request = presentation.getPendingHumanRequest()!;
+      const before = presentation.getSnapshot();
+
+      presentation[action]();
+      // The finding's own reproduction: this used to return `true` and commit the Move regardless.
+      expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(before);
+
+      if (action === 'pause') {
+        // Left genuinely untouched (not consumed/cancelled) - the exact same request is still legitimately
+        // resolvable once resumed, rather than requiring any new retry/queueing behavior.
+        expect(presentation.getPendingHumanRequest()).toEqual(request);
+        presentation.resume();
+        expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
+        await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(before));
+      } else {
+        presentation.resume(); // a stray resume after destroy must not resurrect it either
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        expect(presentation.getSnapshot()).toBe(before);
+      }
+    });
+
+    it('ordering 2 - pause() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: the already-in-flight response is suspended, then published in full once resumed', async () => {
+      const presentation = humanRequestFixture();
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+      const request = presentation.getPendingHumanRequest()!;
+      const before = presentation.getSnapshot();
+
+      // No `await` between these two calls - resolveHumanMove settles HumanController's own Promise
+      // synchronously, but the Engine submission it triggers only happens once GameRunner's suspended
+      // `await controller.chooseMove()` continuation actually runs as a later microtask, which pause()
+      // here still lands strictly before.
+      expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
+      presentation.pause();
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      // The Engine has already committed this Move internally, but it must not be visible yet.
+      expect(presentation.getSnapshot()).toBe(before);
+      presentation.resume();
+      // Nothing is lost - the already-accepted result is published in full once resumed.
+      await vi.waitFor(() => expect(presentation.getSnapshot()).not.toBe(before));
+    });
+
+    it('ordering 2 - destroy() immediately follows a successful resolveHumanMove(), before its Promise continuation runs: the already-in-flight response is never published', async () => {
+      const presentation = humanRequestFixture();
+      presentation.startAutoPlay(0);
+      await vi.waitFor(() => expect(presentation.getPendingHumanRequest()).not.toBeNull());
+      const request = presentation.getPendingHumanRequest()!;
+      const before = presentation.getSnapshot();
+
+      expect(presentation.resolveHumanMove(request.requestId, request.legalMoves[0]!)).toBe(true);
+      presentation.destroy();
+
+      presentation.resume(); // a stray resume must not resurrect a destroyed Session's suspended publish
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(presentation.getSnapshot()).toBe(before);
+    });
+  });
 });

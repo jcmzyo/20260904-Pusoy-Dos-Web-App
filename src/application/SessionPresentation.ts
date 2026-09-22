@@ -116,6 +116,10 @@ export class SessionPresentation {
     return () => { this.listeners.delete(listener); };
   };
 
+  /** An explicit, caller-requested Turn always runs to completion and publishes unconditionally,
+   *  regardless of pause/destroy state — a deliberate caller action, not automatic advancement, mirroring
+   *  `continueToNextRound`'s own contract below. Only `driveTurns`'s own background loop (via its private
+   *  `runTurnForAutoplay`) observes pause/destroy — see its own docstring, and `pause()`'s. */
   async runTurn(): Promise<{ readonly accepted: true } | Pick<Extract<ControllerTurnResult, { accepted: false }>, 'accepted' | 'error' | 'context'>> {
     const result = await this.session.runner.runTurn();
     if (!result.accepted) return { accepted: false, error: result.error, context: result.context };
@@ -137,8 +141,15 @@ export class SessionPresentation {
 
   /** Resolves the pending human input through HumanController's own production contract (M4-T02);
    *  returns `false` without throwing if there is no compatible controller or no matching pending
-   *  request, so a stray/duplicate submission is always safe. */
+   *  request, so a stray/duplicate submission is always safe.
+   *
+   *  Also refuses outright while paused or destroyed (M4-P1 review finding), rather than delegating to
+   *  the controller at all: the underlying pending request is left completely untouched (still genuinely
+   *  unresolved), so it remains available to legitimately resolve once resumed. This is a defense-in-depth
+   *  check at the execution boundary itself — the UI's own overlay/pause guard is what ordinarily prevents
+   *  this call from ever being attempted while paused. */
   resolveHumanMove(requestId: TurnRequestId, move: Move): boolean {
+    if (this.destroyed || this.pauseCount > 0) return false;
     return (this.session.humanController as HumanInputExtras).resolveMove?.(requestId, move) ?? false;
   }
 
@@ -266,13 +277,35 @@ export class SessionPresentation {
       if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
       let result: { readonly accepted: boolean };
       try {
-        result = await this.runTurn();
+        result = await this.runTurnForAutoplay();
       } catch (cause) {
         console.error('Automatic Turn advancement stopped after a Controller failure.', cause);
         return;
       }
       if (!result.accepted) return;
     }
+  }
+
+  /**
+   * `driveTurns`'s own automatic-advancement counterpart to the public `runTurn()` above (M4-P1 review
+   * finding: a controller response already in flight - e.g. a human Move resolved a moment before
+   * pause()/destroy() lands - could still commit to the Engine and advance this loop's own published
+   * history, since `resolveHumanMove`'s own guard above only closes the window before that commit, not
+   * after it). Suspends publishing an already-accepted response while paused (full event fidelity is
+   * preserved - it is only delayed until `resume()`), and drops it entirely once destroyed, so this loop's
+   * own advancement never surfaces a paused/destroyed Session's history no matter how narrowly the race
+   * lands. `runTurn()` itself deliberately stays unconditional (its own docstring); this exists as a
+   * private, identically-shaped variant purely so this loop's own timing is otherwise unaffected.
+   */
+  private async runTurnForAutoplay(): Promise<{ readonly accepted: boolean }> {
+    const result = await this.session.runner.runTurn();
+    if (!result.accepted) return { accepted: false };
+    // Only actually awaits anything when paused, so the overwhelmingly common (unpaused) case adds no
+    // extra microtask hop beyond what `runTurn()` above already takes for the same accepted-Turn path.
+    if (this.pauseCount > 0 && !this.destroyed) await this.waitWhilePaused();
+    if (this.destroyed) return { accepted: true };
+    this.publish(result.events);
+    return { accepted: true };
   }
 
   private publish(events: readonly GameEvent[]): void {

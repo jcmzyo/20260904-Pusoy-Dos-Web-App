@@ -36,6 +36,12 @@ interface Size {
 const SUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported');
 const UNSUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category !== 'supported');
 
+// Reproducible deal (M4-P1 review finding: the required deterministic browser acceptance suite was
+// missing) for the one test below that must reliably drive a full five-Round Session to Session Summary -
+// verified by scripts/find-e2e-seed.mjs to complete cleanly under `driveUnderFakeClock`'s own minimal
+// strategy well inside its step budget, so a failure there is reproducible rather than deal-dependent.
+const FIVE_ROUND_E2E_SEED = 8;
+
 // Sizes beyond the frozen matrix that stress the two ways the play area's own fit can be tight: a short
 // viewport (a real mobile browser's own chrome leaves less usable height than an emulated preset assumes,
 // ui-ux.md §14) and a width-bound one (narrow for its height).
@@ -49,9 +55,13 @@ const FULL_SCALE_BOUNDARY: Size = { name: 'full-scale-boundary', width: FULL_SCA
 const isFullScale = (viewport: Size) => viewport.width >= FULL_SCALE_LANDSCAPE_WIDTH_PX && viewport.height >= FULL_SCALE_LANDSCAPE_HEIGHT_PX;
 const FULL_SCALE_VIEWPORTS: readonly Size[] = [...SUPPORTED_VIEWPORTS.filter(isFullScale), FULL_SCALE_BOUNDARY];
 
-async function startGameAt(page: Page, viewport: Size) {
+/** `seed` opts into `main.tsx`'s own dev-server-only `?e2eSeed=` hook (M4-P1 review finding: the
+ *  deterministic browser acceptance suite was missing) - used only by the test below that must reliably
+ *  reach a five-Round Session Summary, so a failure there is reproducible rather than deal-dependent.
+ *  Every other call here is layout-only and stays on a genuinely random deal. */
+async function startGameAt(page: Page, viewport: Size, seed?: number) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  await page.goto('/');
+  await page.goto(seed === undefined ? '/' : `/?e2eSeed=${seed}`);
   await page.getByRole('button', { name: 'Start Game', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
   // The Round-start transition screen covers the whole table (and every control on it) for a moment
@@ -644,7 +654,7 @@ test('Round Result and Session Summary stay inside the viewport with their actio
   await page.clock.install();
   const [first] = SUPPORTED_VIEWPORTS;
   if (!first) throw new Error('Viewport matrix has no supported entries.');
-  await startGameAt(page, first);
+  await startGameAt(page, first, FIVE_ROUND_E2E_SEED);
 
   await driveUnderFakeClock(page, 'roundResult');
   const roundResult = page.getByRole('dialog', { name: /^Round \d Result$/ });
