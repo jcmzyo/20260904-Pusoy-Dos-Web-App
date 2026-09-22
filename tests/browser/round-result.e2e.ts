@@ -8,22 +8,29 @@ import { expect, test } from '@playwright/test';
  * scores, tie-stable/settle reorder sequence, R1-R4 vs R5 continuation wording) is already exhaustively
  * covered deterministically, via a seeded Engine RNG, by
  * `tests/integration/ui/session-table-round-result.test.tsx` - that determinism is only available
- * in-process; the production entry point this file drives (`npm run dev`, `startSession`'s real RNG) has
- * no seed hook, by design (M4-T01: no speculative configuration surface beyond Basic/four players).
+ * in-process; the production entry point this file drives (`npm run dev`) otherwise has no seed hook by
+ * design (M4-T01: no speculative configuration surface beyond Basic/four players). `E2E_SEED` below
+ * (M4-P1 review finding: the deterministic browser acceptance suite was missing) opts into main.tsx's own
+ * dev-server-only `?e2eSeed=` hook instead - a genuinely random deal was otherwise never reproducible, and
+ * the reveal-then-skip path below could only ever be exercised opportunistically.
  *
  * `driveRoundToResult` below always Passes while responding (canonically legal regardless of held cards)
- * and leads the single lowest-value legal card only when forced to open/free-lead. This has a real,
- * acknowledged consequence: the human seat's own hand almost never shrinks, so in practice the human
- * seat itself finishes 4th almost every run - the reveal (`isRevealing`) only ever shows for a *bot's*
- * 4th-place hand (App.tsx), so this drive strategy reliably exercises the "nothing to reveal, straight to
- * the Round Result overlay" path rather than the reveal-then-skip path. The loop still watches for "Skip
- * reveal" opportunistically (a bot 4th-place finish is not actually impossible, just not the common case
- * this strategy produces) and exercises the real click there when it does appear.
+ * and leads the single lowest-value legal card only when forced to open/free-lead. Under `E2E_SEED`, this
+ * exact strategy is known (scripts/find-e2e-seed.mjs) to make West - a bot - finish 4th in Round 1, so the
+ * reveal (`isRevealing`, shown only for a *bot's* 4th-place hand, App.tsx) and its own "Skip reveal"
+ * control are unconditionally exercised below, rather than only when an unseeded deal happened to produce
+ * a bot's own 4th-place finish.
  *
  * Also drives a genuine second Round to completion after the first "Next Round" click (see the bottom
  * of the single test below) - regression coverage for a real reported bug where nothing ever advanced
- * again past Round 1 in the actual browser.
+ * again past Round 1 in the actual browser. The same seed's own second deal (verified by the same
+ * simulation script) reaches its own Round Result well inside `TURN_BUDGET` too, with South itself
+ * finishing 4th there - no reveal is asserted for that second Round, only that it completes.
  */
+
+// Reproducible deal (M4-P1 review finding) - main.tsx's dev-server-only `?e2eSeed=` hook, verified via
+// scripts/find-e2e-seed.mjs to make a bot finish 4th in Round 1 under this file's own human strategy.
+const E2E_SEED = 8;
 
 const TURN_BUDGET = 300;
 
@@ -84,7 +91,7 @@ async function driveRoundToResult(page: import('@playwright/test').Page): Promis
 
 test('the Round Result overlay is a real, non-dismissible dialog over a genuinely dimmed and inert completed table (M4-T12; ui-ux.md §12)', async ({ page }) => {
   test.setTimeout(180_000);
-  await page.goto('/');
+  await page.goto(`/?e2eSeed=${E2E_SEED}`);
   await page.getByRole('button', { name: 'Start Game', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
 
@@ -96,13 +103,14 @@ test('the Round Result overlay is a real, non-dismissible dialog over a genuinel
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute('aria-label', /^Round \d Result$/);
 
+  // Unconditional under E2E_SEED (M4-P1 review finding): this deal is known to make West finish 4th in
+  // Round 1, so the reveal-then-skip path is always exercised here, not merely opportunistically.
+  expect(revealSkipped, 'Round 1 must reach the Round Result overlay via a bot\'s own 4th-place reveal under this deterministic deal.').toBe(true);
   // A skip must have reached only the Round Result overlay - never also invoking "Next Round"/"View
   // Session Results" underneath it in the very same click (ui-ux.md §11: "the same input must not
   // accidentally activate the next result action"). The Round number is still the pre-result one; only
   // the explicit continuation button (exercised below) is ever allowed to advance it.
-  if (revealSkipped) {
-    await expect(roundLabel).toHaveText(roundTextBeforeResult ?? '');
-  }
+  await expect(roundLabel).toHaveText(roundTextBeforeResult ?? '');
 
   // Real CSS actually computed on the table beneath the overlay - `pointer-events: none` and the
   // brightness/saturate dimming (App.module.css's `.tableDimmed`) are both real-rendering concerns a
