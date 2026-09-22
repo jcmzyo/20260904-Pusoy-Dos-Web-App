@@ -158,26 +158,37 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
     void handleStart();
   }
 
-  // Replaces Home/the table outright rather than overlaying it (M4-T11; ui-ux.md §14): unlike Discard
+  // Replaces Home/the table visually rather than overlaying it (M4-T11; ui-ux.md §14): unlike Discard
   // Pile/Event Log/Leave confirmation, there is nothing safely showable underneath at these dimensions.
-  if (layout !== 'supported') {
-    return <UnsupportedLayoutNotice category={layout} />;
-  }
-
+  // A live table is nonetheless kept mounted, hidden and inert, behind the notice instead of being
+  // unmounted: SessionTable/HumanHand own presentation state the Engine does not (manual hand order,
+  // selection, an open overlay, the Round Result phase, the one-time initial Round transition), and
+  // unmounting would silently discard all of it - §14 requires that returning to landscape restores
+  // coherent state. Bot progression is already paused for the same duration by the effect above.
   if (session) {
     return (
-      <SessionTable
-        presentation={session}
-        onLeave={handleLeave}
-        onPlayAgain={handlePlayAgain}
-        onHome={handleLeave}
-        showInitialTransition
-        {...(revealDurationMs !== undefined ? { revealDurationMs } : {})}
-        {...(resultStageDelayMs !== undefined ? { resultStageDelayMs } : {})}
-        {...(roundTransitionDurationMs !== undefined ? { roundTransitionDurationMs } : {})}
-        {...(summaryAutoAdvanceDelayMs !== undefined ? { summaryAutoAdvanceDelayMs } : {})}
-      />
+      <>
+        {layout !== 'supported' && <UnsupportedLayoutNotice category={layout} />}
+        <div hidden={layout !== 'supported'} inert={layout !== 'supported'}>
+          <SessionTable
+            presentation={session}
+            onLeave={handleLeave}
+            onPlayAgain={handlePlayAgain}
+            onHome={handleLeave}
+            showInitialTransition
+            presentationPaused={layout !== 'supported'}
+            {...(revealDurationMs !== undefined ? { revealDurationMs } : {})}
+            {...(resultStageDelayMs !== undefined ? { resultStageDelayMs } : {})}
+            {...(roundTransitionDurationMs !== undefined ? { roundTransitionDurationMs } : {})}
+            {...(summaryAutoAdvanceDelayMs !== undefined ? { summaryAutoAdvanceDelayMs } : {})}
+          />
+        </div>
+      </>
     );
+  }
+
+  if (layout !== 'supported') {
+    return <UnsupportedLayoutNotice category={layout} />;
   }
 
   return (
@@ -375,6 +386,10 @@ export function SessionTable({
   // interactive - never having clicked any "Start Game" flow of their own - are unaffected; App.tsx's real
   // usage passes `true` here, exactly once, right when a freshly started Session first renders.
   showInitialTransition = false,
+  // Set while unsupported-layout guidance is hiding this (still mounted) table: freezes the presentation
+  // timers below (reveal, Round-start transition, scoring animation) so an interrupted phase resumes
+  // rather than finishing unseen. Bot progression is paused separately, by the caller's own effect.
+  presentationPaused = false,
 }: {
   readonly presentation: SessionPresentation;
   readonly onLeave?: () => void;
@@ -385,6 +400,7 @@ export function SessionTable({
   readonly roundTransitionDurationMs?: number;
   readonly summaryAutoAdvanceDelayMs?: number;
   readonly showInitialTransition?: boolean;
+  readonly presentationPaused?: boolean;
 }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   const [selectedCards, setSelectedCards] = useState<readonly Card[]>([]);
@@ -435,9 +451,10 @@ export function SessionTable({
   useEffect(() => {
     if (!roundComplete || resultPhase !== 'reveal') return;
     if (snapshot.reveal === null || snapshot.reveal.playerId === HUMAN_PLAYER_ID) { setResultPhase('result'); return; }
+    if (presentationPaused) return;
     const timer = setTimeout(() => setResultPhase('result'), revealDurationMs);
     return () => clearTimeout(timer);
-  }, [roundComplete, resultPhase, snapshot.reveal, revealDurationMs]);
+  }, [roundComplete, resultPhase, snapshot.reveal, revealDurationMs, presentationPaused]);
 
   // Round-start transition (person's own follow-up request: "a good or simple round transition aside
   // from the score board... dim the table initially then Round X then lit the game to make it playable
@@ -475,10 +492,10 @@ export function SessionTable({
   }, [isTransitioning, presentation]);
 
   useEffect(() => {
-    if (startingRound === null) return;
+    if (startingRound === null || presentationPaused) return;
     const timer = setTimeout(() => setStartingRound(null), roundTransitionDurationMs);
     return () => clearTimeout(timer);
-  }, [startingRound, roundTransitionDurationMs]);
+  }, [startingRound, roundTransitionDurationMs, presentationPaused]);
 
   // `continueToNextRound()` now runs immediately in `handleContinue` (see `startingRound`'s own
   // docstring above), so `roundComplete` is already false for the entire round-start transition, not
@@ -498,6 +515,10 @@ export function SessionTable({
   // clearing once the round-start transition to the next Round actually begins.
   const isHandRevealed = roundComplete && snapshot.reveal !== null && snapshot.reveal.playerId !== HUMAN_PLAYER_ID && startingRound === null;
   const isTableInert = isResultOverlayOpen || isSummaryOpen || startingRound !== null;
+  // The Round has ended but its own Result overlay has not opened yet (the timed 4th-hand reveal, or the
+  // instant before it). Normal table interaction stops here too (ui-ux.md §11), but - unlike
+  // `isTableInert` above - without dimming, since the revealed cards must stay fully visible.
+  const isRevealPending = roundComplete && resultPhase === 'reveal';
 
   function skipReveal() {
     setResultPhase('result');
@@ -514,6 +535,11 @@ export function SessionTable({
     // `RoundResultOverlay` itself calls this automatically once its own settled stage's short delay
     // elapses (ui-ux.md §12 follow-up, M4-T13 UI refinement) - there is no button for Round 5 to click.
     if (snapshot.sessionResult !== null) { setResultPhase('summary'); return; }
+    // A Discard Pile/Event Log/Leave confirmation (or blocked layout) is currently in front of this
+    // overlay: the person is not looking at it, so a Next Round activation that still reaches here must
+    // not start the next Round behind it. Deliberately after the Round 5 branch above, which is only ever a
+    // presentational phase change (and its own auto-advance fires once, so it must never be dropped).
+    if (presentation.isPaused()) return;
     // Deals the next Round now, before the transition screen even opens (see that screen's own
     // docstring above) - `snapshot` here is still this render's own pre-continuation value, so
     // `snapshot.roundNumber + 1` is exactly the Round `continueToNextRound()` just started.
@@ -522,6 +548,11 @@ export function SessionTable({
   }
 
   function handleSubmit(move: Move) {
+    // Any pause source (an open overlay, Leave confirmation, the initial Round transition, a blocked
+    // layout) means the person is not currently looking at the table: a submission that still reaches
+    // here must not play through it (ui-ux.md §9.2, §10, §14). The `inert` table below already stops
+    // pointer/keyboard input from reaching Play/Pass; this is the belt-and-braces check behind it.
+    if (presentation.isPaused()) return;
     const pending = presentation.getPendingHumanRequest();
     if (!pending || pending.playerId !== move.playerId) return;
     presentation.resolveHumanMove(pending.requestId, move);
@@ -544,8 +575,11 @@ export function SessionTable({
        *  (ui-ux.md §12: "a modal/overlay over the dimmed completed table"; the transition screen extends
        *  the same treatment to its own brief window) - `pointer-events: none` also keeps every control
        *  underneath (Play/Pass, Discard Pile/Event Log/Leave Game, hand selection) inert while either is
-       *  up, matching the Result overlay's own non-dismissible, explicit-continuation-only contract. */}
-      <div className={isTableInert ? `${styles.playContent} ${styles.tableDimmed}` : styles.playContent}>
+       *  up, matching the Result overlay's own non-dismissible, explicit-continuation-only contract.
+       *  `inert` (also set while a Discard Pile/Event Log/Leave confirmation overlay is open) is what
+       *  makes that true for the keyboard too - `pointer-events: none` alone left Tab/Enter able to reach
+       *  Play/Pass beneath an open modal. */}
+      <div className={isTableInert ? `${styles.playContent} ${styles.tableDimmed}` : styles.playContent} inert={overlayOpen || isTableInert || isRevealPending}>
         <section className={styles.table} aria-label="Game Table">
           {snapshot.seats.map((seat) => (
             <Seat
@@ -591,9 +625,14 @@ export function SessionTable({
        *  the local reveal→result phase, never `onContinue`/`continueToNextRound` - "the same input must
        *  not accidentally activate the next result action" (ui-ux.md §11): it is a convenience on top of
        *  the reveal's own timed auto-advance, not the only way to proceed. */}
-      {isRevealing && (
-        <button type="button" className={styles.revealSkipLayer} onClick={skipReveal} aria-label="Skip reveal" />
-      )}
+      {/* Discard Pile/Event Log/Leave confirmation render outside this layer and can open in front of what
+       *  is inside it (a Round can end while one is open); `inert` keeps the covered reveal-skip, Round
+       *  Result, Session Summary and Round-start controls from receiving keyboard or pointer input then. */}
+      <div className={styles.overlayLayer} inert={overlayOpen}>
+        {isRevealing && (
+          <button type="button" className={styles.revealSkipLayer} onClick={skipReveal} aria-label="Skip reveal" />
+        )}
+      </div>
       {overlay === 'discardPile' && <DiscardPileOverlay cards={snapshot.playedCards} onClose={closeOverlay} />}
       {/* Whole-Session history (the person's own follow-up report: the Round Result overlay pauses every
        *  other control, so a Round's own Event Log entries were otherwise unreachable again once that
@@ -601,15 +640,18 @@ export function SessionTable({
        *  docstring for the full scope change. */}
       {overlay === 'eventLog' && <EventLogOverlay events={snapshot.events} names={names} onClose={closeOverlay} />}
       {overlay === 'leaveConfirm' && <LeaveConfirmOverlay onStay={closeOverlay} onLeave={onLeave} />}
+      <div className={styles.overlayLayer} inert={overlayOpen}>
       {isResultOverlayOpen && snapshot.roundCheckpoint && (
         <RoundResultOverlay
           roundNumber={snapshot.roundNumber}
           seats={snapshot.seats}
           placements={snapshot.roundCheckpoint.placements}
+          priorPlacements={snapshot.completedRounds.slice(0, -1).map((round) => round.placements)}
           isFinalRound={snapshot.sessionResult !== null}
           onContinue={handleContinue}
           stageDelayMs={resultStageDelayMs}
           autoAdvanceDelayMs={summaryAutoAdvanceDelayMs}
+          paused={presentationPaused}
         />
       )}
       {/* Replaces the Round Result overlay in place once it auto-advances (ui-ux.md §13 follow-up,
@@ -626,6 +668,7 @@ export function SessionTable({
         />
       )}
       {startingRound !== null && <RoundTransitionOverlay roundNumber={startingRound} onSkip={skipRoundTransition} />}
+      </div>
     </main>
   );
 }

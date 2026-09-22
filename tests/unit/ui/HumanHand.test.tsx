@@ -152,6 +152,37 @@ describe('Drag reorder does not affect selection (M4-T07)', () => {
     fireEvent.pointerUp(neighbor, { pointerId: 3, clientX: 220 });
     expect(slotOf('2', 'Hearts').dataset.selected).toBe('true');
   });
+
+  it('a cancelled drag neither reorders the hand nor swallows the next, unrelated click (review fix)', () => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const orderBefore = orderedKeys();
+    const dragged = slotOf('3', 'Clubs');
+    fireEvent.pointerDown(dragged, { pointerId: 4, clientX: 100, button: 0 });
+    fireEvent.pointerMove(dragged, { pointerId: 4, clientX: 400 });
+    expect(dragged.style.transform).not.toBe('');
+    fireEvent.pointerCancel(dragged, { pointerId: 4, clientX: 400 });
+    // Cleanup without a drop: same order, visual offset gone, and drag state cleared.
+    expect(orderedKeys()).toEqual(orderBefore);
+    expect(dragged.style.transform).toBe('');
+    expect(dragged.className).not.toContain('dragging');
+    // A cancelled gesture never produces a click, so the very next real click on any card must register.
+    const other = slotOf('7', 'Clubs');
+    fireEvent.click(other);
+    expect(other.dataset.selected).toBe('true');
+    fireEvent.click(dragged);
+    expect(dragged.dataset.selected).toBe('true');
+  });
+
+  it('a pointercancel from a different pointer than the active drag is ignored', () => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const dragged = slotOf('3', 'Clubs');
+    fireEvent.pointerDown(dragged, { pointerId: 5, clientX: 100, button: 0 });
+    fireEvent.pointerMove(dragged, { pointerId: 5, clientX: 400 });
+    fireEvent.pointerCancel(dragged, { pointerId: 99 });
+    expect(dragged.style.transform).not.toBe('');
+    fireEvent.pointerUp(dragged, { pointerId: 5, clientX: 400 });
+    expect(dragged.style.transform).toBe('');
+  });
 });
 
 describe('Drag under a scaled play area (M4-T14)', () => {

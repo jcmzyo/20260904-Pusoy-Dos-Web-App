@@ -17,8 +17,8 @@ npm install
 
 ## Type-checking
 
-The project currently has no bundler/build step configured. `tsc` is used purely
-for type-checking (`noEmit: true` in `tsconfig.json`):
+`tsc` is used purely for type-checking (`noEmit: true` in `tsconfig.json`); the
+app itself is bundled by Vite (see "Running the app" below):
 
 ```bash
 npm run typecheck
@@ -26,12 +26,28 @@ npm run typecheck
 
 Expected result: completes with no output/errors.
 
+## Running the app
+
+```bash
+npm run dev       # local development server
+npm run build     # production build into dist/
+npm run preview   # serve the production build locally
+```
+
+New to the game? See [HOW_TO_PLAY.md](HOW_TO_PLAY.md).
+
 ## Project structure (current)
 
 ```
 src/
-  domain/   # Shared, implementation-independent Pusoy Dos vocabulary (domain-model.md)
-  engine/   # Authoritative rules engine (engine.md)
+  domain/        # Shared, implementation-independent Pusoy Dos vocabulary (domain-model.md)
+  engine/        # Authoritative rules engine (engine.md)
+  orchestrator/  # Game-flow coordination and player controllers (orchestrator.md)
+  ai/            # Baseline bot decision logic (ai.md)
+  application/   # Session startup and the UI-safe presentation adapter
+  simulation/    # Headless seeded simulation, replay, and trace tooling (testing-simulation.md)
+  ui/            # React presentation (ui-ux.md)
+tests/           # Vitest/React Testing Library suites and Playwright browser tests
 ```
 
 Architectural boundary: `/domain` must not import from `/engine` (or any other
@@ -89,4 +105,4 @@ npm run test:browser
 
 ## Status
 
-The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, and M3 deterministic simulation and developer trace tooling. M4 playable UI remains separate work.
+The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 deterministic simulation and developer trace tooling, and the M4 playable UI (Home, a five-Round Basic Session against three Baseline bots, and the Session Summary). M4 is in its pre-completion issue sweep (M4-T14.5) ahead of the M4-T15 acceptance gate.

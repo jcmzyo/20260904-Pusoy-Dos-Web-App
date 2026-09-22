@@ -218,3 +218,137 @@ describe('RoundResultOverlay (M4-T12; ui-ux.md §12)', () => {
     expect(onContinue).not.toHaveBeenCalled();
   });
 });
+
+describe('RoundResultOverlay standings ties (ui-ux.md §12: ties keep stable previous relative order)', () => {
+  // Round 1: West 5, North 3, East 2, You 0 (displayed West, North, East, You). Round 2 gives You 5, East 3,
+  // North 2, West 0 - every cumulative total becomes 5, an all-way tie. The tie must keep the order the
+  // person just saw (West, North, East, You), not fall back to raw seat order (You, West, North, East).
+  const tieSeats: readonly RoundResultSeatInput[] = [
+    { playerId: 'south', name: 'You', totalScore: 5 },
+    { playerId: 'west', name: 'West', totalScore: 5 },
+    { playerId: 'north', name: 'North', totalScore: 5 },
+    { playerId: 'east', name: 'East', totalScore: 5 },
+  ];
+  const round1: readonly RoundResultPlacement[] = [
+    { playerId: 'west', placement: 1, points: 5 },
+    { playerId: 'north', placement: 2, points: 3 },
+    { playerId: 'east', placement: 3, points: 2 },
+    { playerId: 'south', placement: 4, points: 0 },
+  ];
+  const round2: readonly RoundResultPlacement[] = [
+    { playerId: 'south', placement: 1, points: 5 },
+    { playerId: 'east', placement: 2, points: 3 },
+    { playerId: 'north', placement: 3, points: 2 },
+    { playerId: 'west', placement: 4, points: 0 },
+  ];
+
+  it('keeps the pre-Round displayed order through an all-way tie instead of jumping back to seat order', () => {
+    render(
+      <RoundResultOverlay roundNumber={2} seats={tieSeats} placements={round2} priorPlacements={[round1]} isFinalRound={false} onContinue={vi.fn()} stageDelayMs={0} />,
+    );
+    // Settle deterministically via the backdrop's own skip click rather than waiting on timers.
+    fireEvent.click(screen.getByRole('dialog').parentElement!);
+    expect(rowTotals()).toEqual(['5', '5', '5', '5']);
+    expect(rowNames()).toEqual(['West', 'North', 'East', 'You']);
+  });
+
+  it('shows the same order before and after settling when scores tie, with no rows moving', () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <RoundResultOverlay roundNumber={2} seats={tieSeats} placements={round2} priorPlacements={[round1]} isFinalRound={false} onContinue={vi.fn()} stageDelayMs={100} />,
+      );
+      const initial = rowNames();
+      expect(initial).toEqual(['West', 'North', 'East', 'You']);
+      // Each stage's timer is only armed after the previous stage has rendered, so step one stage at a time.
+      for (let stage = 0; stage < 3; stage++) act(() => { vi.advanceTimersByTime(100); });
+      expect(rowTotals()).toEqual(['5', '5', '5', '5']);
+      expect(rowNames()).toEqual(initial);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('chains stable order across several prior Rounds, and still reorders when totals genuinely differ', () => {
+    // After Round 1: North 5, West 3, East 2, You 0. After Round 2: North 8, West 8, You 2, East 2 - two ties
+    // whose order must come from the Round 1 standings, not from seat order.
+    const r1: readonly RoundResultPlacement[] = [
+      { playerId: 'north', placement: 1, points: 5 },
+      { playerId: 'west', placement: 2, points: 3 },
+      { playerId: 'east', placement: 3, points: 2 },
+      { playerId: 'south', placement: 4, points: 0 },
+    ];
+    const r2: readonly RoundResultPlacement[] = [
+      { playerId: 'west', placement: 1, points: 5 },
+      { playerId: 'north', placement: 2, points: 3 },
+      { playerId: 'south', placement: 3, points: 2 },
+      { playerId: 'east', placement: 4, points: 0 },
+    ];
+    // Round 3 (current): East +5, You +3, West +2, North +0 -> West 10, North 8, East 7, You 5.
+    const r3: readonly RoundResultPlacement[] = [
+      { playerId: 'east', placement: 1, points: 5 },
+      { playerId: 'south', placement: 2, points: 3 },
+      { playerId: 'west', placement: 3, points: 2 },
+      { playerId: 'north', placement: 4, points: 0 },
+    ];
+    const seatsAfterR3: readonly RoundResultSeatInput[] = [
+      { playerId: 'south', name: 'You', totalScore: 5 },
+      { playerId: 'west', name: 'West', totalScore: 10 },
+      { playerId: 'north', name: 'North', totalScore: 8 },
+      { playerId: 'east', name: 'East', totalScore: 7 },
+    ];
+    render(
+      <RoundResultOverlay roundNumber={3} seats={seatsAfterR3} placements={r3} priorPlacements={[r1, r2]} isFinalRound={false} onContinue={vi.fn()} stageDelayMs={100000} />,
+    );
+    // Before: after Round 2, north 8 and west 8 tie -> north (already first after Round 1) stays ahead of west;
+    // south 2 and east 2 tie -> east (already ahead of south after Round 1) stays ahead.
+    expect(rowNames()).toEqual(['North', 'West', 'East', 'You']);
+    fireEvent.click(screen.getByRole('dialog').parentElement!);
+    expect(rowNames()).toEqual(['West', 'North', 'East', 'You']);
+  });
+});
+
+describe('RoundResultOverlay paused timers (review fix)', () => {
+  it('freezes the scoring animation while paused and resumes the interrupted stage afterwards', () => {
+    vi.useFakeTimers();
+    try {
+      const props = { roundNumber: 1, seats, placements, isFinalRound: false, onContinue: vi.fn(), stageDelayMs: 100 } as const;
+      const { rerender } = render(<RoundResultOverlay {...props} paused />);
+      act(() => { vi.advanceTimersByTime(10_000); });
+      expect(rowRoundPoints()).toEqual(['—', '—', '—', '—']);
+      expect(isMarkedSettledHidden(1)).toBe(false);
+
+      rerender(<RoundResultOverlay {...props} paused={false} />);
+      act(() => { vi.advanceTimersByTime(99); });
+      expect(rowRoundPoints()).toEqual(['—', '—', '—', '—']);
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(rowRoundPoints().every((points) => points !== '—')).toBe(true);
+      for (let stage = 0; stage < 2; stage++) act(() => { vi.advanceTimersByTime(100); });
+      expect(isMarkedSettledHidden(1)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('holds the Round 5 auto-advance while paused, then fires it once resumed', () => {
+    vi.useFakeTimers();
+    try {
+      const onContinue = vi.fn();
+      const props = { roundNumber: 5, seats, placements, isFinalRound: true, onContinue, stageDelayMs: 0, autoAdvanceDelayMs: 500 } as const;
+      const { rerender } = render(<RoundResultOverlay {...props} />);
+      // Settle (three zero-delay stages) but do not yet reach the auto-advance delay.
+      for (let stage = 0; stage < 3; stage++) act(() => { vi.advanceTimersByTime(0); });
+      expect(isMarkedSettledHidden(1)).toBe(true);
+      rerender(<RoundResultOverlay {...props} paused />);
+      act(() => { vi.advanceTimersByTime(10_000); });
+      expect(onContinue).not.toHaveBeenCalled();
+      rerender(<RoundResultOverlay {...props} paused={false} />);
+      act(() => { vi.advanceTimersByTime(499); });
+      expect(onContinue).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(onContinue).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

@@ -98,7 +98,9 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
 
   return (
     <div className={styles.backdrop}>
-      <section className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary">
+      {/* Inert while its own Event Log popup is open on top of it, so Home/Play Again/Event Log cannot be
+       *  reached from the keyboard underneath that modal. */}
+      <section className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen}>
         <header className={styles.header}>
           <p className={styles.eyebrow}>SESSION COMPLETE</p>
           <h2>Session Summary</h2>

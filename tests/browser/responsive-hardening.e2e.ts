@@ -8,6 +8,7 @@ import {
   MINIMUM_TOUCH_TARGET_SIZE_PX,
   VIEWPORT_MATRIX,
 } from './viewportMatrix';
+import { currentSelectionCap, waitForSelectableTurn, waitForYourTurn } from './turnHelpers';
 
 /**
  * Real-browser coverage for M4-T14 (Full Responsive Hardening; ui-ux.md §14): the frozen T04 viewport
@@ -477,6 +478,9 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
     const baseline = await tops();
     for (const top of baseline) expect(top).toBeCloseTo(baseline[0]!, 0);
 
+    // Selecting two cards (rather than one) is what proves a selected card rises independently of its
+    // neighbors, so this Turn's own live cap must allow at least two.
+    await waitForSelectableTurn(page, 2);
     for (const index of [2, 7]) await cards.nth(index).click();
     await expect(slots.nth(2)).toHaveAttribute('data-selected', 'true');
     await expect(slots.nth(7)).toHaveAttribute('data-selected', 'true');
@@ -502,12 +506,15 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
       expect(lefts[index + 1]! - lefts[index]!, `card ${index} exposed width`).toBeGreaterThanOrEqual(MINIMUM_EXPOSED_CARD_WIDTH_PX - 0.5);
     }
 
-    // At Session start the Trick is the Opening Move, so only the first 5 clicks can select anything (the
-    // free Play cap, M4-T08); the rest still prove their own card was hit by staying reliably deselected.
-    const FREE_PLAY_CAP = 5;
+    // Only the first `cap` clicks can select anything (the live Play selection cap, M4-T08); the rest
+    // still prove their own card was hit by staying reliably deselected. `cap` is read from this Turn's
+    // own live state rather than assumed to always be the free-Play 5, since Session start does not
+    // guarantee this seat is the one opening (see `waitForYourTurn`'s own docstring above).
+    await waitForYourTurn(page);
+    const cap = await currentSelectionCap(page);
     for (let index = 0; index < 13; index++) {
       await cards.nth(index).click();
-      await expect(slots.nth(index)).toHaveAttribute('data-selected', index < FREE_PLAY_CAP ? 'true' : 'false');
+      await expect(slots.nth(index)).toHaveAttribute('data-selected', index < cap ? 'true' : 'false');
     }
   });
 }

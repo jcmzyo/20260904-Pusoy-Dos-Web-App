@@ -1,7 +1,7 @@
 import type { Card, Combination, Move, PlayerId } from '../../domain';
 import type { SessionPresentationSnapshot } from '../../application/SessionPresentation';
 import { canBeat, defaultRuleset, generateLegalResponseMoves, inspectCombination } from '../../engine';
-import { describeCombination } from './combinationLabels';
+import { COMBINATION_LABELS, describeCombination } from './combinationLabels';
 import styles from './PlayPassControls.module.css';
 
 type Center = SessionPresentationSnapshot['center'];
@@ -10,6 +10,21 @@ export type PlaySelectionEvaluation =
   | { readonly kind: 'empty' }
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'valid'; readonly combination: Combination };
+
+/**
+ * Why a recognized selection does not beat the current hand. Single/Pair/Triple name the hand to beat
+ * ("Doesn't beat Pair of 9s"). A five-card hand cannot: a bare "Doesn't beat Full House" would read as if
+ * a Full House could never beat another one, and the Play button's fixed two-line sub-label has no room to
+ * also name the deciding Rank. So it says what is missing instead. Five-card hands are only beaten by
+ * five-card hands, and a higher category always beats a lower one, so given `canBeat` already said no:
+ * a different five-card category is a weaker one, and the same category is a lower one.
+ */
+function describeNonBeatingReason(selected: Combination, toBeat: Combination): string {
+  if (toBeat.cards.length !== 5) return `Doesn't beat ${describeCombination(toBeat)}`;
+  if (selected.cards.length !== 5) return 'Needs a 5-card hand';
+  const label = COMBINATION_LABELS[toBeat.type];
+  return selected.type === toBeat.type ? `Needs a higher ${label}` : `Weaker than ${label}`;
+}
 
 /**
  * Mirrors the Engine's own authoritative Play legality using only the Engine's exported
@@ -29,7 +44,7 @@ export function evaluatePlaySelection(selected: readonly Card[], center: Center)
     return { kind: 'invalid', reason: 'Must include 3♣' };
   }
   if (center.kind === 'hand' && !canBeat(inspected.combination, center.combination, defaultRuleset)) {
-    return { kind: 'invalid', reason: `Doesn't beat ${describeCombination(center.combination)}` };
+    return { kind: 'invalid', reason: describeNonBeatingReason(inspected.combination, center.combination) };
   }
   return { kind: 'valid', combination: inspected.combination };
 }

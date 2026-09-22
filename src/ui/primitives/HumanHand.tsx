@@ -156,23 +156,39 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     cardEl.style.transform = `translateX(${clamp(deltaX, minDelta, maxDelta) / state.scale}px)`;
   }
 
-  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
-    const state = dragStateRef.current;
-    if (!state || event.pointerId !== state.pointerId) return;
+  /** Tears down an in-progress drag: visual offset, pointer capture, and drag state. Shared by a completed
+   *  drop (`endDrag`) and a cancelled gesture (`cancelDrag`), neither of which may leave any of it behind. */
+  function releaseDrag(state: DragState, pointerId: number) {
     const cardEl = cardRefs.current.get(state.key);
     if (cardEl) {
       cardEl.style.transform = '';
-      if (typeof cardEl.hasPointerCapture === 'function' && cardEl.hasPointerCapture(event.pointerId)) {
-        cardEl.releasePointerCapture(event.pointerId);
+      if (typeof cardEl.hasPointerCapture === 'function' && cardEl.hasPointerCapture(pointerId)) {
+        cardEl.releasePointerCapture(pointerId);
       }
-    }
-    if (state.dragged) {
-      const targetIndex = computeDropIndex(state.key, event.clientX);
-      setOrder((prev) => moveKey(prev, state.key, targetIndex));
-      suppressClickRef.current = true;
     }
     dragStateRef.current = null;
     setDragKey(null);
+  }
+
+  /** `pointercancel` (the browser took the gesture over, e.g. a touch scroll/system gesture, or capture was
+   *  lost): nothing was dropped, so the hand order stays as it was and, since a cancelled gesture never
+   *  produces the click that would normally clear `suppressClickRef`, it must not be set at all - otherwise
+   *  the person's next, unrelated card click would be silently swallowed. */
+  function cancelDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragStateRef.current;
+    if (!state || event.pointerId !== state.pointerId) return;
+    releaseDrag(state, event.pointerId);
+  }
+
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = dragStateRef.current;
+    if (!state || event.pointerId !== state.pointerId) return;
+    const dropIndex = state.dragged ? computeDropIndex(state.key, event.clientX) : null;
+    releaseDrag(state, event.pointerId);
+    if (dropIndex !== null) {
+      setOrder((prev) => moveKey(prev, state.key, dropIndex));
+      suppressClickRef.current = true;
+    }
   }
 
   return (
@@ -194,7 +210,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
               onPointerDown={(event) => handlePointerDown(key, event)}
               onPointerMove={handlePointerMove}
               onPointerUp={endDrag}
-              onPointerCancel={endDrag}
+              onPointerCancel={cancelDrag}
               onClick={() => toggleSelected(key)}
             >
               <div className={`${styles.lift} ${isSelected ? styles.selected : ''}`}>

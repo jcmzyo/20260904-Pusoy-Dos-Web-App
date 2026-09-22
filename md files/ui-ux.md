@@ -156,6 +156,8 @@ Phase 1 supports bounded manual rearrangement by mouse/touch drag within the han
 
 The large Play control carries selection feedback. No selection/invalid/non-beating selection keeps Play disabled/gray. Where practical, show a specific Engine-derived reason such as **Invalid combination**, **Wrong number of cards**, **Must include 3♣**, or **Doesn't beat Pair of 9s**. A valid legal selection shows the recognized combination and enables Play.
 
+A Single/Pair/Triple's own non-beating reason names the Rank it must beat (**Doesn't beat Pair of 9s**), since that Rank alone decides it. A bare category name cannot do the same job for a five-card hand (Straight, Flush, Full House, Four of a Kind, Straight Flush): "Doesn't beat Full House" would misleadingly read as if a Full House could never beat another one. So a five-card hand to beat instead says what the current selection is missing: **Needs a higher Full House** when the selection is a recognized but lower hand of that same category, **Weaker than Full House** when it is a lower five-card category, or **Needs a 5-card hand** when the selection is not five cards at all.
+
 Pass is available only where canonical rules allow it. Strategic Pass remains available even when legal beating Plays exist. If no legal Play exists while responding, the Pass control explicitly includes **No valid plays** so the player understands the state. Phase 1 does not auto-pass.
 
 After a successful human Play, played cards leave the hand, selection clears, remaining cards close gaps, and the authoritative play becomes the current hand to beat and part of the Discard Pile.

@@ -3,7 +3,7 @@
 ## Milestone Design + Task Breakdown (v1.5)
 
 **Status:** Approved milestone design and implementation task plan  
-**Last Modified:** September 19, 2026  
+**Last Modified:** September 21, 2026  
 **Milestone:** M4 --- Minimal Playable UI  
 **Phase:** Phase 1 --- Initial Playable Basic Game  
 **Parent requirements:** `requirements.md` v1.15  
@@ -69,7 +69,7 @@ After 3rd place finishes, interaction stops and the 4th-place remaining hand is 
 
 Round Result is a non-dismissible modal over the dimmed completed table. It initially uses the standings before the Round score, then Round points appear, totals update, and rows rearrange by new cumulative total. The final heading is **Total**. The animation is skippable but a skip input must not trigger Next Round. Rounds 1–4 use Next Round; Round 5 has no continuation button at all — once the animation settles, the overlay automatically transitions to the Session Summary after a short additional delay (Follow-up, M4-T13 UI refinement).
 
-Session Summary uses the official final ranking/tiebreaks, shows all five Round results (Round-by-Round Summary, plain point values) and final scores, gives 1st/2nd/3rd explicit gold/silver/bronze treatment plus a distinct highlight for the human player's own seat, embeds the full Session Event Log to the left of its actions, and provides Play Again + Home. It presents as a popup replacing the Round Result overlay in place, reached automatically rather than through an explicit button (Follow-up, M4-T13 UI refinement).
+Session Summary uses the official final ranking/tiebreaks, shows all five Round results (Round-by-Round Summary, plain point values) and final scores, gives 1st/2nd/3rd explicit gold/silver/bronze treatment plus a distinct highlight for the human player's own seat, and provides Event Log (opening the same dismissible Event Log popup used elsewhere), Home, and Play Again actions. It presents as a popup replacing the Round Result overlay in place, reached automatically rather than through an explicit button (Follow-up, M4-T13 UI refinement).
 
 # 6. Responsive Contract
 
@@ -445,11 +445,11 @@ Resolve three follow-up reports surfaced during M4-T12 review that are polishing
 ### Work
 - **(A)** Once scope is confirmed: investigate the concrete reported scenario against current Baseline AI decision logic; implement only the agreed fix. Do not guess at a heuristic change without that confirmation.
 - **(B)** Implement `requirements.md` §2.5.2's approved replacement in `resolveBasicContinuation.ts` (and any other dependent Engine/Orchestrator Turn-generation code): each remaining active player gets a real Turn (Play-if-beating or explicit Pass) instead of the Engine silently skipping straight to free-lead reassignment. The eventual outcome (who leads/responds) does not change — only how it is reached. Once implemented and verified, promote §2.5.2's text into §2.5.1's own authoritative rule and retire the old silent-skip description, with the person's approval.
-- **(C)** Implement `ui-ux.md` §5.1's documented canonical order in `getDisplayCards`/`combinationLabels.ts`: Pair/Triple by Suit low→high; Flush by Rank low→high; Full House as the Triple's three cards (by Suit) then the Pair's two cards (by Suit); Four-of-a-Kind as the four matching cards (by Suit) then the kicker last. Leave the existing Straight/Straight Flush logic unchanged. Apply consistently to both the center table's hand-to-beat display and each seat's own Play trail (they already share one code path, ui-ux.md §5.4).
+- **(C)** Implement `ui-ux.md` §5.1's documented canonical order in `getDisplayCards`/`combinationLabels.ts`: Pair/Triple by Suit low→high; Flush by Rank low→high; Full House as the Pair's two cards (by Suit) then the Triple's three cards (by Suit); Four-of-a-Kind as the kicker first, then the four matching cards (by Suit) - so the card(s) that decide strength always land rightmost (the orders `ui-ux.md` §5.1 corrected during M4-T12.5; an earlier draft of this task had them reversed). Leave the existing Straight/Straight Flush logic unchanged. Apply consistently to both the center table's hand-to-beat display and each seat's own Play trail (they already share one code path, ui-ux.md §5.4).
 
 ### Automated Tests
 - **(B):** Engine/Orchestrator integration tests proving every remaining active player now produces a real Turn (a genuine `PLAYER_PASSED` event per passing player) before free-lead reassignment in the "nobody can beat it" branch; the existing "someone can beat it" branch is unchanged and its existing tests must keep passing.
-- **(C):** Unit tests for `getDisplayCards` covering Pair, Triple, Flush, Full House (Triple-before-Pair, each internally Suit-ordered), and Four-of-a-Kind (kicker sorts last); existing Straight/Straight Flush tests remain unchanged and must keep passing.
+- **(C):** Unit tests for `getDisplayCards` covering Pair, Triple, Flush, Full House (Pair-before-Triple, each internally Suit-ordered), and Four-of-a-Kind (kicker sorts first, the four matching cards last); existing Straight/Straight Flush tests remain unchanged and must keep passing.
 - **(A):** Determined once scope is confirmed.
 
 ### Manual Tests
@@ -524,10 +524,10 @@ Run the human viewport checklist on each supported class. Confirm readability, t
 One coherent landscape-first product works from supported phone landscape through desktop/windowed browser, scaling as a proportional whole without requiring the person to scroll to reach core controls.
 
 ### Definition of Done
-- [x] Frozen matrix passes browser checks.
-- [ ] Human checklist has no blocking viewport defect. *(Manual verification pending: a person must run it.)*
-- [x] Card ratio/selection baseline invariant preserved.
-- [x] Play area fits the viewport (no scrollbar) at every supported size, including real-device landscape heights narrower than their nominal/emulated estimate.
+- [ ] Frozen matrix passes browser checks.
+- [ ] Human checklist has no blocking viewport defect. *(Run and confirmed manually by the person, including the follow-up items recorded in the Implementation Notes below.)*
+- [ ] Card ratio/selection baseline invariant preserved.
+- [ ] Play area fits the viewport (no scrollbar) at every supported size, including real-device landscape heights narrower than their nominal/emulated estimate.
 
 ### Implementation Notes (M4-T14)
 
@@ -584,7 +584,7 @@ Prove M4 and Phase 1 are actually complete.
 All milestone-required automated suites. Do not duplicate every Engine rule in Playwright.
 
 ### Manual Tests
-At minimum: complete a real five-Round Session; identify turns/hand-to-beat; select every overlapped card at least once on constrained layout; reorder selected/unselected cards; sort both ways; exercise legal/illegal Play and strategic/no-valid Pass; inspect Discard/Event overlays; observe bot pacing; use Leave confirmation; rotate/resize; observe 4th-hand reveal and result reordering; use Next Round (R1-4) and observe the automatic R5 transition to Session Summary; verify Session Summary (including its embedded Event Log and human-seat highlight) and Play Again/Home.
+At minimum: complete a real five-Round Session; identify turns/hand-to-beat; select every overlapped card at least once on constrained layout; reorder selected/unselected cards; sort both ways; exercise legal/illegal Play and strategic/no-valid Pass; inspect Discard/Event overlays; observe bot pacing; use Leave confirmation; rotate/resize; observe 4th-hand reveal and result reordering; use Next Round (R1-4) and observe the automatic R5 transition to Session Summary; verify Session Summary (including its Event Log button/popup and human-seat highlight) and Play Again/Home.
 
 Task-based usability check: give a tester the goal **“Start a game and play through at least one Round”** without telling them which controls to press; record confusion points separately from functional defects.
 

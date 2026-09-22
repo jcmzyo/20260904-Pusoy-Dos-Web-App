@@ -31,8 +31,10 @@ export interface PresentedSeat {
    * until the cycle actually resets (a Trick reset/free lead, or a fresh Round), matching `passed`'s
    * own reset boundary for a Trick reset but, unlike `passed`, NOT cleared by every subsequent Play:
    * a beaten Play stays visible (grayed) at that seat until the whole cycle clears. `beaten` is false
-   * exactly when this is still the authoritative current hand (`center.kind === 'hand' && center.playerId
-   * === this seat`).
+   * exactly when this is still the authoritative live hand to beat (`center.kind === 'hand' && center.playerId
+   * === this seat`, in a Round that is still in progress). Once the Round has completed no hand is live
+   * any more - `center` keeps showing the final hand purely as a retained display - so every retained
+   * trail is `beaten: true` there, the Round-ending finisher's included; only the cards are preserved.
    *
    * Also `null` the instant this same seat itself Passes (even on a later Turn within the same cycle,
    * after already Playing once), and it STAYS `null` even once a later Play by someone else in that
@@ -53,10 +55,11 @@ export interface PresentedSeat {
    * through every later mid-Round reset too, not only the Round-ending one above - previously it was
    * wiped the instant the very next Trick concluded, reading as if a finisher's own winning Play simply
    * never happened (inconsistent with the 3rd-place finisher's own Play, which already survived).
-   * `beaten` for a finished seat's persisted Play is frozen at the moment its own Trick actually
-   * concludes (whether some other Play beat it before the response cycle moved on), since the live
-   * `center` comparison stops being meaningful once the table moves to a later Trick this finisher no
-   * longer takes part in.
+   * `beaten` follows the same rule for a finished seat's persisted Play: it is grayed as soon as it is
+   * no longer the live hand to beat, i.e. once its own Trick concludes, whether or not another Play
+   * ever topped it. Previously a finisher's Play that nobody topped kept full brightness for the rest
+   * of the Round, beside the live "Current Play" of every later Trick, while a topped one grayed - the
+   * same finisher's trail looked different depending on how its Trick happened to end.
    */
   readonly lastPlay: { readonly combination: Combination; readonly beaten: boolean } | null;
 }
@@ -293,12 +296,10 @@ export class SessionPresentation {
     // Round, so its own final Play stays visible at its seat for the rest of the Round rather than
     // being wiped by the very next mid-Round Trick reset - matching how the 3rd-place finisher's own
     // final Play already survives Round completion below, but now applied uniformly to every
-    // finisher rather than only the one whose finish happens to also end the Round. `frozenBeaten`
-    // locks in whether that final Play was itself topped (via that Trick's own `lastSuccessfulPlayerId`)
-    // at the moment its Trick actually concludes, since the live `center`-based comparison below stops
-    // being meaningful for a seat once it moves on to a later Trick this finisher no longer takes part in.
+    // finisher rather than only the one whose finish happens to also end the Round. Once its own Trick
+    // has concluded that Play is no longer the live hand to beat, so the `center`-based `beaten`
+    // comparison below grays it whether or not anything ever topped it.
     const finishedSeats = new Set<PlayerId>();
-    const frozenBeaten = new Map<PlayerId, boolean>();
     for (const [index, event] of roundEvents.entries()) {
       if (event.type === 'CARDS_PLAYED') { lastPlay = event; passed.clear(); lastPlaysBySeat.set(event.playerId, event.combination); }
       if (event.type === 'PLAYER_FINISHED') finishedSeats.add(event.playerId);
@@ -308,12 +309,10 @@ export class SessionPresentation {
         // is also the Round's own completion, e.g. the 3rd-place finisher's final Play). The latter needs
         // no special handling here — nothing plays again this Round, so every seat's trail is already
         // left as-is; the former is an actual mid-Round reset, but must still preserve (rather than wipe)
-        // any already-finished seat's own final Play, freezing its beaten status against this exact
-        // Trick's own outcome before moving on.
+        // any already-finished seat's own final Play (which is grayed from here on: its Trick is over).
         if (roundEvents[index + 1]?.type !== 'ROUND_ENDED') {
           for (const id of [...lastPlaysBySeat.keys()]) {
-            if (!finishedSeats.has(id)) { lastPlaysBySeat.delete(id); continue; }
-            if (!frozenBeaten.has(id)) frozenBeaten.set(id, event.lastSuccessfulPlayerId !== id);
+            if (!finishedSeats.has(id)) lastPlaysBySeat.delete(id);
           }
           // A Pass that itself closes the response cycle (nobody left to out-bid the current hand) emits
           // PLAYER_PASSED immediately followed by this very TRICK_ENDED in the SAME Turn's event batch
@@ -359,9 +358,8 @@ export class SessionPresentation {
       const placement = roundCheckpoint?.placements.find((entry) => entry.playerId === seat)?.placement
         ?? (finishIndex === -1 ? null : (finishIndex + 1) as 1 | 2 | 3);
       const seatLastPlay = lastPlaysBySeat.get(seat);
-      const frozen = frozenBeaten.get(seat);
       const lastPlayPresentation = seatLastPlay === undefined || passed.has(seat) ? null
-        : { combination: seatLastPlay, beaten: frozen ?? !(center.kind === 'hand' && center.playerId === seat) };
+        : { combination: seatLastPlay, beaten: roundCheckpoint !== null || !(center.kind === 'hand' && center.playerId === seat) };
       return {
         seat, playerId: seat, name, cardCount: player?.cardCount ?? 0, totalScore: standing.totalScore,
         isCurrentTurn: round?.currentPlayerId === seat, passed: passed.has(seat), done: player?.finished ?? false, placement,

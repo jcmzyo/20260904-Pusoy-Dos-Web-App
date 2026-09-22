@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Move } from '../../../src/domain';
 import { SessionPresentation } from '../../../src/application/SessionPresentation';
+import { createSessionConfiguration, startSession } from '../../../src/application/startSession';
 import type { StartedSession } from '../../../src/application/startSession';
 import { createSession, defaultRuleset, getPublicView, startRound } from '../../../src/engine';
 import { GameRunner } from '../../../src/orchestrator';
@@ -131,6 +132,68 @@ describe('SessionTable seats and center (M4-T06)', () => {
     // seats retains either a "Current Play" or "Previous Play, now beaten" landmark.
     expect(screen.queryAllByRole('group', { name: 'Current Play' })).toHaveLength(0);
     expect(screen.queryAllByRole('group', { name: 'Previous Play, now beaten' })).toHaveLength(0);
+  });
+});
+
+/** A production Session (real HumanController for South) whose seeded deal has East open, so South's own
+ *  first Turn is a response to East's Play - a Turn where Pass is legal. Bots advance instantly. */
+async function respondingHumanTable() {
+  let seed = 26;
+  const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+  const presentation = new SessionPresentation(startSession(createSessionConfiguration(), { engineRng }));
+  render(<SessionTable presentation={presentation} />);
+  presentation.startAutoPlay(0);
+  await waitFor(() => {
+    expect(presentation.getSnapshot().currentPlayerId).toBe('south');
+    expect(presentation.getPendingHumanRequest()).not.toBeNull();
+  });
+  return presentation;
+}
+
+describe('Modal overlays block gameplay, including from the keyboard (review fix; ui-ux.md §9.2, §10)', () => {
+  const tableIsInert = () => screen.getByRole('region', { name: 'Game Table' }).closest('[inert]') !== null;
+
+  it.each([
+    ['Event Log', 'Event Log'],
+    ['Check Discard Pile', 'Discard Pile'],
+    ['Leave Game', 'Leave Game'],
+  ])('makes the whole table inert while %s is open, and interactive again once it closes', async (buttonName, dialogName) => {
+    const presentation = await respondingHumanTable();
+    expect(tableIsInert()).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: buttonName }));
+    expect(screen.getByRole('dialog', { name: dialogName })).toBeTruthy();
+    expect(tableIsInert()).toBe(true);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(tableIsInert()).toBe(false);
+    expect(presentation.getPendingHumanRequest()).not.toBeNull();
+  });
+
+  it('does not let Pass go through while Event Log is open, even if the activation still reaches the handler (reviewer repro)', async () => {
+    const presentation = await respondingHumanTable();
+    const before = presentation.getSnapshot().events.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+    // `fireEvent` ignores `inert`, standing in for any activation that slips past it (e.g. Tab to Pass + Enter
+    // before `inert` existed): the submission itself must still be rejected while paused.
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    expect(presentation.getPendingHumanRequest()).not.toBeNull();
+    expect(presentation.getSnapshot().currentPlayerId).toBe('south');
+    expect(presentation.getSnapshot().events).toHaveLength(before);
+    expect(within(screen.getByRole('dialog', { name: 'Event Log' })).queryByText('You passed.')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Event Log' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
+    await waitFor(() => expect(presentation.getSnapshot().events.slice(before)).toContainEqual(expect.objectContaining({ type: 'PLAYER_PASSED', playerId: 'south' })));
+  });
+
+  it('returns keyboard focus to the control that opened an overlay once it closes', () => {
+    render(<SessionTable presentation={fixture()} />);
+    const opener = screen.getByRole('button', { name: 'Event Log' });
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(opener);
   });
 });
 

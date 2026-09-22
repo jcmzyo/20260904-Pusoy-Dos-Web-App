@@ -153,6 +153,21 @@ describe('SessionSummary (M4-T13; ui-ux.md §13)', () => {
     expect(screen.getByRole('dialog', { name: 'Session Summary' })).toBeTruthy();
   });
 
+  it('makes the Summary\'s own actions inert while its Event Log is open, so Home/Play Again are not reachable underneath it', () => {
+    const result = resolveBasicSessionResult(ids, clearRounds);
+    renderSummary(result, clearRounds);
+    const summary = screen.getByRole('dialog', { name: 'Session Summary' });
+    expect(summary.hasAttribute('inert')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+    expect(summary.hasAttribute('inert')).toBe(true);
+    // The log's own dialog is a sibling of the Summary's panel, not inside the inert subtree.
+    expect(screen.getByRole('dialog', { name: 'Event Log' }).closest('[inert]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Event Log' }));
+    expect(summary.hasAttribute('inert')).toBe(false);
+  });
+
   it('shows a placeholder for an empty Event Log rather than an empty list', () => {
     const result = resolveBasicSessionResult(ids, clearRounds);
     renderSummary(result, clearRounds, { events: [] });
