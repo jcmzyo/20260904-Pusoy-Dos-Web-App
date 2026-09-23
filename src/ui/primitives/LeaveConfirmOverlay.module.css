@@ -1,0 +1,50 @@
+.warning {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #f7f4e9;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.stay,
+.leave {
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid #ead8a7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stay {
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+}
+
+.stay:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+/* Leaving is the destructive/one-way action here (progress is not saved), so it gets its own warning
+ * color rather than the shared gold/cream treatment every other button in the app uses — the person
+ * should never confuse it with a routine action. */
+.leave {
+  background: #c94f4f;
+  border-color: #c94f4f;
+  color: #f7f4e9;
+}
+
+.leave:hover {
+  background: #d96363;
+}
+
+.stay:focus-visible,
+.leave:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}

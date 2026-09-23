@@ -1,0 +1,475 @@
+:global(*) {
+  box-sizing: border-box;
+}
+
+:global(body) {
+  margin: 0;
+  background: #0b2822;
+  color: #f7f4e9;
+  font-family: system-ui, sans-serif;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: clamp(24px, 5vw, 64px);
+  background: radial-gradient(ellipse at top, #215b47, #0b2822);
+}
+
+/* Live-session screen (M4-T14): exactly one viewport tall and never scrolls - the play area inside it
+ * (PlayArea.tsx) is what scales to fit, so nothing here needs a scroll extent of its own. `100dvh`
+ * follows a mobile browser's own collapsing address bar where supported; `100vh` is the fallback. */
+/* `--edge-inset` is how far the title row and the bottom bar sit in from the play area's own left/right
+ * edges: where the table's straight edge begins after its 48px corner curve (8px margin + 48px = 56px),
+ * so the title, Event Log/Leave Game, Round line and Play/Pass line up with the start of the curve
+ * instead of hugging the window edge (the person's own follow-up request). On a narrow play area it
+ * shrinks (down to the table's own 8px margin) so the bottom bar's three containers - 874px in total -
+ * still fit; the percentage is resolved by each element that uses it, against the play area's width. */
+.sessionShell {
+  --edge-inset: clamp(8px, calc((100% - 890px) / 2), 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: radial-gradient(ellipse at top, #215b47, #0b2822);
+}
+
+.home {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.home h1 {
+  margin: 12px 0;
+  font-size: clamp(40px, 8vw, 80px);
+  letter-spacing: -0.04em;
+}
+
+.eyebrow {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  color: #c8d8cd;
+}
+
+/* Portrait/undersized-landscape guidance (M4-T11; ui-ux.md §14) - its own heading size rather than
+ * `.home`'s (tuned specifically for the short "Pusoy Dos" title), since the guidance text is longer. */
+.unsupportedLayout {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.unsupportedLayout h1 {
+  margin: 0;
+  font-size: clamp(22px, 5vw, 36px);
+  letter-spacing: -0.02em;
+}
+
+.unsupportedLayout p {
+  margin: 0;
+  color: #c8d8cd;
+  font-size: 14px;
+}
+
+.start {
+  margin-top: 24px;
+  padding: 16px 40px;
+  border: 1px solid #ead8a7;
+  border-radius: 10px;
+  background: #ead8a7;
+  color: #163b2d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.start:hover {
+  background: #f8e7ba;
+}
+
+.start:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 5px;
+}
+
+.start:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+/* Its own row above the table, title left and Round right, so it never overlaps the table (M4-T14). */
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px var(--edge-inset) 0;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.header p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Fills the play area's own height (PlayArea.module.css's `.playArea` is a flex column) so the table can
+ * take whatever the bottom bar leaves. */
+.playContent {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.table {
+  position: relative;
+  display: grid;
+  /* West/East's own columns are never narrower than their seat's own content width (56px bot-hand column
+   * + `--seat-card-gap` (12-20px) + PlayerPanel's own fixed 168px width = 236-244px) and span the table's full height, so their
+   * content can never overflow the table border at any viewport (M4-T14; previously a 96px floor here was
+   * inconsistent with that seat width at the narrowest supported viewport). Beyond that floor the columns
+   * share the table's width 1:2:1 with each seat centered in its own column, so a wide play area spreads
+   * the seats around the center instead of pinning them to the border. */
+  grid-template-columns: minmax(calc(56px + var(--seat-card-gap) + 168px), 1fr) minmax(0, 2fr) minmax(calc(56px + var(--seat-card-gap) + 168px), 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "west north east"
+    "west center east"
+    "west south east";
+  align-items: center;
+  justify-items: center;
+  gap: 6px;
+  margin: 6px 8px 0;
+  padding: 10px;
+  border: 2px solid #66866b;
+  border-radius: 48px;
+  background: #164b39;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Room between a bot's face-down cards and its PlayerPanel, so the panel's Turn/placement glow does not
+   * crowd the cards. At the play area's design height (PLAY_AREA_DESIGN_HEIGHT_PX, 656) there is only room
+   * for 12px; every 2px of extra height (`cqh`, design units) adds 1px, up to a comfortable 20px, so a short
+   * window keeps the tighter spacing and a taller one gets more. */
+  --seat-card-gap: 12px;
+}
+
+@supports (height: 1cqh) {
+  .table {
+    --seat-card-gap: clamp(12px, calc(12px + (100cqh - 656px) / 2), 20px);
+  }
+}
+
+.seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.seatNorth {
+  grid-area: north;
+  gap: var(--seat-card-gap);
+}
+
+/* West/East: cards lengthwise (stacked vertically) on the outer edge, details adjacent to
+ * center - "Lengthwise cards | West Details | Center Table | East Details | Lengthwise Cards" -
+ * so a 13-card hand overlaps within the seat's own row instead of spilling into the table border. The
+ * card-to-panel gap matches North's (`.seatNorth`) - the person's own follow-up request - and is wide
+ * enough (`--seat-card-gap`, set on `.table`) that the panel's own Turn/placement glow (PlayerPanel.module.css,
+ * about 10px of visible fade past its 3px ring) no longer washes over the face-down cards. */
+.seatWest {
+  grid-area: west;
+  flex-direction: row;
+  gap: var(--seat-card-gap);
+}
+
+.seatEast {
+  grid-area: east;
+  flex-direction: row-reverse;
+  gap: var(--seat-card-gap);
+}
+
+.seatSouth {
+  grid-area: south;
+}
+
+/* `min-width`/`min-height` below each reserve this seat's own worst-case (13-card, the hard Pusoy Dos
+ * hand-size ceiling) footprint, so it stays constant instead of shrinking as that hand is played down
+ * during a Round - previously this shrank the whole seat, which in turn shrank the table's own border
+ * (the person's own follow-up report: "the main table border also changes size...kinda trippy"). Since
+ * 13 cards is already the hand size every seat starts a Round with, this reserves no more room than
+ * what's already rendered (and already verified within the table border, viewport-matrix.e2e.ts) at the
+ * very start of every Round - it simply stops that reservation from shrinking later. */
+.botHand {
+  display: flex;
+  min-width: 184px;
+  /* One card's own height (40px wide × 5:7 aspect ratio = 56px tall) so this row never collapses to 0
+   * height at 0 cards, which would otherwise shift PlayerPanel below it (same root cause the West/East
+   * min-width fix above addresses for that axis; the person's own follow-up report only named East, but
+   * North/South share the identical empty-row-collapse mechanism). */
+  min-height: 56px;
+  justify-content: center;
+}
+
+/* Every face-down bot card exposes 12px of itself (a 13-card fan is 40 + 12 × 12 = 184px), tighter than
+ * the earlier 20px (M4-T14: secondary, purely decorative UI compresses before core gameplay does). */
+.botHand > *:not(:first-child) {
+  margin-left: -28px;
+}
+
+.seatWest .botHand,
+.seatEast .botHand {
+  flex-direction: column;
+  /* One rotated card's own width (`.rotatedCard`, 56px) rather than `auto` - at 0 cards this column had
+   * no children at all, collapsing to 0 width and letting the whole seat's row narrow, which visibly
+   * shifted PlayerPanel sideways toward the table the moment a West/East hand emptied out (the person's
+   * own follow-up report, observed at East). */
+  min-width: 56px;
+  min-height: 184px;
+}
+
+/* West/East cards are always rendered rotated (App.tsx's `BotHand` `rotated` prop; the `.rotatedCard`
+ * wrapper's own overlap margin is set below), so this only ever matters if that ever changes. */
+.seatWest .botHand > *:not(:first-child),
+.seatEast .botHand > *:not(:first-child) {
+  margin-left: 0;
+  margin-top: -40px;
+}
+
+.center {
+  grid-area: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+}
+
+/* Fixed (not min-) height, generously sized for its tallest real state (a full hand-to-beat's meta
+ * line plus its card row) and held constant across every other state (OPENING/FREE LEAD/empty single
+ * line) - part of the same table-dimension stability fix as `.botHand` above (the person's own
+ * follow-up report). `overflow: hidden` is a safety net only; it is not expected to ever actually clip
+ * real content at this size. */
+.currentHand {
+  height: 108px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.freeLead,
+.opening {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ead8a7;
+}
+
+.handInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.handMeta {
+  margin: 0;
+  font-size: 14px;
+  color: #c8d8cd;
+}
+
+.handCards {
+  display: flex;
+  gap: 6px;
+}
+
+/* Three horizontal containers - left, middle (HumanHand's own root), right (PlayPassControls' own
+ * root) - the person's own round-4 follow-up request ("Three horizontal containers, left, middle,
+ * right, all aligning"). The side columns are equal (`1fr`, never narrower than their own buttons), so
+ * the hand stays centered however wide the play area gets, with Event Log/Leave Game against its left
+ * edge and Play/Pass against its right. The 12px column gap is exactly the hand row's own side padding
+ * (HumanHand.module.css's `.handRow`, which overhangs the reserved hand width), so the three containers'
+ * boxes never overlap. `align-items: stretch` (the grid default) makes all three share the row's
+ * own height, which in practice is set by whichever container's own content is tallest; each
+ * container centers its own content vertically (`justify-content: center`) so they read as one
+ * coherent, evenly-aligned band regardless of which one happens to be tallest. */
+.bottomBar {
+  display: grid;
+  grid-template-columns: minmax(136px, 1fr) auto minmax(150px, 1fr);
+  column-gap: 12px;
+  margin: 6px 0;
+  padding: 0 var(--edge-inset);
+}
+
+/* Event Log/Check Discard Pile/Leave Game (ui-ux.md §4, §5.2), stacked vertically and centered - the person's own round-4
+ * follow-up request. Rendered as inert placeholder buttons, the same way the center table's own
+ * Discard Pile button (App.tsx's `CenterTable`) has been since M4-T06: their actual overlay/confirmation
+ * behavior remains M4-T10 (Event Log) and M4-T11 (Leave Game) scope respectively - only the button
+ * itself and its position are built here. */
+.bottomLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  min-width: 96px;
+}
+
+/* Fixed (not content-based) width and height so Event Log, Check Discard Pile, and Leave Game are the same
+ * size regardless of their own label length (the person's own round-5 follow-up request). The height is
+ * the frozen minimum touch target (M4-T14: three of them must stack within the hand row's own height),
+ * and the longest label, "Check Discard Pile", wraps onto two lines within it. */
+.sideButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 136px;
+  height: 44px;
+  padding: 4px 8px;
+  border: 1px solid #ead8a7;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+.sideButton:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+/* Leave Game is the one destructive button here, so it is red (the person's own follow-up request); the
+ * "Leave Game" label itself still carries the meaning without the color (ui-ux.md §15). */
+.leaveButton {
+  border-color: #ff9b94;
+  background: rgba(200, 50, 45, 0.7);
+  color: #ffffff;
+}
+
+.leaveButton:hover {
+  background: rgba(220, 60, 55, 0.9);
+}
+
+.sideButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
+/* West/East hold their cards rotated 90° (App.tsx's `BotHand`); this wrapper reserves the rotated
+ * visual footprint a same-size 40x56 card produces once rotated (~56 wide x 40 tall), so West/East
+ * cards render at the same physical size as North/South's (the person's own follow-up report). */
+.rotatedCard {
+  width: 56px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rotatedCard > * {
+  transform: rotate(90deg);
+}
+
+.seatWest .botHand > .rotatedCard:not(:first-child),
+.seatEast .botHand > .rotatedCard:not(:first-child) {
+  margin-top: -28px;
+}
+
+/* Per-seat Play trail (ui-ux.md §5.4): this seat's own last Play in the active response cycle, dimmed
+ * once a later Play beats it, cleared once the cycle itself resets (SessionPresentation's `lastPlay`).
+ * Renders inside PlayerPanel's own container (its `playTrail` slot), sized (via that panel's own fixed
+ * width, PlayerPanel.module.css's `.panel`) to fit a full 5-card combination on one row without
+ * wrapping (the person's own follow-up report: a Straight's last card wrapping onto its own second
+ * row) - `flex-wrap: wrap` remains only as a defensive fallback, not something a legal (at most 5-card)
+ * combination is expected to ever actually trigger. */
+.lastPlay {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.lastPlayBeaten {
+  opacity: 0.4;
+  filter: grayscale(55%);
+}
+
+/* Round Result overlay's own "dimmed completed table" (M4-T12; ui-ux.md §12) — wraps the table/bottom-bar
+ * group (App.tsx's `SessionTable`) while `RoundResultOverlay` is showing. `pointer-events: none` keeps
+ * every control underneath inert (Play/Pass, hand selection, Discard Pile/Event Log/Leave Game) while the
+ * overlay's own explicit-continuation-only contract is in effect. */
+.tableDimmed {
+  filter: brightness(0.4) saturate(0.7);
+  pointer-events: none;
+  transition: filter 0.2s ease;
+}
+
+/* Click/tap-to-skip layer for the 4th-hand reveal (M4-T12; ui-ux.md §11) — transparent, full-screen, and
+ * above everything else so a click anywhere during the reveal advances it, without changing the table's
+ * own visible appearance (the reveal itself, unlike the Round Result overlay above, is not specified as
+ * dimmed - only the cards at the revealed seat change). */
+/* Wrapper for the layers that sit in front of the table (reveal-skip, Round Result, Session Summary,
+ * Round-start transition) so App.tsx can make them `inert` as one while a modal is open on top of them;
+ * `display: contents` keeps it out of layout entirely (their own `position: fixed` is unaffected). */
+.overlayLayer {
+  display: contents;
+}
+
+.revealSkipLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+  appearance: none;
+}
+
+/* Round-start transition screen (person's own follow-up request on top of M4-T12: "dim the table
+ * initially then Round X then lit the game to make it playable again") - the same backdrop treatment
+ * and z-index as RoundResultOverlay's own `.backdrop`, since the two are mutually exclusive (App.tsx's
+ * `isResultOverlayOpen`/`startingRound` gating) rather than ever stacking. A real (keyboard-reachable)
+ * full-screen button, same click/tap-to-skip convention as `.revealSkipLayer` above, rather than a
+ * decorative click-catcher div. */
+.roundTransition {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(6, 20, 16, 0.72);
+  border: none;
+  padding: 0;
+  appearance: none;
+}
+
+.roundTransitionText {
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ead8a7;
+}

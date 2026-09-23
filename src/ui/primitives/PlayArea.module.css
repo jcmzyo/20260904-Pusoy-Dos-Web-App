@@ -1,0 +1,24 @@
+.frame {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* Authored in design units (playAreaScale.ts) and scaled from its own top-left corner into
+ * `.frame`'s already-scaled footprint. `--play-area-scale` (set inline by PlayArea.tsx) is that scale, for
+ * the few CSS rules that must reason about on-screen size (the hand's minimum exposed card width).
+ * `--card-width` is the one shared held-card width (Card.module.css's default, HumanHand.module.css's own
+ * reserved-width/row-height/overlap expressions) so those all derive from a single design-unit value
+ * instead of each restating a viewport-relative expression. */
+.playArea {
+  --card-width: 60px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  transform-origin: top left;
+  /* A size container (its width/height are always set explicitly, PlayArea.tsx), so descendants can size
+   * against the play area's own laid-out height in design units (`cqh`) - App.module.css's
+   * `--seat-card-gap` - which viewport units cannot give them, since the whole area is scaled by transform. */
+  container-type: size;
+}

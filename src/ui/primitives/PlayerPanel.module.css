@@ -1,0 +1,150 @@
+/* Fixed (not min-) height, sized for this panel's own tallest real state (name + count/score + a
+ * status pill + a wrapped up-to-5-card Play trail) and held constant across every other, shorter state
+ * - the per-seat Play trail (ui-ux.md §5.4) was the biggest source of this panel visibly growing and
+ * shrinking as different combinations were Played through a Round, which in turn changed the whole
+ * table's own height (the person's own follow-up report: "the main table border also changes
+ * size...kinda trippy"). `justify-content: center` plus the always-reserved `.statusSlot`/`.trailSlot`
+ * below (rather than conditionally omitting those rows) center the whole content block and keep it
+ * from shifting position as PASS/DONE/Turn or the Play trail appear and disappear - a bare top-aligned
+ * fixed height left a visibly lopsided gap at the bottom on an idle seat (the person's own follow-up
+ * report that this panel now reads as "too tall"). `overflow: hidden` is a safety net only, not
+ * expected to actually clip real content at this size; it does not clip this panel's own glow
+ * (box-shadow paints outside the box regardless of the box's own overflow). */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* Fixed (not min-) width, same convention/reason as the fixed height above: held constant across
+   * every state (blank/"Turn"/"PASS"/"DONE" alone/"DONE · 1st"-"4th") - a bare `min-width` let the
+   * panel visibly widen the moment a placement label appeared (the person's own follow-up report: "the
+   * panel change[s] sizes" when DONE pops up). Sized for this panel's own two widest real states: the
+   * "DONE · 1st"/"2nd"/"3rd"/"4th" status text, and a wrapped-free single row of a full 5-card Play
+   * trail (App.module.css's `.lastPlay`, 5 fixed 22px-wide `CardIndex` badges plus 4 3px gaps = 122px) -
+   * 130px left only ~98px of interior width once padding/border are subtracted, too narrow for either
+   * one on one line (the person's own follow-up report: a 5-card Straight's last card wrapping onto its
+   * own second row, and "DONE · 2nd" itself wrapping and overlapping the row below). */
+  width: 168px;
+  height: 122px;
+  overflow: hidden;
+  padding: 6px 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(11, 40, 34, 0.55);
+  color: #f7f4e9;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+}
+
+/* Always rendered (PlayerPanel.tsx), fixed height regardless of whether a status badge is actually
+ * present, so an idle seat (no PASS/DONE/Turn) reserves the same space as one that has a badge, rather
+ * than the name/count line shifting position when it appears or disappears. */
+.statusSlot {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Always rendered (PlayerPanel.tsx), fixed height regardless of whether the "deciding" spinner or a
+ * Play trail badge row is actually present - sized for the taller of the two (a single-row, up to
+ * 5-card trail; `.panel`'s own fixed width above keeps it from ever wrapping onto a second row). */
+.trailSlot {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Panel glow convention (the person's own follow-up request): who is finished is easy to lose track
+ * of at a glance, so 1st/2nd/3rd placement each get a distinct medal-colored glow, and the current
+ * Turn gets its own cyan glow - a hue none of the medal glows use, so it is never confused with the
+ * gold/silver/bronze finish glows (the earlier white read as too close to silver). Text status
+ * (DONE/placement, "Turn") still carries the same meaning without color, per §15's label-plus-color
+ * rule; this is an additional glance-able cue, not a replacement. */
+.glowTurn {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.55), 0 0 14px 3px rgba(34, 211, 238, 0.4);
+}
+
+.glowGold {
+  border-color: #ffd54a;
+  box-shadow: 0 0 0 3px rgba(255, 213, 74, 0.6), 0 0 16px 4px rgba(255, 213, 74, 0.5);
+}
+
+.glowSilver {
+  border-color: #c7d0d6;
+  box-shadow: 0 0 0 3px rgba(199, 208, 214, 0.6), 0 0 16px 4px rgba(199, 208, 214, 0.5);
+}
+
+.glowBronze {
+  border-color: #d08a4f;
+  box-shadow: 0 0 0 3px rgba(208, 138, 79, 0.6), 0 0 16px 4px rgba(208, 138, 79, 0.5);
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 0;
+  font-size: 14px;
+  color: #c8d8cd;
+}
+
+.status {
+  margin: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  /* Belt-and-suspenders alongside `.panel`'s own widened fixed width above: this pill's text (up to
+   * "DONE · 2nd"/"3rd" etc.) must never line-wrap, since a wrapped second line has no reserved space of
+   * its own and instead overlaps `.trailSlot` below it (the person's own follow-up report: "'Done . 2nd'
+   * doesn't fit in one line and blocks text"). */
+  white-space: nowrap;
+}
+
+.statusTurn {
+  background: #ead8a7;
+  color: #163b2d;
+}
+
+.statusPass {
+  background: #4b6b5c;
+  color: #f7f4e9;
+}
+
+.statusDone {
+  background: #2f5b48;
+  color: #ffe9a8;
+  border: 1px solid #ead8a7;
+}
+
+/* "Deciding" indicator for a bot's own Turn (M4-T09 slice) - a small spinning ring, no image asset. */
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  border: 2px solid rgba(247, 244, 233, 0.3);
+  border-top-color: #ead8a7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

@@ -1,0 +1,80 @@
+.list {
+  margin: 0;
+  padding: 0 10px 0 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  /* Reserves the scrollbar's own track as a permanent gutter (rather than having it overlap content only
+   * while actually scrollable), plus this own 10px of real padding on top of that gutter - the person's
+   * own follow-up report: "the edge of the event and the scroll bar... is still too close, add some small
+   * spacing" (a first pass here only widened `.entry`'s own inner padding, which the scrollbar's track
+   * still sat flush against). Falls back to ordinary overlap in the rare browser without `scrollbar-
+   * gutter` support; the padding here still helps there too. */
+  scrollbar-gutter: stable;
+}
+
+.entry {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(234, 216, 167, 0.1);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+/* Just the human player's own NAME within an entry, not the whole entry (the person's own follow-up
+ * report: "I only meant to highlight the name, not the whole event") - text color only, same restrained
+ * teal accent as SessionSummary.module.css's/RoundResultOverlay.module.css's own `.you`, distinct from
+ * the gold/silver/bronze medal palette used elsewhere. The name text already carries the meaning; this
+ * is purely an additional glance-able cue (`renderEntryText`, EventLogOverlay.tsx). */
+.you {
+  font-weight: 700;
+  color: #7fe3d4;
+}
+
+/* Round-boundary marker entries ("Round 1 started.") get a more prominent, centered treatment of their
+ * own, distinguishing them from ordinary Play/Pass/finish entries at a glance (the person's own follow-
+ * up request) - warm tan, the product's existing secondary accent color (already used for buttons/the
+ * Turn status pill), rather than the teal already reserved for "this is you" or the gold/silver/bronze
+ * medal palette, so this reads as its own distinct third category rather than colliding with either. */
+.roundMarker {
+  justify-content: center;
+  background: rgba(234, 216, 167, 0.16);
+  border: 1px solid rgba(234, 216, 167, 0.35);
+}
+
+.roundMarker .entryText {
+  flex: 0 1 auto;
+  color: #ead8a7;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.entryText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The played combination's own cards, at the right end of its entry (the person's own follow-up
+ * request to mirror the seat's own Play trail here) - `flex-shrink: 0` keeps the fixed-width `CardIndex`
+ * badges (Card.module.css) from being squeezed when the entry text wraps at a narrow width. */
+.entryCards {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.empty {
+  margin: 0;
+  color: #c8d8cd;
+  font-size: 14px;
+}

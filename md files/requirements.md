@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.14)
+## Requirements & Planning Document (v1.16)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 15, 2026
+**Last Modified:** September 18, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -479,22 +479,35 @@ When a player empties their hand in Basic Mode:
 1.  Record that player in `finishOrder`.
 2.  Remove that player from the active rotation.
 3.  Examine the final combination they played.
-4.  Starting from the next active player in clockwise order, determine
-    whether an active player can legally beat that combination.
-5.  If an active player can beat it:
-    -   the first such player in turn order plays it;
-    -   normal trick flow continues from that play;
-    -   pass count resets.
-6.  If no active player can beat it:
-    -   the next active player becomes the new leader;
-    -   that player may play any valid combination;
-    -   pass count resets.
-7.  Continue until only one active player remains.
-8.  That final remaining player is recorded as **4th place** and the
+4.  Each remaining active player, in turn order starting from the next
+    active player after the finisher, takes an **explicit Turn of
+    their own** in response to that final combination:
+    -   If that player has a legal combination that beats it, they
+        may play it — normal trick flow continues from that Play, and
+        pass count resets.
+    -   If they have no such legal combination, or simply choose not
+        to play a beating combination they do have (a strategic Pass
+        remains available, consistent with this section's general
+        Pass rules), they explicitly Pass on their own Turn. The
+        Engine never determines this on a player's behalf, and never
+        skips a remaining active player's own Turn.
+5.  Once every remaining active player has, in turn, either played a
+    beating combination or explicitly passed without one, the next
+    active player after the finisher becomes the new leader and may
+    play any valid combination; pass count resets.
+6.  Continue until only one active player remains.
+7.  That final remaining player is recorded as **4th place** and the
     round ends.
 
 This means a player going out does **not** automatically end the current
-trick in Basic Mode.
+trick in Basic Mode, and no remaining active player's own Turn is ever
+silently skipped or Engine-computed on their behalf — each one either
+plays a beating combination or produces a genuine Pass of their own
+(M4-T12.5).
+
+### 2.5.2 (retired — promoted into §2.5.1)
+
+**Status:** Implemented and verified (M4-T12.5). This subsection previously recorded an approved-but-not-yet-implemented replacement for §2.5.1's earlier silent-determination behavior (the Engine computing, in one internal step, whether any remaining active player could beat the finisher's own final combination, and reassigning the free lead without any of those players ever taking a visible Turn). That replacement has since been implemented in `resolveBasicContinuation.ts` (each remaining active player now takes a real Turn and, where applicable, produces a genuine `PLAYER_PASSED` event) and its text has been promoted into §2.5.1 above, which is now the sole authoritative rule for this behavior. This subsection is kept only as a version-history marker; it carries no separate rule of its own.
 
 ------------------------------------------------------------------------
 
@@ -689,7 +702,7 @@ Competitive Mode **skips average placement entirely**. Only the Round winner has
     - that player opens with a valid combination containing 3♣.
 5. After each Round, calculate the official Basic Round result and update cumulative Session totals.
 6. When the 3rd-place player finishes, the Round is complete. Before the result overlay appears, briefly reveal the 4th-place player's remaining hand on the table, sorted by Rank. After that presentation step, enter the **Round Result** checkpoint. The result appears as a modal/overlay over the dimmed completed table, initially ordered by the standings before the Round score is applied; Round points then appear, totals update, and rows rearrange by the new cumulative total.
-7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**. After Round 5, the equivalent action proceeds to the Session Summary rather than starting another Round.
+7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**. After Round 5, this explicit-action requirement does not apply: once the Round Result overlay's own scoring animation settles, the UI automatically transitions to the Session Summary after a short presentational delay, with no click required (Follow-up, M4-T13 UI refinement — a presentation-layer screen transition only; it starts no new Round and calls no Orchestrator continuation, so the explicit-action requirement above for points 2-5 is unaffected).
 8. Headless execution/simulation may pass through the same checkpoint and continue immediately without an artificial wait.
 9. After Round 5, show the Session Summary and apply Basic Mode Session tiebreakers if necessary.
 10. Phase 1 does not select AI difficulty, persist unfinished Sessions, or update persistent player statistics.
@@ -722,8 +735,8 @@ If statistics enter a future committed scope, combination counts may include Sin
 - [ ] Minimal React/Vite playable UI described by `ui-ux.md`.
 - [ ] Human card selection, bounded drag/reorder manual hand arrangement, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists. Selection and visual hand order are independent: rearranging or sorting must not silently deselect selected cards.
 - [ ] Current trick, turn, opponent face-down hands/card counts, PASS/DONE state, current running Session scores, a Discard Pile view containing every card already played this Round, and an Event Log containing chronological factual public events are accessible through the UI.
-- [ ] End-of-Round presentation briefly reveals the 4th-place remaining hand after 3rd place finishes, then shows a dimmed-table Round Result overlay with previous standings, animated Round-score application, updated totals, and reordering by cumulative score; explicit Next Round, or View Session Results after Round 5.
-- [ ] Session Summary after Round 5 ordered by official final Session result, with final scores/tiebreak information and distinct gold/silver/bronze treatment for 1st/2nd/3rd plus Play Again and Home actions.
+- [ ] End-of-Round presentation briefly reveals the 4th-place remaining hand after 3rd place finishes, then shows a dimmed-table Round Result overlay with previous standings, animated Round-score application, updated totals, and reordering by cumulative score; explicit Next Round for Rounds 1-4, or an automatic transition to the Session Summary after Round 5 once the scoring animation settles (Follow-up, M4-T13 UI refinement).
+- [ ] Session Summary after Round 5 ordered by official final Session result, with final scores/tiebreak information and distinct gold/silver/bronze treatment for 1st/2nd/3rd plus Play Again and Home actions. Presents as a popup replacing the Round Result overlay in place, with the human player's own seat highlighted and the full Session Event Log embedded alongside the actions (Follow-up, M4-T13 UI refinement).
 - [ ] Four-color suits by default: Hearts red, Diamonds orange, Clubs blue, Spades black; no Phase 1 toggle.
 - [ ] Landscape-first responsive usability on documented desktop/laptop/tablet/phone landscape viewports, including non-fullscreen windows; cards preserve ratio, text/controls remain usable, and portrait/undersized states show rotate/resize guidance.
 - [ ] No save/Resume in Phase 1. In-app leaving an unfinished Session warns that progress will be lost; browser close/refresh warning is used where supported.

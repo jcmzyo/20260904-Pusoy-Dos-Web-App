@@ -1,6 +1,5 @@
 import type { PlayerId } from '../../domain';
 import type { RulesetConfig } from '../config/RulesetConfig';
-import { generateLegalResponseMoves } from '../moves/generateLegalResponseMoves';
 import type { MoveValidationContext, MoveValidationResult } from '../moves/validateMove';
 import type { ResponseCycle } from './resolveTurnAndPass';
 import { resolveTurnAndTrick } from './resolveTurnAndTrick';
@@ -52,11 +51,15 @@ export function resolveBasicContinuation(
   if (remaining.length === 1) {
     return { kind: 'roundCompletionPending', players, finishOrder: nextFinishOrder, remainingPlayerId: remaining[0]!.playerId };
   }
-  const responder = remaining.find((player) => generateLegalResponseMoves(player.hand, player.playerId, validation.combination, ruleset).some((move) => move.kind === 'play'));
+  // requirements.md §2.5.2 (M4-T12.5): every remaining active player gets an explicit response Turn of
+  // their own to the finisher's own final combination, starting with the very next active player in
+  // order, rather than the Engine silently searching ahead for whichever remaining player can beat it
+  // (or silently reassigning the free lead when none can). A player with no beating Move, or one who
+  // simply chooses not to play a beating Move they do have, explicitly Passes on their own Turn; the
+  // generic all-Pass-cycle handling above (validation.kind === 'pass') already reassigns the free lead
+  // once every remaining active player has, in turn, either played a beating combination or passed.
   return {
     kind: 'continue', players, finishOrder: nextFinishOrder,
-    progression: responder
-      ? { currentPlayerId: responder.playerId, trick: { kind: 'response', current: validation.combination }, responseCycle: { lastSuccessfulPlayerId: context.currentPlayerId, passedPlayerIds: [] } }
-      : { currentPlayerId: remaining[0]!.playerId, trick: { kind: 'freeLead' }, responseCycle: null },
+    progression: { currentPlayerId: remaining[0]!.playerId, trick: { kind: 'response', current: validation.combination }, responseCycle: { lastSuccessfulPlayerId: context.currentPlayerId, passedPlayerIds: [] } },
   };
 }
