@@ -378,14 +378,27 @@ describe('Best-effort browser unload warning (M4-T11; ui-ux.md §10)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
     await screen.findByRole('region', { name: 'Game Table' });
 
-    const duringSession = new Event('beforeunload', { cancelable: true });
-    expect(window.dispatchEvent(duringSession)).toBe(false); // still prevented: Round 1 in progress
+    // Retried rather than a single immediate dispatch (M4-T15 stabilization round): the Game Table
+    // region and the `beforeunload` listener's own attachment (App.tsx's `[session, sessionResult]`
+    // effect) commit together in the same render in every case this was traced, but nothing about
+    // `findByRole` itself is a documented guarantee that a *different* effect off the same commit has
+    // already flushed - only that this particular query has stopped throwing. `waitFor` keeps the exact
+    // same final expectation (still strictly `false`); it only tolerates a startup instant where that
+    // has not yet landed, by dispatching a fresh Event each retry.
+    await waitFor(() => {
+      const duringSession = new Event('beforeunload', { cancelable: true });
+      expect(window.dispatchEvent(duringSession)).toBe(false); // still prevented: Round 1 in progress
+    });
 
     await driveToSessionSummary();
 
     const afterSummary = new Event('beforeunload', { cancelable: true });
     expect(window.dispatchEvent(afterSummary)).toBe(true); // no longer prevented: nothing left to lose
-  }, 20000);
+    // 45000ms (M4-T15 stabilization round): `driveToSessionSummary` drives a real, fully-automatic
+    // five-Round Session end to end - the same inherent per-Turn cost `session-summary.test.tsx`'s own
+    // two full-Session tests document and measure (their own comment has the full reasoning and the
+    // measured worst case under synthetic full-suite-level CPU contention). Same justification, same value.
+  }, 45000);
 });
 
 describe('Leave Game abandons the Session (M4-T11 follow-up)', () => {
