@@ -76,6 +76,14 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     // per Round) genuinely takes longer than Vitest's 5000ms default test timeout; the sub-`findByRole`
     // calls below already have their own generous 10000ms timeout, so the test itself needs at least as
     // much room to let them actually resolve rather than being aborted first by the outer test timeout.
+    // 45000ms (M4-T15 stabilization round): every autoplay Turn crosses one genuinely real, deliberately
+    // un-fake-timer-mockable macrotask (`GameRunner`'s own `yieldToMacrotask`, orchestrator.md's own
+    // approved lifecycle guard) - across the many Turns a five-Round Session needs, that real per-Turn
+    // cost is bounded but stretches under CPU contention from a full parallel test run. Reproduced
+    // directly: under six CPU-saturating background processes on this two-core sandbox (a synthetic load
+    // well beyond anything a real full-suite run creates, since that run itself only ever spawns about
+    // one worker per core), this exact test still completed - deterministically, never hung - in ~35s;
+    // 45000ms keeps meaningful headroom above that measured worst case without masking a genuine hang.
     const start = vi.fn()
       .mockImplementationOnce(() => buildAutomaticSession(5))
       .mockImplementationOnce(() => buildAutomaticSession(11));
@@ -109,7 +117,7 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
     expect(screen.queryByRole('dialog', { name: 'Session Summary' })).toBeNull();
     expect(start).toHaveBeenCalledTimes(2);
-  }, 20000);
+  }, 45000);
 
   it('Home returns Session Summary to the Home screen, abandoning the finished Session', async () => {
     const start = vi.fn(() => buildAutomaticSession(5));
@@ -133,5 +141,5 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     expect(screen.queryByRole('dialog', { name: 'Session Summary' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
     expect(start).toHaveBeenCalledOnce();
-  }, 20000);
+  }, 45000);
 });

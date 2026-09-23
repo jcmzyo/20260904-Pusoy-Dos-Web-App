@@ -80,6 +80,20 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
     return () => session.resume();
   }, [session, layout]);
 
+  // Safety-net teardown for a true component unmount (test-reproduced defect, M4-T15 stabilization
+  // round): every other exit path (`handleLeave`/`handlePlayAgain` below) already calls
+  // `session.destroy()` itself before letting go of a Session, but nothing previously stopped
+  // `driveTurns`'s own background Turn-advancement loop (SessionPresentation.ts) if this component
+  // unmounted while a Session was still live instead - the loop has no way to know its own owning
+  // component is gone, so it kept running full Sessions to completion entirely unattended. Deliberately
+  // an empty-dependency effect (runs its cleanup only on unmount, not on every `session` change) reading
+  // the latest Session from a ref: a dependency-array cleanup keyed on `session` would also fire, and
+  // re-destroy, on the ordinary session -> null transition `handleLeave`/`handlePlayAgain` themselves
+  // already drive - this only ever acts when a Session was still live and nothing already tore it down.
+  const sessionRef = useRef<SessionPresentation | null>(null);
+  sessionRef.current = session;
+  useEffect(() => () => sessionRef.current?.destroy(), []);
+
   // Subscribes only for `sessionResult` below (the beforeunload guard's own gate) - SessionTable is
   // still what actually renders the live table from its own separate subscription; this is a second,
   // independent read of the same store, the same `useSyncExternalStore` pattern SessionTable itself
