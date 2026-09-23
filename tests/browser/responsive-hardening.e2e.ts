@@ -603,22 +603,53 @@ for (const viewport of FULL_SCALE_VIEWPORTS) {
  * (`'roundResult'`), or after clicking through every "Next Round" until Session Summary is showing
  * (`'sessionSummary'`).
  */
+/**
+ * Blocks until this seat's own just-submitted Move has actually left it - the Round ending or another
+ * Turn genuinely starting elsewhere. A `click()` resolving is only the browser dispatching the click
+ * event; the resulting Engine commit runs on the far side of `GameRunner.commitWhenSubmissionAllowed`'s
+ * own deliberate macrotask boundary (M4-P1 review finding, escalated - a real `MessageChannel` round-trip,
+ * not gated by this test's own fake clock), so without this wait the loop's very next atomic `evaluate()`
+ * below could run before that commit lands and re-observe this exact same, already-acted-on Turn - the
+ * Engine never lets this same seat's own Turn immediately recur, so waiting for the "no longer my Turn"
+ * edge is always safe here.
+ */
+async function waitForTurnToRelease(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const panel = document.querySelector('[aria-label="You panel"]');
+      const isYourTurn = panel?.getAttribute('aria-current') === 'true';
+      const dialogOpen = document.querySelector('[role="dialog"]') !== null;
+      return !isYourTurn || dialogOpen;
+    },
+    { timeout: 20_000 },
+  );
+}
+
 async function driveUnderFakeClock(page: Page, until: 'roundResult' | 'sessionSummary') {
   const passButton = page.getByRole('button', { name: 'Pass', exact: true });
   const playButton = page.getByRole('button', { name: 'Play', exact: true });
   const nextRound = page.getByRole('button', { name: 'Next Round', exact: true });
   const hand = page.getByRole('group', { name: 'Your hand' });
-  const openingLabel = page.getByText('OPENING · 3♣ required', { exact: true });
 
   for (let step = 0; step < 4000; step++) {
-    const state = await page.evaluate(() => ({
-      yourTurn: document.querySelector('[aria-label="You panel"]')?.getAttribute('aria-current') === 'true',
-      summary: document.querySelector('[aria-label="Session Summary"]') !== null,
-      dialog: document.querySelector('[role="dialog"]') !== null,
-      nextRound: [...document.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Next Round'),
-      skipReveal: document.querySelector('[aria-label="Skip reveal"]') !== null,
-      transition: document.querySelector('[aria-label^="Starting Round"]') !== null,
-    }));
+    // Every fact this loop decides on, including whether Pass is enabled and whether this is an
+    // Opening lead, is read together in this one atomic evaluate (M4-P1 review finding, escalated) -
+    // `GameRunner.commitWhenSubmissionAllowed` now deliberately crosses a macrotask boundary on every
+    // Turn, so a `yourTurn` read and a separate, later `passButton.isEnabled()` read could otherwise
+    // straddle two different Turns instead of describing the same live one.
+    const state = await page.evaluate(() => {
+      const passButtonEl = document.querySelector('button[aria-label="Pass"]') as HTMLButtonElement | null;
+      return {
+        yourTurn: document.querySelector('[aria-label="You panel"]')?.getAttribute('aria-current') === 'true',
+        summary: document.querySelector('[aria-label="Session Summary"]') !== null,
+        dialog: document.querySelector('[role="dialog"]') !== null,
+        nextRound: [...document.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Next Round'),
+        skipReveal: document.querySelector('[aria-label="Skip reveal"]') !== null,
+        transition: document.querySelector('[aria-label^="Starting Round"]') !== null,
+        passEnabled: passButtonEl !== null && !passButtonEl.disabled,
+        opening: document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false,
+      };
+    });
 
     if (state.summary) {
       // Let the settling Round 5 -> Summary hand-off and the Summary's own layout finish.
@@ -638,13 +669,14 @@ async function driveUnderFakeClock(page: Page, until: 'roundResult' | 'sessionSu
       await page.clock.runFor(state.dialog || state.transition ? 700 : 800);
       continue;
     }
-    if (await passButton.isEnabled()) {
+    if (state.passEnabled) {
       await passButton.click();
     } else {
-      if (await openingLabel.isVisible()) await hand.getByRole('img', { name: '3 of Clubs', exact: true }).click();
+      if (state.opening) await hand.getByRole('img', { name: '3 of Clubs', exact: true }).click();
       else await hand.getByRole('img').first().click();
       await playButton.click();
     }
+    await waitForTurnToRelease(page);
   }
   throw new Error(`Session did not reach ${until} within the step budget.`);
 }

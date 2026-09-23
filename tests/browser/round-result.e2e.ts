@@ -34,14 +34,57 @@ const E2E_SEED = 8;
 
 const TURN_BUDGET = 300;
 
-async function waitForYourTurnOrRoundOver(page: import('@playwright/test').Page) {
+/**
+ * A single atomic in-browser read of every fact `driveRoundToResult` decides on, so that fact and the
+ * decision made from it can never straddle two separate Playwright round-trips (each a genuine
+ * yield back to the browser's own event loop, across which the SPA keeps running). Reading
+ * "is it still my Turn" and "is Pass enabled" as two separate locator calls let a real, correctly-
+ * ordered gap between them - the deliberate macrotask boundary `GameRunner.commitWhenSubmissionAllowed`
+ * now crosses on every Turn (M4-P1 review finding, escalated) - land between the two, so the first read
+ * could observe this seat's own Turn while the second, a moment later, already reflected a different one.
+ * Bundling both into one `page.waitForFunction` predicate removes that window entirely: whichever Turn is
+ * live when the predicate finally returns is the exact one every field below describes.
+ */
+type TurnDecision =
+  | { readonly kind: 'dialog' }
+  | { readonly kind: 'skipReveal' }
+  | { readonly kind: 'pass' }
+  | { readonly kind: 'lead'; readonly opening: boolean };
+
+async function waitForTurnDecision(page: import('@playwright/test').Page): Promise<TurnDecision> {
+  const handle = await page.waitForFunction(
+    () => {
+      if (document.querySelector('[role="dialog"]') !== null) return { kind: 'dialog' };
+      if (document.querySelector('[aria-label="Skip reveal"]') !== null) return { kind: 'skipReveal' };
+      const panel = document.querySelector('[aria-label="You panel"]');
+      if (panel?.getAttribute('aria-current') !== 'true') return null;
+      const passButton = document.querySelector('button[aria-label="Pass"]') as HTMLButtonElement | null;
+      if (passButton !== null && !passButton.disabled) return { kind: 'pass' };
+      const opening = document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false;
+      return { kind: 'lead', opening };
+    },
+    { timeout: 20_000 },
+  );
+  return handle.jsonValue() as Promise<TurnDecision>;
+}
+
+/**
+ * Blocks until this seat's own just-submitted Move has actually left it (`GameRunner.submitResponse`
+ * committed and `SessionPresentation` published the result) - the Round ending or another Turn genuinely
+ * starting elsewhere. A `click()` resolving is only the browser dispatching the click event; the resulting
+ * Engine commit runs on the far side of `GameRunner.commitWhenSubmissionAllowed`'s own deliberate macrotask
+ * boundary (M4-P1 review finding, escalated), so without this wait the very next `waitForTurnDecision` call
+ * below could poll before that commit lands and re-observe this exact same, already-acted-on Turn - the
+ * Engine never lets this same seat's own Turn immediately recur (at least one other seat's own Turn always
+ * comes between two of this seat's own), so waiting for the "no longer my Turn" edge is always safe here.
+ */
+async function waitForTurnToRelease(page: import('@playwright/test').Page): Promise<void> {
   await page.waitForFunction(
     () => {
       const panel = document.querySelector('[aria-label="You panel"]');
       const isYourTurn = panel?.getAttribute('aria-current') === 'true';
       const dialogOpen = document.querySelector('[role="dialog"]') !== null;
-      const revealSkip = document.querySelector('[aria-label="Skip reveal"]') !== null;
-      return isYourTurn || dialogOpen || revealSkip;
+      return !isYourTurn || dialogOpen;
     },
     { timeout: 20_000 },
   );
@@ -55,29 +98,26 @@ async function driveRoundToResult(page: import('@playwright/test').Page): Promis
   const playButton = page.getByRole('button', { name: 'Play', exact: true });
   const dialog = page.getByRole('dialog');
   const skipReveal = page.getByRole('button', { name: 'Skip reveal', exact: true });
-  const openingLabel = page.getByText('OPENING · 3♣ required', { exact: true });
   const hand = page.getByRole('group', { name: 'Your hand' });
 
   for (let turn = 0; turn < TURN_BUDGET; turn++) {
-    if (await dialog.isVisible()) return { revealSkipped: false };
+    const decision = await waitForTurnDecision(page);
 
-    await waitForYourTurnOrRoundOver(page);
-
-    if (await dialog.isVisible()) return { revealSkipped: false };
-    if (await skipReveal.isVisible()) {
+    if (decision.kind === 'dialog') return { revealSkipped: false };
+    if (decision.kind === 'skipReveal') {
       await skipReveal.click();
       await expect(dialog).toBeVisible();
       return { revealSkipped: true };
     }
 
-    if (await passButton.isEnabled()) {
+    if (decision.kind === 'pass') {
       await passButton.click();
     } else {
       // Forced to lead (opening or free lead): a single card is always a structurally legal Play, and
       // during the opening specifically it is human's Turn at all only because the deal gave this seat
       // the 3♣ (the Engine's own opening-Turn invariant), so that single card always satisfies "must
       // include 3♣" too.
-      if (await openingLabel.isVisible()) {
+      if (decision.opening) {
         await hand.getByRole('img', { name: '3 of Clubs', exact: true }).click();
       } else {
         await hand.getByRole('img').first().click();
@@ -85,6 +125,7 @@ async function driveRoundToResult(page: import('@playwright/test').Page): Promis
       await expect(playButton).toBeEnabled();
       await playButton.click();
     }
+    await waitForTurnToRelease(page);
   }
   throw new Error(`Round did not reach its Result overlay within ${TURN_BUDGET} human decisions.`);
 }
