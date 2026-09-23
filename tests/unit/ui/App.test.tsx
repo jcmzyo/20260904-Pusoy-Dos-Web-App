@@ -419,3 +419,44 @@ describe('Leave Game abandons the Session (M4-T11 follow-up)', () => {
     destroySpy.mockRestore();
   });
 });
+
+describe('Session teardown on unmount (M4-T15 stabilization round, review finding MINOR-1)', () => {
+  it('destroys a still-live Session if <App> unmounts without an explicit Leave/Home, instead of leaving its background Turn-advancement loop running unattended', async () => {
+    // Regression coverage for a reproduced defect: every OTHER exit path (Leave Game, Play Again) already
+    // called `session.destroy()` itself, but nothing previously did if the owning component simply
+    // unmounted with a Session still live - exactly what every other test file's own `afterEach(cleanup)`
+    // does for a test that starts a Session and never explicitly leaves it. A live probe (a `chooseMove`
+    // call counter) showed the orphaned background loop kept driving real Turns for as long as the test
+    // process stayed alive, entirely undetectable from the unmounted component's own perspective - this
+    // spy on `destroy()` itself is the narrower, permanent version of that same probe.
+    const destroySpy = vi.spyOn(SessionPresentation.prototype, 'destroy');
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    const { unmount } = render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+
+    unmount();
+
+    expect(destroySpy).toHaveBeenCalledOnce();
+    destroySpy.mockRestore();
+  });
+
+  it('does not destroy a Session a second time on unmount once Leave Game has already torn it down explicitly', async () => {
+    // Guards the specific double-destroy regression a naive fix would reintroduce: keying the teardown
+    // effect's cleanup on `[session]` (rather than running only once, on true unmount, via a ref) would
+    // also fire - and re-destroy - on the ordinary session -> null transition `handleLeave` itself already
+    // drives, breaking this exact count even though `destroy()` is individually idempotent per call.
+    const destroySpy = vi.spyOn(SessionPresentation.prototype, 'destroy');
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    const { unmount } = render(<App start={start} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, Leave Game' }));
+    unmount();
+
+    expect(destroySpy).toHaveBeenCalledOnce();
+    destroySpy.mockRestore();
+  });
+});
