@@ -276,9 +276,10 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
   // `executeTurn(false)` submits straight to `submitResponse()` and never reaches
   // `commitWhenSubmissionAllowed()`/`yieldToMacrotask()`; that macrotask-boundary guard exists solely on
   // the `runAutoplayTurn()` path production's `driveTurns` uses (see GameRunner.ts), so this test crosses
-  // no macrotask at all. The actual cost is ordinary CPU-bound work - AI candidate/decomposition search
-  // plus Engine state transitions - repeated across many real Turns; under full-suite CPU contention the
-  // single-threaded process simply gets fewer timeslices, so the same synchronous/microtask work takes
+  // no macrotask at all. The actual cost is ordinary CPU-bound work - Engine state transitions, invariant
+  // checks, presentation/assertion work, and the mounted component's own React updates - repeated across
+  // many real Turns; under full-suite CPU contention the single-threaded process simply gets fewer
+  // timeslices, so the same synchronous/microtask work takes
   // longer in wall-clock time. This file's three heaviest tests here had no explicit timeout at all and
   // were silently relying on Vitest's 5000ms default, which that contention alone can exceed even though
   // each test still passes 15/15 in an uncontended, isolated run. Reproduced directly under six
@@ -370,8 +371,10 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
 
   // 45000ms (M4-T15/PR#92 acceptance fix): this drives a full five-Round Session end to end via
   // `driveToRoundEnd`'s own `presentation.runTurn()` calls - the same non-macrotask, plain CPU-bound cost
-  // (AI decomposition search + Engine transitions across many real Turns) documented above the first fix
-  // in this file, not the `yieldToMacrotask` cost `session-summary.test.tsx`'s full-Session tests actually
+  // documented above the first fix in this file (Engine state transitions, invariant checks, and this
+  // test's own presentation/assertion work across many real Turns; the component here is not mounted
+  // until all five Rounds are already driven, so no React updates are part of this cost), not the
+  // `yieldToMacrotask` cost `session-summary.test.tsx`'s full-Session tests actually
   // cross (those go through the production autoplay path; this test does not). Same justification for the
   // bound (measured worst case under CPU contention, generous headroom, no masked hang), different cause.
   it('shows no continuation button once the Basic Session\'s own official result exists, and automatically replaces itself with Session Summary rather than continuing (ui-ux.md §12/§13 follow-up: M4-T13 UI refinement)', async () => {

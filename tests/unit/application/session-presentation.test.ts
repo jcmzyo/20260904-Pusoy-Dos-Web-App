@@ -121,11 +121,11 @@ describe('production Session presentation', () => {
   // to `submitResponse()` and never reaches `commitWhenSubmissionAllowed()`/`yieldToMacrotask()`; that
   // macrotask-boundary guard exists solely on the `runAutoplayTurn()` path production's `driveTurns` uses
   // (see GameRunner.ts), so this test crosses no macrotask. The actual cost is ordinary CPU-bound work -
-  // AI candidate/decomposition search plus Engine state transitions - repeated across many real Turns;
-  // under full-suite CPU contention the single-threaded process gets fewer timeslices, so the same
-  // synchronous/microtask work takes longer in wall-clock time (the same cause documented in the
-  // `session-table-round-result.test.tsx` sibling fix - a different, non-macrotask cost from
-  // `session-summary.test.tsx`'s full-Session tests, which do cross that macrotask via the production
+  // Engine state transitions, invariant checks, and this test's own presentation/assertion work - repeated
+  // across many real Turns; under full-suite CPU contention the single-threaded process gets fewer
+  // timeslices, so the same synchronous/microtask work takes longer in wall-clock time (the same cause
+  // documented in the `session-table-round-result.test.tsx` sibling fix - a different, non-macrotask cost
+  // from `session-summary.test.tsx`'s full-Session tests, which do cross that macrotask via the production
   // autoplay path). This test had no explicit timeout at all and was silently relying on Vitest's 5000ms
   // default, which that contention alone can exceed even though it passes 34/34 in isolation and 49/49
   // together with session-table-round-result.test.tsx. Reproduced directly under 6-8 CPU-saturating
