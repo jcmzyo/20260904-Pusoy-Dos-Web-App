@@ -2,9 +2,9 @@
 
 ## Task and Review Scope
 - **Task:** M4-T15 stabilization round (acceptance failures on PR #87)
-- **PR:** #91 (open, 2 commits: 87f0fba + e962cf1)
+- **PR:** #91 (open; stabilization commits 87f0fba, e962cf1, d0a90e2)
 - **Branch:** dev/M4/T15-Phase_1_End-to-End_Acceptance_and_Regression_Gate-20260922
-- **Head commit verified locally:** e962cf148e33669af7ca3a6e1527dcde51476c08 (matches PR head; re-review 2)
+- **Head commit verified locally:** d0a90e240a5d610f21d6abf9db1ec74912e7846c (matches PR head; re-review 3)
 - **Base:** dev/M4/main-Minimal_Playable_UI-20260915
 - **Documents consulted:** md files/orchestrator.md (GameRunner yieldToMacrotask lifecycle guard), md files/requirements.md, md files/ui-ux.md (section 10 unload warning)
 - **Working tree:** clean; no pre-existing changes
@@ -21,8 +21,8 @@ Commit `e962cf1` adds two well-formed, deterministic regression tests under `Ses
 
 Both pass: `npx vitest run tests/unit/ui/App.test.tsx` → 20/20. MINOR-1 is resolved.
 
-### MINOR-2 (new, re-review 2): Original M4-T15 acceptance-gate report is overwritten in-place
-Commit `e962cf1` rewrites `reviews/M4-T15-Task-Completion.md`, replacing the previously-committed Phase 1 End-to-End Acceptance and Regression Gate report (the full record of the acceptance gate: 989/989 Vitest, 4/4 M3 batch, 121/121 Playwright, and the executed human-acceptance checklist verdict) with the PR #91 stabilization report under the same filename. The original record is still recoverable via git history, but merging this PR erases it from the working tree's documentation trail. Suggest keeping the two reports distinct — e.g. restore the original gate report and add the stabilization report as a separate file (`M4-T15-Stabilization-Task-Completion.md`) — or otherwise record both, so the acceptance-gate evidence remains available on the merged branch. The committed review report also carries stale metadata from round 1 (says "1 commit", head 87f0fba, with MINOR-1 open).
+### MINOR-2 (RESOLVED in re-review 3): Original M4-T15 acceptance-gate report is overwritten in-place
+Commit `e962cf1` rewrote `reviews/M4-T15-Task-Completion.md`, replacing the previously-committed Phase 1 End-to-End Acceptance and Regression Gate report with the PR #91 stabilization report under the same filename. **Resolved by `d0a90e2`:** the original gate report is restored byte-exact (`reviews/M4-T15-Task-Completion.md` now matches blob `f02cbf3`, verified via `git rev-parse`), and the stabilization report lives at its own distinct path `reviews/M4-T15.1-Task-Completion.md`, following the project's existing `T14`/`T14.5` sub-round naming convention. MINOR-2 is resolved.
 
 ### NIT-1: `sessionRef.current = session` written during render
 Writing a ref during render is slightly against the latest React guidance for concurrent safety. In this specific case it is acceptable: the ref only ever needs the latest `session` at unmount, `destroy()` is idempotent (SessionPresentation.ts:268), and there is no scenario where a stale ref would destroy a live Session erroneously. The `started` ref at App.tsx:65 uses the same pattern.
@@ -49,6 +49,7 @@ Writing a ref during render is slightly against the latest React guidance for co
 - Existing exact-call-count and Play Again/Home/warning assertions are preserved.
 
 ## Verification (performed locally, Node 24)
+- Re-review 3 (head `d0a90e2`): commit touches only `reviews/*.md` — zero source/test changes vs `e962cf1` (verified `diff e962cf1 d0a90e2 -- src tests` empty). All earlier code verification remains valid. Original gate report blob restored to `f02cbf3` (byte-exact).
 - Re-review 2 (head `e962cf1`): `npx vitest run tests/unit/ui/App.test.tsx` → 20/20 passed (incl. the two new regression tests); `npm run typecheck` → clean; `npm test` → 1000 passed, 2 failed (both the pre-existing `session-table-round-result.test.tsx` timeout flakes; that file passes 15/15 in isolation and is untouched by this PR)
 - Re-review 1 (head `87f0fba`):
   - `npx vitest run tests/unit/ui/App.test.tsx tests/integration/ui/session-summary.test.tsx` → 20/20 passed
@@ -71,15 +72,15 @@ Writing a ref during render is slightly against the latest React guidance for co
 
 ## Scope and Working Tree
 - Review made no file modifications.
-- Local working tree clean; HEAD matches PR head commit e962cf1.
+- Local working tree clean; HEAD matches PR head commit d0a90e2.
 - **Pre-existing changes:** none.
-- **Unrelated/deferred work:** production/test diff is confined to the three files (App.tsx, App.test.tsx, session-summary.test.tsx); the two reviews/*.md files committed in e962cf1 are review artifacts (see MINOR-2).
+- **Unrelated/deferred work:** production/test diff is confined to the three files (App.tsx, App.test.tsx, session-summary.test.tsx); the reviews/*.md files are review artifacts.
 - **Note:** the full-suite flakes (session-table-round-result, session-presentation) remain unresolved pre-existing issues but are outside this PR's scope and predate it.
 
 ## Remaining Risks
 - The leak fix depends on `destroy()` idempotency; the unit test at SessionPresentation.ts already covers the idempotent-destroy contract, so this dependency is verified.
 - Full-suite timeout flakes persist for two test files, but are unrelated to this PR and were failing before it.
-- If MINOR-2 is left as-is, the original M4-T15 acceptance-gate report is absent from the merged working tree (recoverable only via history).
+- None for the documentation reconciliation: original gate report restored byte-exact; stabilization report in its own file.
 
 ## Suggested Next Step
-Address MINOR-2 (keep the original gate report separate from the stabilization report), then merge. The pre-existing flakes in session-table-round-result.test.tsx and session-presentation.test.ts remain open as separate issues.
+Both outstanding review findings (MINOR-1, MINOR-2) are resolved; NIT-1 required no change. Ready for merge. The pre-existing flakes in session-table-round-result.test.tsx and session-presentation.test.ts remain open as separate issues.
