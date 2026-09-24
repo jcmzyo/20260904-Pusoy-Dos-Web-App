@@ -1,9 +1,9 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.9)
+## Requirements & Planning Document (v1.16)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 5, 2026
+**Last Modified:** September 18, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
 **Committed roadmap:** Phase 1 only\
 **Future scope:** Deferred or possible directions only; no committed timeline
@@ -37,7 +37,7 @@ The codebase should preserve clean boundaries that do not unnecessarily block fu
 
 -   Online multiplayer/networking.
 -   Accounts, cloud saves, or leaderboards.
--   Additional bot personalities beyond the Optimizer Bot.
+-   Multiple bot difficulty/personality systems in the Phase 1 release.
 -   Sound design/music as a v1 requirement.
 
 
@@ -62,11 +62,11 @@ Detailed design and implementation decisions belong in dedicated subsystem docum
 | `domain-model.md` | Shared Domain Model | Shared, implementation-independent TypeScript concepts used across modules, such as cards, ranks, suits, combinations, moves, player IDs, and game modes |
 | `engine.md` | Game Engine | Authoritative game rules, validation, state transitions, scoring, engine-owned state, information-safe views, and engine event contracts |
 | `orchestrator.md` | Game Orchestrator | Coordinates game flow, player controllers, engine execution, events, and round/session progression |
-| `ai.md` | AI System | Bot move selection, strategies, personalities, difficulty behavior, and permitted game information |
+| `ai.md` | AI System | Phase 1 Baseline move selection, permitted game information, deterministic decision behavior, and deferred stronger-strategy extension boundaries |
 | `ui-ux.md` | UI Layer | Screens, interactions, presentation, feedback, accessibility, responsive behavior, and quality-of-life features |
 | `persistence.md` | Game Persistence | Saving/loading resumable state, settings, statistics, storage schema, versioning, and migrations |
 | `events-logging.md` | Event & Logging System | Structured gameplay events, game history, debug logging, formatting, and event consumers |
-| `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic simulation, regression testing, and AI balancing support |
+| `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic reliability simulation, replay/regression testing, and future evaluation support |
 
 Future online multiplayer may introduce a separate `networking.md` when that work enters scope. Shared domain concepts should be defined once in `domain-model.md` rather than duplicated inside subsystem documents. Player-controller contracts should initially be documented with the orchestrator, while engine configuration, authoritative state, ruleset configuration, player/public views, and engine event contracts should initially be documented with the engine.
 
@@ -124,7 +124,7 @@ This section is the **canonical glossary for shared game/domain terms** used acr
 | **Winner Final Play** | The winner's last played combination in Competitive Mode. It triggers the winner-final-play multiplier when it satisfies one of the qualifying conditions defined in §2.6.2. |
 | **Public Information** | Game information every player is entitled to know, such as publicly played cards, current trick, scores, and opponent card counts where applicable. |
 | **Private Information** | Game information restricted to a particular player or authorized component, primarily the unrevealed cards in a player's hand. |
-| **Game Mode** | The rule configuration governing round-ending and scoring behavior. v1 provides **Basic** and **Competitive** modes. |
+| **Game Mode** | The rule configuration governing round-ending and scoring behavior. Phase 1 implements **Basic Mode** only. **Competitive Mode** is a deferred approved design retained for future consideration. |
 | **Ruleset** | The configured set of shared Pusoy Dos rule values and comparison behavior used by the authoritative engine. |
 
 When a later section needs to specify the detailed behavior of one of these terms, it should define the **rule or algorithm**, not introduce a competing definition.
@@ -141,15 +141,15 @@ A **milestone** must produce a concrete, testable technical output. A **phase** 
 
 ## M2 — Baseline AI + Headless Game
 
-**Technical output:** the production Engine and Orchestrator can complete a five-Round Basic Session autonomously with four deterministic Baseline controllers. The Baseline bot must be legal and reasonably rational, including conserving powerful cards/hands where practical, but does not require deep search, difficulty profiles, personalities, or sophisticated opponent modeling.
+**Technical output:** the production Engine and Orchestrator can complete a five-Round Basic Session autonomously with four deterministic Baseline controllers. The Baseline bot uses a deterministic hybrid policy: Engine-authorized candidates, strategic PASS when responding, exact memoized remaining-hand decomposition as the primary hand-structure signal, lightweight tactical/context evaluation, and canonical deterministic tie-breaking. It does not require deep search, difficulty profiles, personalities, Monte Carlo, or sophisticated opponent modeling.
 
 ## M3 — Headless Simulator + Reliability
 
-**Technical output:** deterministic batch simulation of real production Sessions with reproducible seeds, invariant checking, failure reproduction, termination checks, regression coverage, and measured performance.
+**Technical output:** deterministic batch simulation of real production Sessions with reproducible seeds, invariant checking, structured diagnostic traces, failed-seed replay, termination/stuck detection, regression-fixture capture, and measured engineering performance. A failing deal must be treated as a diagnosable software/controller defect until shown otherwise, not silently skipped as an "unplayable" seed.
 
 ## M4 — Minimal Playable UI
 
-**Technical output:** a React/Vite UI integrated with the same Engine/Orchestrator used headlessly. A human can complete a five-Round Basic Session against three Baseline bots.
+**Technical output:** a landscape-first React/Vite UI integrated with the same Engine/Orchestrator used headlessly. A human can complete a five-Round Basic Session against three Baseline bots on supported desktop/laptop/tablet/phone landscape viewports, including non-fullscreen browser windows, with ratio-preserving cards and bounded readable typography/control sizing. Portrait/undersized gameplay fails gracefully with rotate/resize guidance.
 
 ### Phase 1 working product
 
@@ -239,8 +239,9 @@ that new current trick.
 
   Triple                              Exactly 3 cards of the same rank
 
-  Straight                            Exactly 5 consecutive ranks
-                                      according to §2.4
+  Straight                            Exactly 5 cards forming a valid
+                                      house-rule sequence according to
+                                      §2.4, regardless of suits
 
   Flush                               Exactly 5 cards of the same suit
 
@@ -250,8 +251,9 @@ that new current trick.
   Four-of-a-Kind                      Exactly 4 cards of the same rank +
                                       1 kicker
 
-  Straight Flush                      Exactly 5 consecutive ranks, all of
-                                      the same suit
+  Straight Flush                      Exactly 5 cards of the same suit forming
+                                      a valid house-rule sequence according
+                                      to §2.4
   -----------------------------------------------------------------------
 
 ### Five-card combination ranking
@@ -259,6 +261,10 @@ that new current trick.
 Low → high:
 
 `Straight < Flush < Full House < Four-of-a-Kind < Straight Flush`
+
+A five-card card set may satisfy the defining properties of more than one combination type. When this occurs, its **final canonical classification is the highest-ranking applicable combination** under the hierarchy above.
+
+For example, a same-suit valid house-rule sequence satisfies both Straight and Flush properties and therefore qualifies as a **Straight Flush**, the higher applicable category. Authoritative detection must evaluate applicable five-card definitions and return the strongest valid classification rather than rejecting a lower-type property merely because a stronger overlap exists.
 
 Combination types cannot be mixed for 1-, 2-, or 3-card tricks.
 
@@ -285,24 +291,34 @@ five-card combinations, not a same-type-only restriction.
 
 If no legal play can beat the current trick, the player may pass.
 
+### 2.3.1 Single, Pair, and Triple comparison
+
+For 1-, 2-, and 3-card combinations, the response must use the same combination type and must be strictly stronger.
+
+- **Single:** compare Rank first. If the Ranks are equal, compare Suit using `Clubs < Spades < Hearts < Diamonds`.
+- **Pair:** compare the Pair Rank first. If both Pairs have the same Rank, compare the **highest-Suit card contained in each Pair** using `Clubs < Spades < Hearts < Diamonds`. Example: `7♠ 7♦` beats `7♣ 7♥` because the highest-Suit card is `7♦` versus `7♥`.
+- **Triple:** compare the Triple Rank only. Two distinct equal-Rank Triples cannot occur in normal play from one standard 52-card deck because only four cards of each Rank exist.
+
+Physical deck uniqueness is part of the rules model. Tests and examples must not fabricate two distinct playable combinations that would require the same physical card to exist twice.
+
 ------------------------------------------------------------------------
 
 ## 2.4 Five-Card Combination Comparison Rules
 
 Five-card comparison occurs in two stages:
 
-1.  Compare combination type using the hierarchy in §2.3.
-2.  If both combinations have the same type, use the type-specific
-    comparison rule below.
+1.  Compare final canonical combination type using the hierarchy in §2.3.
+2.  If both combinations have the same final type, use that type's specific comparison rule below.
 
-Therefore, any combination from a stronger five-card category beats any
-combination from a weaker category regardless of its internal rank values.
+A stronger five-card category **strictly beats every weaker five-card category regardless of the cards' internal ranks, suits, or apparent strength**.
 
-Each five-card type has its own same-type comparison rule.
+For same-type comparisons, apply only that category's documented comparison definition. Some apparent equality cases are physically impossible between two distinct playable combinations from one standard 52-card deck because cards are unique. Examples and tests must respect this constraint rather than duplicating physical cards merely to manufacture a tie.
 
 ### 2.4.1 Straight
 
-A straight is ranked by the **last/highest rank in its sequence**.
+A five-card set satisfies the **Straight property** when its ranks form one of the valid house-rule sequences below, regardless of suits. A same-suit valid sequence therefore satisfies both Straight and Flush properties; its final canonical classification is Straight Flush because Straight Flush is the highest-ranking applicable category.
+
+A Straight is ranked by the **last/highest rank in its sequence**.
 
 The special low straights are:
 
@@ -331,10 +347,10 @@ highest card** using:
 
 Example:
 
--   `3♣ 4♣ 5♣ 6♣ 7♣` is weaker than
+-   `3♦ 4♣ 5♣ 6♣ 7♣` is weaker than
 -   `3♣ 4♥ 5♠ 6♦ 7♥`
 
-because both are 7-high and `7♥ > 7♣`.
+because both are ordinary 7-high Straights and `7♥ > 7♣`.
 
 For the special straights, the effective high card is:
 
@@ -360,7 +376,9 @@ special straights above.
 
 ### 2.4.2 Flush
 
-A flush is compared by **suit first**.
+A Flush is exactly five cards of one suit whose ranks **do not** form a valid house-rule Straight sequence. If the same-suit cards form a valid house-rule sequence, the combination is a Straight Flush instead.
+
+A Flush is compared by **suit first**.
 
 Suit order:
 
@@ -386,6 +404,8 @@ A full house is ranked by the **rank of its triple only**.
 
 The pair does not affect the comparison.
 
+Two distinct Full Houses with the same triple Rank cannot occur in normal play from one standard 52-card deck because each Full House already consumes three of the four cards of that Rank.
+
 Example:
 
 -   `77733` beats `555KK`
@@ -401,6 +421,8 @@ A four-of-a-kind is ranked by the **rank of the four matching cards**.
 
 The kicker does not affect the comparison.
 
+Two distinct Four-of-a-Kind combinations with the same quad Rank cannot occur in normal play because there is only one four-card set of that Rank in the deck.
+
 Example:
 
 -   `7777 + X` beats `6666 + Y`
@@ -411,8 +433,7 @@ regardless of the kicker.
 
 ### 2.4.5 Straight Flush
 
-A straight flush follows the **same rank-first comparison logic as a
-straight**.
+A Straight Flush is exactly five cards of one suit forming a valid house-rule Straight sequence. It follows the **same rank-first comparison logic as a Straight**.
 
 1.  Compare the effective highest rank of the straight.
 2.  If the highest rank is the same, compare the suit of the highest
@@ -458,22 +479,35 @@ When a player empties their hand in Basic Mode:
 1.  Record that player in `finishOrder`.
 2.  Remove that player from the active rotation.
 3.  Examine the final combination they played.
-4.  Starting from the next active player in clockwise order, determine
-    whether an active player can legally beat that combination.
-5.  If an active player can beat it:
-    -   the first such player in turn order plays it;
-    -   normal trick flow continues from that play;
-    -   pass count resets.
-6.  If no active player can beat it:
-    -   the next active player becomes the new leader;
-    -   that player may play any valid combination;
-    -   pass count resets.
-7.  Continue until only one active player remains.
-8.  That final remaining player is recorded as **4th place** and the
+4.  Each remaining active player, in turn order starting from the next
+    active player after the finisher, takes an **explicit Turn of
+    their own** in response to that final combination:
+    -   If that player has a legal combination that beats it, they
+        may play it — normal trick flow continues from that Play, and
+        pass count resets.
+    -   If they have no such legal combination, or simply choose not
+        to play a beating combination they do have (a strategic Pass
+        remains available, consistent with this section's general
+        Pass rules), they explicitly Pass on their own Turn. The
+        Engine never determines this on a player's behalf, and never
+        skips a remaining active player's own Turn.
+5.  Once every remaining active player has, in turn, either played a
+    beating combination or explicitly passed without one, the next
+    active player after the finisher becomes the new leader and may
+    play any valid combination; pass count resets.
+6.  Continue until only one active player remains.
+7.  That final remaining player is recorded as **4th place** and the
     round ends.
 
 This means a player going out does **not** automatically end the current
-trick in Basic Mode.
+trick in Basic Mode, and no remaining active player's own Turn is ever
+silently skipped or Engine-computed on their behalf — each one either
+plays a beating combination or produces a genuine Pass of their own
+(M4-T12.5).
+
+### 2.5.2 (retired — promoted into §2.5.1)
+
+**Status:** Implemented and verified (M4-T12.5). This subsection previously recorded an approved-but-not-yet-implemented replacement for §2.5.1's earlier silent-determination behavior (the Engine computing, in one internal step, whether any remaining active player could beat the finisher's own final combination, and reassigning the free lead without any of those players ever taking a visible Turn). That replacement has since been implemented in `resolveBasicContinuation.ts` (each remaining active player now takes a real Turn and, where applicable, produces a genuine `PLAYER_PASSED` event) and its text has been promoted into §2.5.1 above, which is now the sole authoritative rule for this behavior. This subsection is kept only as a version-history marker; it carries no separate rule of its own.
 
 ------------------------------------------------------------------------
 
@@ -656,49 +690,32 @@ Competitive Mode **skips average placement entirely**. Only the Round winner has
 
 ------------------------------------------------------------------------
 
-## 2.6.4 Session Flow
+## 2.6.4 Phase 1 Session Flow
 
-1.  Choose Basic or Competitive mode.
-2.  Configure each AI bot's difficulty independently.
-3.  Start the session.
-4.  Play 5 rounds.
-5.  Before each round:
-    -   shuffle the full deck;
-    -   deal 13 cards to each player;
-    -   identify the player holding 3♣;
-    -   that player opens with a valid combination containing 3♣.
-6.  After each Round, calculate the official Round result and update cumulative Session totals.
-7.  Enter the **Round Result** checkpoint and show the official Round result/scores plus updated cumulative Session totals.
-8.  In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**.
-9.  Headless simulation may pass through the same checkpoint and continue immediately without an artificial wait.
-10. After Round 5, show the Session summary.
-11. Apply the mode-specific Session tiebreakers if necessary.
-12. Update persistent local statistics.
+1. Start a new **Basic Mode** Session.
+2. Use one human player and three deterministic Baseline bots.
+3. Play exactly 5 Rounds.
+4. Before each Round:
+    - shuffle the full deck using the Engine's deterministic RNG path;
+    - deal 13 cards to each player;
+    - identify the player holding 3♣;
+    - that player opens with a valid combination containing 3♣.
+5. After each Round, calculate the official Basic Round result and update cumulative Session totals.
+6. When the 3rd-place player finishes, the Round is complete. Before the result overlay appears, briefly reveal the 4th-place player's remaining hand on the table, sorted by Rank. After that presentation step, enter the **Round Result** checkpoint. The result appears as a modal/overlay over the dimmed completed table, initially ordered by the standings before the Round score is applied; Round points then appear, totals update, and rows rearrange by the new cumulative total.
+7. In normal human gameplay, do **not** start the next Round until the user explicitly chooses **Next Round**. After Round 5, this explicit-action requirement does not apply: once the Round Result overlay's own scoring animation settles, the UI automatically transitions to the Session Summary after a short presentational delay, with no click required (Follow-up, M4-T13 UI refinement — a presentation-layer screen transition only; it starts no new Round and calls no Orchestrator continuation, so the explicit-action requirement above for points 2-5 is unaffected).
+8. Headless execution/simulation may pass through the same checkpoint and continue immediately without an artificial wait.
+9. After Round 5, show the Session Summary and apply Basic Mode Session tiebreakers if necessary.
+10. Phase 1 does not select AI difficulty, persist unfinished Sessions, or update persistent player statistics.
+
+Competitive Mode uses the deferred rules defined elsewhere in §2.6 when/if that feature enters committed scope; it is not selectable in Phase 1.
 
 ------------------------------------------------------------------------
 
-# 2.7 Hand-Type Tracking
+# 2.7 Hand-Type Tracking — Deferred
 
-Track the **human player's** played combinations.
+Persistent/per-session player statistics are not required in Phase 1.
 
-The following types are counted separately:
-
--   Single
--   Pair
--   Triple
--   Straight
--   Flush
--   Full House
--   Four-of-a-Kind
--   Straight Flush
-
-The two special low straights are included in the **Straight** count.
-
-Track:
-
-1.  Per-round counts.
-2.  Per-session cumulative counts.
-3.  Persistent cumulative counts across all sessions.
+If statistics enter a future committed scope, combination counts may include Single, Pair, Triple, Straight, Flush, Full House, Four-of-a-Kind, and Straight Flush, with the two special low Straights counted under Straight. The exact persistence/statistics schema must be designed with that future work rather than implemented implicitly during M3 or M4.
 
 ------------------------------------------------------------------------
 
@@ -712,16 +729,16 @@ Track:
 - [ ] Pure TypeScript authoritative Engine with no React dependency.
 - [ ] Deterministic injected Engine randomness for shuffle/deal and reproducible headless execution.
 - [ ] Engine-generated legal Moves and authoritative Move validation.
-- [ ] Baseline bot that always chooses from legal Moves, behaves reasonably, and attempts to conserve powerful cards/hands; no deep search/difficulty/personality requirement.
+- [ ] Deterministic Baseline bot using Engine-authorized actions, strategic PASS evaluation, exact memoized hand decomposition, lightweight contextual evaluation, and canonical tie-breaking; no deep search/difficulty/personality requirement.
 - [ ] Headless execution through the production Orchestrator/controllers.
 - [ ] Reusable deterministic batch simulator with invariants and failure reproduction.
 - [ ] Minimal React/Vite playable UI described by `ui-ux.md`.
-- [ ] Human card selection, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists.
-- [ ] Current trick, turn, opponent card counts, PASS/DONE state, public played-card history/Event Log, and current running Session scores visible through the UI.
-- [ ] Round Result checkpoint after every Round showing official placement, Round points, and updated cumulative Session score; explicit Next Round.
-- [ ] Session Summary after Round 5 with final result and tiebreak information when applicable.
+- [ ] Human card selection, bounded drag/reorder manual hand arrangement, Play, voluntary Pass, Sort by Rank, Sort by Suit, and explicit feedback when no legal Play exists. Selection and visual hand order are independent: rearranging or sorting must not silently deselect selected cards.
+- [ ] Current trick, turn, opponent face-down hands/card counts, PASS/DONE state, current running Session scores, a Discard Pile view containing every card already played this Round, and an Event Log containing chronological factual public events are accessible through the UI.
+- [ ] End-of-Round presentation briefly reveals the 4th-place remaining hand after 3rd place finishes, then shows a dimmed-table Round Result overlay with previous standings, animated Round-score application, updated totals, and reordering by cumulative score; explicit Next Round for Rounds 1-4, or an automatic transition to the Session Summary after Round 5 once the scoring animation settles (Follow-up, M4-T13 UI refinement).
+- [ ] Session Summary after Round 5 ordered by official final Session result, with final scores/tiebreak information and distinct gold/silver/bronze treatment for 1st/2nd/3rd plus Play Again and Home actions. Presents as a popup replacing the Round Result overlay in place, with the human player's own seat highlighted and the full Session Event Log embedded alongside the actions (Follow-up, M4-T13 UI refinement).
 - [ ] Four-color suits by default: Hearts red, Diamonds orange, Clubs blue, Spades black; no Phase 1 toggle.
-- [ ] Basic responsive usability on common phone and desktop widths.
+- [ ] Landscape-first responsive usability on documented desktop/laptop/tablet/phone landscape viewports, including non-fullscreen windows; cards preserve ratio, text/controls remain usable, and portrait/undersized states show rotate/resize guidance.
 - [ ] No save/Resume in Phase 1. In-app leaving an unfinished Session warns that progress will be lost; browser close/refresh warning is used where supported.
 
 ## 3.2 Phase 1 — SHOULD HAVE
@@ -729,7 +746,7 @@ Track:
 - [ ] Clear validation explanations for invalid/non-beating selections.
 - [ ] Simple green Modern Casino Table visual foundation using reusable design tokens/components.
 - [ ] Information overlays pause game progression while open.
-- [ ] Deterministic diagnostics sufficient to reproduce simulation failures.
+- [ ] Deterministic simulation diagnostics include structured failure traces and failed-seed replay sufficient to identify the failing transition and create regression coverage.
 
 A SHOULD item may be deferred within Phase 1 only if the Phase 1 working-product acceptance criteria remain satisfied and the deferral is explicitly recorded; it must not be silently dropped.
 
@@ -742,7 +759,6 @@ The following are intentionally not required for Phase 1 even where detailed des
 - Settings and auto-pass.
 - Easy/Normal/Hard difficulty system and deeper Optimizer/search behavior.
 - AI personalities, Mystery Bots, and Surprise Me.
-- manual arbitrary hand rearrangement.
 - two-color/four-color suit preference toggle.
 - richer animations, sounds, branding, progression, achievements, and other polish.
 
@@ -773,7 +789,7 @@ No gameplay operation should require a network request.
 For the initial POC, engineering tradeoffs follow this order:
 
 1. **Accuracy and reliability** --- authoritative rules, legal-Move generation, scoring, state transitions, and AI analysis must be correct and reproducible.
-2. **Speed** --- optimize computation after correctness is established and measured. A slower device may legitimately take longer, especially for Hard search, provided computation remains bounded and the application stays responsive.
+2. **Speed** --- optimize computation after correctness is established and measured. A slower device may legitimately take longer, provided computation remains bounded and the application stays responsive.
 3. **Memory usage** --- memoization/caching may use additional memory in the POC when it materially improves correctness, simplicity, or speed. Memory reduction and cache policies may be optimized later.
 
 Additional requirements:
@@ -784,7 +800,7 @@ Additional requirements:
 - Actual AI computation time and simulated presentation delay are separate concerns.
 - Target AI presentation delay is approximately 0.3--1.5 seconds and may be tuned independently from computation.
 - Headless simulation uses no artificial thinking delay.
-- AI/search implementations must provide room for future profiling, cache optimization, pruning improvements, and faster algorithms without changing public game contracts.
+- AI implementations must provide room for future profiling, cache optimization, and stronger algorithms without changing public game contracts.
 - The AI delay must not be part of the engine's game rules.
 
 ## 4.3 Portability
@@ -896,20 +912,18 @@ Recommended high-level source organization:
     NetworkController (future)
 
   /ai
-    strategies
-    personalities
-    difficulty
-    rng
+    baseline
+    analysis
+    evaluation
+    tracing
 
   /ui
     pages
     components
     navigation
     game
-    stats
-    settings
 
-  /persistence
+  /persistence (deferred)
     snapshots
     statistics
     settings
@@ -1039,11 +1053,11 @@ Requirements:
 
 # 5.3 Determinism and Randomness
 
-The initial AI is **deterministic**: given the same permitted game state, legal Moves, mode, personality, and difficulty, it should choose the same Move. Initial difficulty differences must come from reasoning capability rather than random mistakes.
+The Phase 1 Baseline AI is **deterministic**: given the same permitted player-facing state, same private hand, same candidate action set, and same Baseline configuration, it must choose the same Move. Reordering an otherwise identical `legalMoves` collection must not alter the selected action. Cold/warm memoization state must also not alter the decision.
 
-If controlled AI variation is introduced later, it must use an injectable/seeded RNG and should normally vary only among strategically defensible candidates rather than force irrational play.
+The Phase 1 Baseline Bot uses no decision randomness. If controlled AI variation is introduced later, it must use an injectable/seeded RNG and should normally vary only among strategically defensible candidates rather than force irrational play.
 
-Determinism/reproducibility is particularly important for AI unit tests, simulations, bug reproduction, debugging, and balancing.
+Determinism/reproducibility is particularly important for AI unit tests, simulations, bug reproduction, debugging, and later balancing.
 
 Authoritative engine randomness such as deck shuffling must also be injectable/seedable for deterministic tests.
 
@@ -1053,31 +1067,38 @@ Authoritative engine randomness such as deck shuffling must also be injectable/s
 
 ## 6.1 Phase 1 — Baseline Bot
 
-Phase 1 implements one deterministic Baseline strategy shared by the three bots. Its purpose is to make headless simulation and the first playable product useful without paying the cost of the full advanced AI design.
+Phase 1 implements one deterministic Baseline strategy shared by the three bots. Its purpose is to provide rational, reproducible play for headless execution and the first playable product without paying the cost of advanced imperfect-information search.
 
-The Baseline bot must:
+The selected M2 algorithm is a **deterministic hybrid Move evaluator**. It:
 
-- choose only from Engine-provided legal Moves;
-- use only permitted `PlayerView`/public information;
-- make deterministic decisions for identical inputs;
-- prefer reasonable card shedding rather than arbitrary first-legal behavior;
-- attempt to conserve powerful resources/hands when spending them is unnecessary;
-- avoid intentionally irrational Plays or Passes merely to appear "easy";
-- remain understandable and testable.
+- chooses only among Engine-authorized actions;
+- treats PASS as a first-class strategic candidate whenever responding, even when legal beating Plays exist;
+- forbids PASS on free lead according to Engine legality;
+- immediately prefers a legal Move that empties the bot's hand;
+- evaluates candidate resulting hands using **exact memoized bitmask decomposition** to estimate the minimum number of valid future Plays required to partition the remaining hand;
+- combines that primary hand-structure signal with lightweight resource preservation, immediate shedding value, Trick/control context, PASS opportunity cost, and public opponent remaining-card pressure;
+- uses only permitted `PlayerView`/public information;
+- uses canonical deterministic tie-breaking independent of input Move ordering;
+- avoids intentionally irrational Plays or Passes merely to appear "easy";
+- remains explainable and instrumentable for tests/debugging.
 
-It does not need deep lookahead, exhaustive Session strategy, sophisticated opponent modeling, difficulty profiles, personalities, or Competitive evaluation.
+The decomposition estimate is not a prediction of actual future Turns and must not assume opponent cooperation. It is a structural signal that may be overridden by obvious tactical context such as immediate finish or urgent opponent pressure.
 
-The exact heuristic weights remain an implementation/tuning decision as long as the bot satisfies these behavioral constraints and does not duplicate legality rules.
+A public Pass alone must never be treated as proof that another player lacked a legal response because voluntary passing is legal.
+
+Detailed evaluator precedence/constants may be refined in M2 design, but substantial ambiguity must be recorded rather than hidden behind arbitrary weights.
 
 ## 6.2 Deferred AI Design
 
-The richer Optimizer, minimum-play solver, Easy/Normal/Hard capability profiles, deeper bounded search, Session-aware strategy, public-card analysis, personalities, Mystery Bots, and controlled variation remain approved design material in `ai.md` but are not Phase 1 implementation requirements.
+Deferred techniques include difficulty profiles, personalities, sophisticated opponent inference, deep search, Minimax/MaxN, hidden-hand determinization, Monte Carlo, MCTS/ISMCTS, machine learning, neural networks, advanced card counting, Competitive Mode strategy, and controlled random/personality behavior.
 
-Future AI must continue to obey the same information-safety boundary used by the Baseline bot. A public Pass alone must never be treated as proof that a player lacked a legal response because voluntary passing is legal.
+The AI/Controller boundary should remain replaceable so stronger future strategies do not require Engine changes.
 
 ## 6.3 Algorithm Adaptation and House-Rule Authority
 
-External Big Two/Poker algorithms may be used as implementation references only. Canonical house rules and Engine contracts remain authoritative. For Phase 1, correctness/reliability outranks speed, and speed outranks memory optimization.
+External Big Two/Poker algorithms may be used as implementation references only. Canonical house rules and Engine contracts remain authoritative. External suit ordering, Straight semantics, five-card hierarchy, bomb rules, opening rules, legality assumptions, or comparison semantics must not be imported without independent verification against this project.
+
+For Phase 1, correctness/reliability outranks speed, and speed outranks memory optimization. Exact <=13-card decomposition should be benchmarked on the real TypeScript implementation before approximation is considered.
 
 # 7. Data and Model Ownership
 
@@ -1088,9 +1109,9 @@ The model ownership rules are:
 - **`domain-model.md`** defines stable shared domain concepts such as `Card`, `Rank`, `Suit`, `PlayerId`, `GameMode`, `CombinationType`, `Combination`, and `Move`.
 - **`engine.md`** defines authoritative/internal runtime state and engine public contracts such as Round/Session/Trick state, internal player state, validation results, scoring breakdowns, Player/Public Views, and engine event contracts.
 - **`orchestrator.md`** defines PlayerController and game-runner/orchestration contracts.
-- **`ai.md`** defines bot personalities, difficulty behavior, evaluation data, and AI-specific state.
-- **`ui-ux.md`** defines UI view state, navigation, card-selection/manual-ordering state, presentation models, and screen behavior.
-- **`persistence.md`** defines saved-game snapshots, statistics records, settings persistence, storage versions, and migrations.
+- **`ai.md`** defines the Phase 1 Baseline bot decision policy, analysis/evaluation data, deterministic tracing, permitted information, and extension boundaries for deferred stronger AI.
+- **`ui-ux.md`** defines UI view state, navigation, Phase 1 card selection/sorting, presentation models, responsive behavior, and screen behavior.
+- **`persistence.md`** is deferred for Phase 1; if later created, it will define saved-game snapshots, statistics records, settings persistence, storage versions, and migrations.
 - **`events-logging.md`** defines event retention, formatting, debug/history records, filtering, and consumers.
 - **`testing-simulation.md`** defines simulation scenarios, aggregate metrics, fixtures, and test-run configuration.
 
@@ -1104,7 +1125,7 @@ This separation is intended to prevent duplicate models, hidden-information leak
 
 `ui-ux.md` is the authoritative UI/UX design document. Phase 1 implements only its Phase 1 sections.
 
-The Phase 1 UI is intentionally small but complete: Home, minimal Game Setup, Game Table, Round Result, and Session Summary. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
+The Phase 1 UI is intentionally small but complete: Home, Game Table, Round Result overlay, and Session Summary. **Start Game** immediately starts the fixed Basic Session in Phase 1; startup must still pass through a clean application/configuration boundary so a future setup sub-screen can be inserted when real options such as game mode or difficulty enter scope. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
 
 Deferred UI concepts documented there preserve prior decisions but do not imply a post-Phase-1 timeline.
 
@@ -1232,12 +1253,16 @@ Test the engine independently of React.
 -   Correct shuffle behavior.
 -   Correct 13-card deal.
 
-### Card comparison
+### Card and small-combination comparison
 
 -   Rank order.
 -   Suit order.
 -   3♣ is lowest.
 -   2♦ is highest.
+-   Same-Rank Singles compare by Suit.
+-   Pairs compare by Rank first; equal-Rank Pairs compare by the highest-Suit card contained in each Pair.
+-   Triples compare by Rank only.
+-   Tests must not fabricate two distinct equal-Rank Triples, because such a matchup is impossible with one standard 52-card deck.
 
 ### Combination detection
 
@@ -1246,8 +1271,9 @@ Test:
 -   Single.
 -   Pair.
 -   Triple.
--   Straight.
--   Flush.
+-   Straight property detection for every valid house-rule sequence regardless of suits, including same-suit sequences.
+-   Flush property detection for every same-suit five-card set, including sets that also satisfy Straight.
+-   Final five-card classification chooses the highest-ranking applicable category when definitions overlap.
 -   Full House.
 -   Four-of-a-Kind.
 -   Straight Flush.
@@ -1263,6 +1289,8 @@ Explicit tests for:
 -   J-Q-K-A-2.
 -   K-A-2-3-4 invalid.
 -   Q-K-A-2-3 invalid.
+-   A valid sequence with all five cards in one suit still passes Straight property detection, but its final canonical category is Straight Flush.
+-   A valid sequence using at least two suits is classified as Straight when no stronger category applies.
 
 ### Straight comparison
 
@@ -1280,6 +1308,8 @@ Verify:
 -   Hearts \> Spades.
 -   Spades \> Clubs.
 -   Same-suit flushes compare by descending card ranks.
+-   A same-suit hand whose ranks form a valid house-rule sequence still satisfies Flush, but its final canonical category is Straight Flush.
+-   A same-suit hand whose ranks do not form a valid house-rule sequence is classified as Flush.
 
 ### Full house
 
@@ -1293,8 +1323,19 @@ Verify only the four-card rank determines strength.
 
 Verify:
 
-1.  highest rank first;
-2.  highest-card suit second.
+1.  detection requires both one suit and a valid house-rule sequence;
+2.  when Straight and Flush properties overlap, final classification selects Straight Flush as the highest-ranking applicable category;
+3.  highest rank first;
+4.  highest-card suit second.
+
+### Five-card hierarchy and physical uniqueness
+
+Verify:
+
+-   every stronger five-card category strictly beats every weaker category regardless of internal cards;
+-   same-category comparisons use only that category's documented comparison rule;
+-   test hands are physically realizable from one 52-card deck and do not duplicate a physical card across opposing combinations;
+-   impossible tie scenarios are not presented as normal gameplay cases.
 
 ### Trick validation
 
@@ -1417,25 +1458,29 @@ Verify:
 -   With identical deterministic configuration and the same Engine RNG seed/state, the same headless execution is reproducible.
 -   Initial AI move selection is deterministic and does not require a separate AI RNG seed. If future controlled AI variation is introduced, its AI RNG seed/state becomes part of replay metadata.
 
-Simulation should eventually be used to evaluate and tune Bot A's
-strategy.
+Phase 1 M3 simulation is a reliability/debugging harness, not an AI balancing tournament. Future AI evaluation may reuse the simulator after stronger AI work enters committed scope.
 
 ------------------------------------------------------------------------
 
 # 12.4 Manual Testing
 
-Test:
+Test Phase 1 behaviors including:
 
--   Desktop browser.
--   Mobile browser.
--   Small screens.
--   Card selection/misclicks.
--   Rapid clicking.
--   Round transitions.
--   Session transitions.
--   Refresh/resume behavior.
--   Offline operation.
--   Persistence after closing/reopening the browser.
+- desktop/laptop landscape;
+- supported tablet/phone landscape;
+- non-fullscreen/windowed browser layouts;
+- unsupported portrait and undersized guidance;
+- card selection, raised selected-card state, and rapid repeated input;
+- bounded mouse/touch manual hand rearrangement while preserving selection;
+- Sort by Rank/Suit while preserving selection;
+- Play/Pass validation and understandable invalid reasons;
+- Discard Pile and Event Log overlays, including pause/resume behavior;
+- readable bot-turn pacing without requiring humans to measure milliseconds;
+- 4th-place remaining-hand reveal;
+- Round Result scoring/reordering animation and explicit Next Round;
+- full five-Round Session transition to Session Summary;
+- leave/reload behavior clearly communicating that unfinished progress is not saved;
+- offline gameplay after required application assets are available.
 
 ------------------------------------------------------------------------
 
@@ -1486,69 +1531,40 @@ application assets.
 
 ------------------------------------------------------------------------
 
-# 14. Open Design / Research Items
+# 14. Remaining Phase 1 Design / Implementation Items
 
-These are not unresolved game rules. They are implementation/research
-tasks.
+These are implementation details still to be finalized inside the committed M3/M4 work. They are not unresolved game rules.
 
-## 14.1 Bot A evaluation strategy
+## 14.1 M3 reliability harness details
 
-Research and prototype different approaches for the Optimizer Bot.
+M3 task design may finalize implementation details such as:
 
-The final implementation should document:
+- simulator configuration/seed representation;
+- trace/failure artifact formatting;
+- generous nontermination/progress guard thresholds;
+- deterministic acceptance seed-set/batch size;
+- compact summary/report formatting.
 
--   evaluation criteria;
--   weighting;
--   lookahead depth;
--   handling of opponent risk;
--   handling of bombs;
--   endgame behavior;
--   how difficulty modifies the strategy.
+These choices must not create a second gameplay implementation or redefine Engine rules.
 
-Do not describe Bot A as "objectively optimal" unless a mathematically
-justified optimal solver is actually implemented.
+## 14.2 M4 responsive layout contract
 
-## 14.2 AI balancing
+M4 must explicitly define and then consistently test:
 
-Use seeded simulations to compare:
+- representative supported viewport dimensions;
+- minimum supported landscape dimensions;
+- the play-area aspect-ratio/envelope;
+- the constant card width:height ratio;
+- minimum readable core typography;
+- minimum usable critical control/touch sizes;
+- reflow/collapse behavior for secondary panels;
+- unsupported portrait/undersized behavior.
 
--   Easy vs Normal vs Hard.
--   Win rates.
--   Average placement.
--   Average cards remaining.
--   Competitive Mode scores.
+These are intentionally finalized during M4 implementation/design rather than guessed in advance. The result must satisfy `ui-ux.md` and the M4 milestone requirements.
 
-Difficulty should feel meaningfully different without being artificially
-unfair.
+## 14.3 Deferred research/design
 
-## 14.3 UI design
-
-The visual design can evolve independently as long as it preserves the engine/UI boundary.
-
-Current UX direction:
-
--   prioritize readable game state over decorative animation;
--   always explain what combination was played and its effective strength;
--   keep animation as Nice to Have rather than a core milestone dependency;
--   provide strong defaults and avoid an overgrown settings screen;
--   use Relaxed / Fast as the main pacing control rather than many granular timing settings;
--   preserve manual hand organization until the player explicitly requests sorting;
--   keep legal-card dimming/highlighting as a potential future improvement rather than a committed v1 behavior;
--   contextual help is useful but lower priority than the engine and basic playable UI.
-
-## 14.4 Future setup-modifier rules
-
-Before implementing Card Exchange, explicitly define:
-
--   simultaneous vs sequential selection;
--   when received cards become visible to the recipient;
--   whether exchanged cards are publicly revealed;
--   modifier ordering when multiple setup modifiers are enabled;
--   AI selection strategy for exchange decisions.
-
-These are intentionally deferred and must not be inferred silently during
-implementation.
-
+Stronger AI, AI difficulty/personality systems, Competitive strategy, persistence/statistics/settings, setup modifiers, richer pacing controls, and other post-Phase-1 ideas remain deferred. Existing prior designs may be preserved, but they must not be treated as current implementation tasks.
 
 ------------------------------------------------------------------------
 
@@ -1566,7 +1582,7 @@ These have meaningful prior design decisions that should be preserved, but they 
 - Persistence/Resume, persistent statistics, and Settings.
 - Auto-pass convenience.
 - Two-color/four-color suit preference; Phase 1 uses four-color suits by default with no toggle.
-- Manual hand rearrangement and additional UI polish.
+- Additional UI polish beyond the committed manual rearrangement, responsive layout, and result-transition requirements.
 - Progression/achievement concepts already discussed.
 
 ## 15.2 Possible future directions — not committed
@@ -1640,6 +1656,6 @@ Round ends when the first player goes out.
 Highest session total wins, followed by:
 
 1.  Most round wins.
-2.  Best average placement.
+2.  Best average placement across the 5 Rounds; lower average is better.
 3.  Highest single best-round score.
 4.  Genuine tie if still tied.

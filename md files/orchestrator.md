@@ -1,12 +1,12 @@
 # Pusoy Dos --- Game Orchestrator Design
 
-## Game Orchestrator / Runner Document (v1.3)
+## Game Orchestrator / Runner Document (v1.6)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 5, 2026
-**Parent document:** `requirements.md` v1.9  
-**Shared model:** `domain-model.md` v1.2  
-**Engine design:** `engine.md` v1.3  
+**Last Modified:** September 15, 2026
+**Parent document:** `requirements.md` v1.14  
+**Shared model:** `domain-model.md` v1.3  
+**Engine design:** `engine.md` v1.7  
 **Module:** Game Orchestrator  
 **Language:** TypeScript
 
@@ -28,7 +28,7 @@ Its job is to connect:
 - Human, AI, and future Network Player Controllers;
 - the UI/application layer;
 - event consumers;
-- persistence integration points; and
+- deferred/future persistence integration boundaries; and
 - headless testing/simulation.
 
 `requirements.md` remains the product source of truth.
@@ -99,9 +99,16 @@ The Game Orchestrator owns:
 - coordinating Session completion;
 - supporting pause, resume, cancellation, and stale-input protection at the execution layer;
 - supporting headless execution with four AI Controllers;
-- exposing integration points for persistence and simulation without implementing either subsystem.
+- exposing integration points for the M3 simulator and deferred/future persistence without implementing either subsystem.
 
 ---
+
+## M2 Baseline Controller Decision Boundary
+
+For Phase 1, the Orchestrator supplies the Baseline controller with only the documented safe `PlayerView`, Engine-produced legal Moves, and request identity/context. The Baseline controller may strategically choose `PassMove` even when legal beating Plays exist; the Orchestrator must not auto-replace that choice with a Play. PASS legality remains Engine-authoritative.
+
+The Orchestrator does not perform AI decomposition/evaluation and does not reorder/filter candidates in a way that changes semantics. AI `DecisionTrace`/instrumentation may be routed to tests or M3 diagnostics, but it is non-authoritative and must not influence game-state transitions.
+
 
 # 4. Non-Responsibilities
 
@@ -116,17 +123,17 @@ The Game Orchestrator does **not** own:
 - deciding which player becomes the next authoritative Turn owner;
 - Trick completion rules;
 - finished-player handling;
-- Basic or Competitive scoring calculations;
+- Basic scoring calculations or deferred Competitive scoring calculations;
 - Session winner/tiebreak calculations;
 - authoritative Round or Session state;
-- AI move-selection strategy, personality, difficulty, or heuristic evaluation;
+- Baseline AI move-selection/decomposition/heuristic evaluation, or any deferred future difficulty/personality strategy;
 - React components, page navigation, animations, card selection, or manual hand ordering;
 - user-facing presentation timing;
 - `localStorage` or another persistence implementation;
 - serialization schema or migration logic;
 - formatted log history or event retention;
 - network transport;
-- simulation metrics or balancing analysis.
+- simulation metrics/reliability analysis or deferred future AI balancing analysis.
 
 When the Orchestrator needs any authoritative gameplay answer, it asks or submits to the Game Engine rather than recalculating that answer itself.
 
@@ -289,13 +296,15 @@ The AI Controller adapts the AI System to the common Player Controller interface
 Its responsibilities include:
 
 - receiving only the permitted `PlayerView` and engine-produced legal Move set;
-- invoking the configured AI strategy/personality/difficulty implementation;
+- invoking the configured Phase 1 Baseline controller implementation;
 - returning the chosen shared `Move`;
 - respecting cancellation/staleness from the runner integration.
 
 AI evaluation behavior belongs in `ai.md`, not here.
 
 The AI Controller must never obtain unrevealed opponent hands from authoritative engine state.
+
+For human UI execution, an AI controller request begins only when that bot owns the authoritative Turn. The runner must not ask later bots to precompute Moves while another player is acting. UI presentation delay after/beside a completed AI decision is non-authoritative presentation behavior.
 
 ## 9.3 NetworkController — Possible Future Direction
 
@@ -343,17 +352,13 @@ The registry is runtime coordination data, not authoritative game state.
 
 # 11. Session Startup
 
-The UI Game Setup screen gathers product configuration such as:
-
-- selected `GameMode`;
-- each bot's difficulty;
-- any supported Session settings/configuration.
+Phase 1 has no visible Game Setup screen because there are no meaningful user-selectable options. **Start Game** immediately requests the fixed Basic Session. Startup must still pass through a small application/configuration boundary so a future setup sub-screen can supply `GameMode`, difficulty, or other approved options without replacing runner startup.
 
 The high-level flow is:
 
 ```text
-Game Setup UI
-    ↓ configuration
+Home / future Game Setup UI
+    ↓ Session configuration
 Application / Orchestrator setup
     ↓
 Create controller mapping
@@ -681,9 +686,11 @@ Engine updates cumulative Session scores
     ↓
 Runner enters ROUND_RESULT state
     ↓
-UI displays:
-  • official Round scores/results
-  • updated cumulative Session scores
+UI presentation sequence:
+  • briefly reveal the 4th-place remaining hand after Round completion, using an information-safe post-Round projection
+  • show Round Result as an overlay over the completed table
+  • present official Round points and authoritative cumulative Session totals
+  • animate/reorder standings as presentation only
     ↓
 User chooses "Next Round"
     ↓
@@ -700,6 +707,7 @@ During the checkpoint:
 
 - no Player Controller should receive a normal Turn request;
 - the completed Round's authoritative result remains available for presentation;
+- post-Round public information may expose the 4th-place remaining hand only after the Engine has completed the Round; this must not broaden active-play PlayerView access;
 - the UI may present scoring explanations defined in the requirements;
 - presentation animations/timing remain UI responsibilities;
 - only an explicit continuation action should advance to the next Round.
@@ -790,7 +798,7 @@ At Session completion:
 - no Player Controller receives another Turn request;
 - final engine results remain available to UI/persistence consumers;
 - Session Summary may be shown by the UI;
-- persistence may update cumulative statistics;
+- deferred future persistence/statistics consumers may observe the final result if those features are later implemented;
 - Rematch/New Session/Home behavior is coordinated by the application layer around a new or replacement runner execution.
 
 The runner does not calculate final rankings or tiebreaks itself.
@@ -1065,7 +1073,7 @@ interface RunnerSessionConfig {
 
 Potential event sinks/observers may be supplied separately through constructor dependencies or registration.
 
-AI difficulty/personality configuration should normally be used when constructing AI Controllers rather than being interpreted by `GameRunner`.
+Phase 1 `GameRunner` receives already-constructed deterministic Baseline controllers and does not interpret AI strategy configuration. If difficulty/personality systems are introduced later, that configuration belongs in AI/controller construction rather than `GameRunner`.
 
 Presentation pacing should not be an engine setting and does not need to be a core runner rule configuration.
 
@@ -1101,7 +1109,7 @@ Headless mode must not require:
 - `localStorage`;
 - artificial timing delays.
 
-This architecture is important for automated regression testing and future AI balancing simulations.
+This architecture is important for M3 deterministic reliability/regression simulation and may later support AI evaluation if that work enters committed scope.
 
 ---
 
@@ -1116,8 +1124,8 @@ Initial v1 AI move selection is deterministic and does not require AI decision r
 A reproducible headless game therefore requires enough configuration to reproduce:
 
 - engine RNG seed/state;
-- AI RNG seed/state only when future controlled AI randomness is enabled;
-- each controller's configured personality/difficulty;
+- AI RNG seed/state only if future controlled AI randomness is introduced;
+- controller configuration that materially affects deterministic behavior; Phase 1 Baseline has no personality/difficulty selection;
 - game mode/ruleset configuration;
 - initial/session configuration.
 
@@ -1157,25 +1165,22 @@ The Orchestrator does not decide how a Round Result screen looks or how long the
 
 # 38. AI Boundary
 
-The AI subsystem owns:
+The Phase 1 AI subsystem owns:
 
-- candidate evaluation;
-- move scoring;
-- personality behavior;
-- difficulty differences;
-- opponent-aware heuristics;
-- AI-specific randomness;
-- difficulty-dependent reasoning breadth/depth and strategic capability; Easy must not intentionally make irrational Moves merely because it is Easy.
+- deterministic Baseline candidate evaluation;
+- exact remaining-hand decomposition and memoization;
+- strategic PLAY/PASS evaluation;
+- lightweight resource, shedding, Trick/control, and public opponent-pressure heuristics;
+- canonical deterministic tie-breaking;
+- non-authoritative `DecisionTrace`/instrumentation.
 
-The Orchestrator owns only the act of requesting a Move from the AI Controller at the correct time.
+The Orchestrator owns only the act of requesting a Move from the AI Controller at the correct time and forwarding the returned Move through normal Engine authority.
 
 The AI must not import or inspect engine-internal `SessionState` simply because the Orchestrator has access to it.
 
-It receives information-safe contracts prepared for that controller.
+Easy/Normal/Hard, personalities, advanced search/Optimizer behavior, and AI-specific randomness are deferred. If introduced later, they remain AI responsibilities rather than Orchestrator logic.
 
----
-
-# 39. Persistence Boundary
+# 39. Persistence Boundary — Deferred for Phase 1
 
 Persistence owns:
 
@@ -1226,7 +1231,7 @@ The Testing & Simulation subsystem owns:
 - matchup configuration;
 - automatic Round continuation;
 - metrics aggregation;
-- balance analysis;
+- reliability analysis; deferred future AI balance analysis is outside Phase 1.
 - regression fixtures;
 - failure reproduction.
 
@@ -1319,18 +1324,18 @@ A practical implementation order is:
 5. Implement the basic serialized Turn loop.
 6. Implement accepted/rejected Move handling.
 7. Implement `HumanController` asynchronous request resolution.
-8. Implement `AIController` adapter contract with a placeholder/test AI.
+8. Integrate the production deterministic Baseline controller through the established `PlayerController` contract.
 9. Implement Round Result checkpoint.
 10. Implement explicit `continueToNextRound()`.
 11. Implement Session completion.
 12. Add request IDs/stale-response protection.
 13. Add pause/resume/cancel behavior.
 14. Add event observers/sinks.
-15. Add optional human auto-pass coordination.
+15. Preserve the deferred auto-pass boundary; Phase 1 human play remains manual Pass.
 16. Add headless four-controller execution tests.
 17. Integrate UI/application layer.
-18. Integrate persistence through defined hooks/contracts.
-19. Integrate simulation/balancing tooling.
+18. Integrate M3 simulation/reliability tooling through defined observation/execution contracts.
+19. Integrate deferred persistence only if/when it enters a later committed scope.
 
 ---
 
@@ -1457,12 +1462,12 @@ The Orchestrator should maintain the following execution invariants:
 | Async human/AI/network waiting | `orchestrator.md` |
 | Round Result execution checkpoint | `orchestrator.md` + product requirement in `requirements.md` |
 | Explicit Next Round continuation | `orchestrator.md` + UI behavior in `ui-ux.md` |
-| AI strategy/personality/difficulty | `ai.md` |
+| Phase 1 Baseline AI strategy; deferred future personality/difficulty | `ai.md` |
 | Screens/card interaction/presentation | `ui-ux.md` |
 | Relaxed/Fast presentation pacing | `ui-ux.md` |
 | Save/load schema and `localStorage` | `persistence.md` |
 | Event retention/formatting/history | `events-logging.md` |
-| Batch runs/metrics/balance analysis | `testing-simulation.md` |
+| M3 batch reliability runs/metrics/replay; deferred future AI balance analysis | `testing-simulation.md` |
 | Network protocol/transport | future `networking.md` |
 
 ---
@@ -1529,15 +1534,17 @@ These open decisions should not be silently inferred during implementation if th
 
 # 50. Cross-Document Synchronization Status
 
-The previously recorded Round Result / explicit **Next Round** clarification and parent-version metadata mismatch have been synchronized in the September 5, 2026 documentation pass.
+**Last synchronization:** September 14, 2026
 
-Current orchestration constraints relevant to AI/performance are:
+This document is synchronized to the committed Phase 1 plan and `requirements.md` v1.14:
 
-- actual AI computation duration is distinct from simulated presentation delay;
-- the Orchestrator may wait for configured presentation pacing after a bot result, but must not force the AI algorithm to burn CPU time;
-- a slower device may take longer to compute a Hard decision; orchestration should remain cancellation/staleness-safe rather than assume a fixed compute duration;
-- headless simulations bypass artificial presentation delay;
-- AI-internal memoization, bitmasks, pruning, and search algorithms do not affect Orchestrator public contracts.
+- Phase 1 implements **Basic Mode only**; Competitive Mode remains a deferred approved design.
+- Phase 1 AI is the deterministic **Baseline Bot** completed in M2. Easy/Normal/Hard, personalities, Optimizer/advanced search, and AI balancing are deferred.
+- `GameRunner` coordinates already-constructed controllers and never interprets AI strategy/difficulty/personality.
+- M3 uses the production GameRunner/Engine/controller path for deterministic reliability simulation, replay, invariants, diagnostics, and regression work.
+- M4 may add a HumanController and presentation pause/continuation behavior without moving game-rule authority into React.
+- Persistence, Resume, persistent statistics, and settings are deferred and remain boundary/future-extension concerns only.
+- Normal human gameplay stops at the Round Result checkpoint and requires explicit **Next Round**; headless execution may auto-continue through the same checkpoint.
+- Baseline AI has no controlled randomness; separate AI RNG state is unnecessary unless a future approved AI introduces it.
 
-No known unresolved rule conflict is introduced by these changes. Future material conflicts discovered during implementation must be raised for product/design review rather than silently resolved in this document.
-
+No canonical gameplay rule was changed by this cleanup. Any future feature that changes these boundaries must be planned and synchronized explicitly rather than inferred from older deferred text.

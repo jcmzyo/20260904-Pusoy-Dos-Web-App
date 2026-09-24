@@ -1,0 +1,467 @@
+import type { Card, Combination, Move, PlayerId } from '../domain';
+import type { CompletedRoundReveal, GameEvent, PublicGameView } from '../engine';
+import type { ControllerTurnResult, PlayerTurnRequest, RunnerStatus, TurnRequestId } from '../orchestrator';
+import type { StartedSession } from './startSession';
+
+/**
+ * HumanController's own extra (non-`PlayerController`) surface for exposing/resolving pending human
+ * input (M4-T02). Duck-typed rather than importing `HumanController` directly so a test's bare
+ * `{ playerId, chooseMove }` fixture `humanController` remains a valid `StartedSession` without also
+ * implementing these — `getPendingHumanRequest`/`resolveHumanMove` below simply report "no pending
+ * request" for such a fixture, which is correct since it never has one.
+ */
+interface HumanInputExtras {
+  readonly getPendingRequest?: () => PlayerTurnRequest | null;
+  readonly resolveMove?: (requestId: TurnRequestId, move: Move) => boolean;
+  /** HumanController's own pause/resume/destroy primitives (M4-P1 review finding), forwarded to from
+   *  this class's own like-named methods below so the Engine-submission boundary itself - not only this
+   *  class's own publication - actually observes lifecycle state; see `pause()`/`destroy()`'s docstrings. */
+  readonly pause?: () => void;
+  readonly resume?: () => void;
+  readonly destroy?: () => void;
+}
+
+export interface PresentedSeat {
+  readonly seat: 'south' | 'west' | 'north' | 'east';
+  readonly playerId: PlayerId;
+  readonly name: string;
+  readonly cardCount: number;
+  readonly totalScore: number;
+  readonly isCurrentTurn: boolean;
+  readonly passed: boolean;
+  readonly done: boolean;
+  readonly placement: 1 | 2 | 3 | 4 | null;
+  /**
+   * This seat's own most recent Play in the active response cycle, and whether it has since been
+   * beaten by a later Play (ui-ux.md §5.4: per-seat Play trail). Persists — including once beaten —
+   * until the cycle actually resets (a Trick reset/free lead, or a fresh Round), matching `passed`'s
+   * own reset boundary for a Trick reset but, unlike `passed`, NOT cleared by every subsequent Play:
+   * a beaten Play stays visible (grayed) at that seat until the whole cycle clears. `beaten` is false
+   * exactly when this is still the authoritative live hand to beat (`center.kind === 'hand' && center.playerId
+   * === this seat`, in a Round that is still in progress). Once the Round has completed no hand is live
+   * any more - `center` keeps showing the final hand purely as a retained display - so every retained
+   * trail is `beaten: true` there, the Round-ending finisher's included; only the cards are preserved.
+   *
+   * Also `null` the instant this same seat itself Passes (even on a later Turn within the same cycle,
+   * after already Playing once), and it STAYS `null` even once a later Play by someone else in that
+   * same still-open cycle makes this seat eligible to respond again (the Engine's own `passedPlayerIds`
+   * reset) - a seat's own Pass explicitly replaces its own prior Play indicator rather than showing both
+   * at once (the person's own follow-up report: "I passed, but my previous play was still present"),
+   * and only this same seat's own next actual Turn (a fresh Play or another Pass) changes it again;
+   * `passed` above is what drives the PASS label in the meantime.
+   *
+   * If the Trick that ends the Round is also the Round's own final Trick (e.g. the 3rd-place finisher's
+   * last Play), every seat's trail is deliberately left as-is rather than cleared — otherwise the very
+   * Play that ended the Round would disappear an instant before the person ever sees it (round-4 follow-
+   * up). It clears normally on the next genuine mid-Round reset, and on the next Round via
+   * `continueToNextRound`.
+   *
+   * A seat that has itself finished (1st-3rd) is the other exception (M4-T12.5 follow-up): once
+   * finished, it takes no further Turn this Round, so its own final Play keeps showing at its seat
+   * through every later mid-Round reset too, not only the Round-ending one above - previously it was
+   * wiped the instant the very next Trick concluded, reading as if a finisher's own winning Play simply
+   * never happened (inconsistent with the 3rd-place finisher's own Play, which already survived).
+   * `beaten` follows the same rule for a finished seat's persisted Play: it is grayed as soon as it is
+   * no longer the live hand to beat, i.e. once its own Trick concludes, whether or not another Play
+   * ever topped it. Previously a finisher's Play that nobody topped kept full brightness for the rest
+   * of the Round, beside the live "Current Play" of every later Trick, while a topped one grayed - the
+   * same finisher's trail looked different depending on how its Trick happened to end.
+   */
+  readonly lastPlay: { readonly combination: Combination; readonly beaten: boolean } | null;
+}
+
+export interface SessionPresentationSnapshot {
+  readonly status: RunnerStatus;
+  readonly roundNumber: number;
+  readonly seats: readonly PresentedSeat[];
+  readonly humanHand: readonly Card[];
+  readonly currentPlayerId: PlayerId | null;
+  readonly center: { readonly kind: 'opening' | 'freeLead' | 'empty' }
+    | { readonly kind: 'hand'; readonly playerId: PlayerId; readonly combination: Combination };
+  readonly playedCards: readonly Card[];
+  readonly events: readonly GameEvent[];
+  readonly roundEvents: readonly GameEvent[];
+  readonly standings: PublicGameView['standings'];
+  readonly completedRounds: PublicGameView['completedRounds'];
+  readonly roundCheckpoint: PublicGameView['completedRounds'][number] | null;
+  readonly sessionResult: PublicGameView['result'];
+  readonly reveal: CompletedRoundReveal | null;
+}
+
+function freeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    Object.values(value).forEach(freeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/** Application Turn/continuation boundary: React receives cached safe snapshots, never Engine transactions.
+ * Drive this Session through this adapter to retain every public event, including intermediate Turns.
+ */
+export class SessionPresentation {
+  private readonly listeners = new Set<() => void>();
+  private snapshot: SessionPresentationSnapshot;
+  private autoPlayStarted = false;
+  private pauseCount = 0;
+  private pauseWaiters: (() => void)[] = [];
+  // Woken by `publish()` (every accepted Turn and every `continueToNextRound()`) and by `destroy()`,
+  // mirroring `pauseWaiters`' own convention - lets `driveTurns` below block between Rounds without
+  // busy-polling instead of exiting outright (see its own docstring for the bug this fixes).
+  private roundWaiters: (() => void)[] = [];
+  private destroyed = false;
+
+  constructor(private readonly session: StartedSession) {
+    this.snapshot = this.project(session.startupEvents);
+  }
+
+  readonly getSnapshot = (): SessionPresentationSnapshot => this.snapshot;
+
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  };
+
+  /** An explicit, caller-requested Turn always runs to completion and publishes unconditionally,
+   *  regardless of pause/destroy state — a deliberate caller action, not automatic advancement, mirroring
+   *  `continueToNextRound`'s own contract below. Only `driveTurns`'s own background loop (via its private
+   *  `runTurnForAutoplay`) observes pause/destroy — see its own docstring, and `pause()`'s. */
+  async runTurn(): Promise<{ readonly accepted: true } | Pick<Extract<ControllerTurnResult, { accepted: false }>, 'accepted' | 'error' | 'context'>> {
+    const result = await this.session.runner.runTurn();
+    if (!result.accepted) return { accepted: false, error: result.error, context: result.context };
+    this.publish(result.events);
+    return { accepted: true };
+  }
+
+  continueToNextRound(): void {
+    const result = this.session.runner.continueToNextRound(this.session.engineRng);
+    this.publish(result.events);
+  }
+
+  /** The pending human input boundary (M4-T02's HumanController), when `humanController` exposes one.
+   *  React only needs this at the moment of Play/Pass submission (M4-T08) — whether Play/Pass should be
+   *  enabled at all is already derivable from the public snapshot's `status`/`currentPlayerId`. */
+  getPendingHumanRequest(): PlayerTurnRequest | null {
+    return (this.session.humanController as HumanInputExtras).getPendingRequest?.() ?? null;
+  }
+
+  /** Resolves the pending human input through HumanController's own production contract (M4-T02);
+   *  returns `false` without throwing if there is no compatible controller or no matching pending
+   *  request, so a stray/duplicate submission is always safe.
+   *
+   *  Also refuses outright while paused or destroyed (M4-P1 review finding), rather than delegating to
+   *  the controller at all: the underlying pending request is left completely untouched (still genuinely
+   *  unresolved), so it remains available to legitimately resolve once resumed. This is a defense-in-depth
+   *  check at the execution boundary itself — the UI's own overlay/pause guard is what ordinarily prevents
+   *  this call from ever being attempted while paused. */
+  resolveHumanMove(requestId: TurnRequestId, move: Move): boolean {
+    if (this.destroyed || this.pauseCount > 0) return false;
+    return (this.session.humanController as HumanInputExtras).resolveMove?.(requestId, move) ?? false;
+  }
+
+  /**
+   * Drives the production Turn loop so bot Turns advance without manual polling and the human's Turn
+   * naturally becomes reachable — HumanController's Move stays pending until `resolveHumanMove`/its own
+   * `resolveMove` is called, so this simply keeps requesting the next Turn once each prior one settles.
+   * Idempotent per Session (callers do not need to guard repeat calls, e.g. across React StrictMode).
+   *
+   * Before starting each bot's Turn, waits `botTurnDelayMs` — a short, tunable presentation pause
+   * (ui-ux.md §8, originally "initially around 0.6-1.0 seconds per bot action"; raised to 1.5s and then
+   * back down to 0.8s across two follow-up requests once the person could see it in practice — a
+   * pending doc amendment covers the current number), separate from and additional to the Baseline's
+   * own (effectively instant) computation time, so bot actions read as deliberate turns rather than
+   * flashing by instantly. Never delays the
+   * human's own Turn (`runTurn()` for the human only registers the pending request and returns once a
+   * Move is submitted — delaying that would just delay showing Play/Pass controls). Callers needing a
+   * fast/deterministic loop (tests) should pass `0`.
+   *
+   * Full stale-input protection across Turn transitions beyond this is still M4-T09's job. This exists
+   * only so a human Turn is reachable at all outside a test's own manual `runTurn` loop.
+   */
+  startAutoPlay(botTurnDelayMs: number = 800): void {
+    if (this.autoPlayStarted) return;
+    this.autoPlayStarted = true;
+    void this.driveTurns(botTurnDelayMs);
+  }
+
+  /**
+   * Pauses automatic Turn advancement (M4-T10; ui-ux.md §9.2: "While either overlay is open,
+   * Orchestrator progression is paused so bot actions do not occur unseen"). Only `driveTurns`'s own
+   * loop below observes this — a human Turn already sits idle awaiting HumanController's own pending
+   * Move regardless of pause state, and `continueToNextRound` (an explicit user action, not automatic
+   * advancement) is intentionally unaffected.
+   *
+   * Reference-counted rather than a single idempotent flag: M4-T11 added independent pause sources
+   * (Leave confirmation, and the portrait/undersized layout guard) that can be active at the same time
+   * as each other or as an open Discard Pile/Event Log overlay — e.g. the window is resized to an
+   * unsupported size while Leave confirmation is already open. Each `pause()` must be matched by exactly
+   * one `resume()`; advancement only actually resumes once every caller that paused it has resumed.
+   *
+   * Also forwarded to `humanController.pause()` when it exposes one (M4-P1 review finding), on every
+   * call rather than only the 0→1 edge — HumanController's own `paused` flag is a plain idempotent
+   * boolean, not reference-counted, so it only actually needs to go true once, but calling it
+   * unconditionally here keeps this method a single, simple forward with no edge-detection to get wrong.
+   * Also forwarded to `session.runner.pauseSubmission()` on every call, for the same reason (M4-P1 review
+   * finding, escalated): `HumanController.pause()` alone only ever holds back a human response's own
+   * delivery to `chooseMove()` - it cannot intercept a bot's response, nor a human response an adversarial
+   * caller manages to deliver before this call lands (no bound on how many microtask ticks separate the
+   * two). `GameRunner.pauseSubmission()` guards Engine submission itself, uniformly for every controller,
+   * so authoritative state truly does not advance while paused regardless of that race - see its own
+   * docstring and `commitWhenSubmissionAllowed()`'s.
+   */
+  pause(): void {
+    this.pauseCount += 1;
+    (this.session.humanController as HumanInputExtras).pause?.();
+    this.session.runner.pauseSubmission();
+  }
+
+  /** Resumes automatic Turn advancement once every `pause()` call has been matched by a `resume()`.
+   *  A `resume()` with no outstanding `pause()` is a no-op rather than going negative. `session.runner
+   *  .resumeSubmission()` is forwarded on every genuine call (paired 1:1 with `pause()`'s own unconditional
+   *  forwarding above), since `GameRunner`'s own pause count is a true reference count; `humanController
+   *  .resume()` only forwards on the actual 1→0 edge (unlike that) - as long as any other independent
+   *  pause source here is still active, the human input boundary must stay paused too. */
+  resume(): void {
+    if (this.pauseCount === 0) return;
+    this.pauseCount -= 1;
+    this.session.runner.resumeSubmission();
+    if (this.pauseCount > 0) return;
+    (this.session.humanController as HumanInputExtras).resume?.();
+    const waiters = this.pauseWaiters.splice(0);
+    waiters.forEach((resolve) => resolve());
+  }
+
+  isPaused(): boolean {
+    return this.pauseCount > 0;
+  }
+
+  /**
+   * Permanently abandons this Session's presentation (M4-T11 follow-up: Leave Game). Unlike
+   * `pause()`/`resume()` — for temporary interruptions (an open overlay, an unsupported viewport)
+   * that resume the SAME Session — leaving the table gives up on the Session outright, so this makes
+   * `driveTurns`'s background loop actually exit rather than parking it forever on an unmatched extra
+   * `pause()`: a permanent pause would leave that loop suspended on a `pauseWaiters` Promise that never
+   * resolves, keeping this object (and its closure over `session`/`listeners`) reachable for as long as
+   * anything still holds a reference to it. `destroy()` instead lets the loop return and this instance
+   * become eligible for garbage collection once the caller (App.tsx) drops its own reference.
+   *
+   * Idempotent — a repeat call is a safe no-op — and safe regardless of pause state or whether
+   * `startAutoPlay` was ever called at all.
+   *
+   * Also forwards to `humanController.destroy()` when it exposes one (M4-P1 review finding): a pending or
+   * `resolveMove()`-accepted-but-undelivered human response left dangling here would otherwise be able to
+   * still reach Engine submission afterward (the exact gap `pause()`'s own forwarding above closes for a
+   * temporary pause), and would also leave GameRunner's own suspended `await controller.chooseMove()`
+   * hanging forever - itself keeping this instance (and the human request that summoned it) unreachable
+   * for garbage collection, the very leak this method exists to avoid. `driveTurns` below rejects in
+   * response (via `runTurnForAutoplay`'s own `runner.runAutoplayTurn()` call) and exits without logging it as a
+   * genuine Controller failure, since a destroy-triggered rejection here is an expected, deliberate part
+   * of this same shutdown, not one.
+   *
+   * Also forwards to `session.runner.destroy()` (M4-P1 review finding, escalated), for the same reason
+   * `pause()` above also forwards to `session.runner.pauseSubmission()`: `humanController.destroy()` alone
+   * cannot guard a bot's own in-flight response, nor a human response already delivered before this call
+   * lands. `GameRunner.destroy()` rejects any Turn still held in `commitWhenSubmissionAllowed()`'s own wait
+   * instead of ever letting it reach Engine submission, uniformly for every controller.
+   */
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    (this.session.humanController as HumanInputExtras).destroy?.();
+    this.session.runner.destroy();
+    const waiters = this.pauseWaiters.splice(0);
+    waiters.forEach((resolve) => resolve());
+    const roundWaiters = this.roundWaiters.splice(0);
+    roundWaiters.forEach((resolve) => resolve());
+    this.listeners.clear();
+  }
+
+  private async waitWhilePaused(): Promise<void> {
+    while (!this.destroyed && this.pauseCount > 0) {
+      await new Promise<void>((resolve) => this.pauseWaiters.push(resolve));
+    }
+  }
+
+  /** Blocks while a Round is not actually in progress (`'READY'` before the first Round, or
+   *  `'ROUND_RESULT'` between Rounds 1-4) without busy-polling, woken by the next `publish()` -
+   *  `continueToNextRound()`'s own publish is exactly what starts driving the next Round's Turns again.
+   *  Returns immediately once a Round is active or the Session is over; `driveTurns`'s own loop
+   *  condition below is what stops advancement for good once `'SESSION_COMPLETE'` is reached. */
+  private async waitForRoundActive(): Promise<void> {
+    while (!this.destroyed && this.getSnapshot().status !== 'ROUND_ACTIVE' && this.getSnapshot().status !== 'SESSION_COMPLETE') {
+      await new Promise<void>((resolve) => this.roundWaiters.push(resolve));
+    }
+  }
+
+  /**
+   * Drives Turns for every Round of the Session, not only the first: after a Round ends, `status`
+   * leaves `'ROUND_ACTIVE'` (to `'ROUND_RESULT'` for Rounds 1-4, or straight to `'SESSION_COMPLETE'` for
+   * Round 5's own status-collapse) and no further Turn is ever requested until `continueToNextRound()`
+   * runs - so this loop must wait for that rather than exiting the instant it first observes a
+   * non-active Round. That was the actual bug behind a bot's Turn spinner getting stuck indefinitely
+   * from Round 2 onward: the original loop's condition doubled as its own exit condition, so it
+   * returned for good the moment Round 1 finished, and nothing was ever driving Turns again afterward
+   * even though `continueToNextRound()` had genuinely started a new, otherwise-undriven Round.
+   */
+  private async driveTurns(botTurnDelayMs: number): Promise<void> {
+    while (!this.destroyed && this.getSnapshot().status !== 'SESSION_COMPLETE') {
+      await this.waitForRoundActive();
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
+      await this.waitWhilePaused();
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
+      const currentPlayerId = this.getSnapshot().currentPlayerId;
+      if (botTurnDelayMs > 0 && currentPlayerId !== null && currentPlayerId !== this.session.humanController.playerId) {
+        await new Promise((resolve) => setTimeout(resolve, botTurnDelayMs));
+      }
+      // Re-checked after the presentation delay above: an overlay may have opened (or `destroy()` may
+      // have been called) while that delay was in flight, and the actual state-advancing step is the
+      // `runTurn()` call below, not the delay itself - this is the gate that must hold pause, not the
+      // one above.
+      await this.waitWhilePaused();
+      if (this.destroyed || this.getSnapshot().status !== 'ROUND_ACTIVE') continue;
+      let result: { readonly accepted: boolean };
+      try {
+        result = await this.runTurnForAutoplay();
+      } catch (cause) {
+        // destroy()'s own forwarding to humanController.destroy() (M4-P1 review finding) deliberately
+        // rejects a pending/deferred human response so this await settles instead of hanging forever -
+        // an expected, intentional part of this same shutdown (e.g. Leave Game), not a genuine Controller
+        // defect, so it is not logged as one; any other rejection reaching here still is.
+        if (!this.destroyed) console.error('Automatic Turn advancement stopped after a Controller failure.', cause);
+        return;
+      }
+      if (!result.accepted) return;
+    }
+  }
+
+  /**
+   * `driveTurns`'s own automatic-advancement counterpart to the public `runTurn()` above (M4-P1 review
+   * finding, escalated: a controller response already decided - e.g. a human Move resolved, or a bot's
+   * own `chooseMove()` settled - a moment before pause()/destroy() lands must not still reach Engine
+   * submission, however many ticks separate the two).
+   *
+   * Calls `session.runner.runAutoplayTurn()` rather than the public `runTurn()`: that is what actually
+   * holds Engine submission back while `session.runner.pauseSubmission()` is active and rejects instead of
+   * submitting once `session.runner.destroy()` has run (see their own docstrings and
+   * `commitWhenSubmissionAllowed()`), uniformly for every controller - a bot has no external resolution
+   * point for `pause()`/`destroy()` to intercept the way `HumanController.pause()`/`destroy()` intercept a
+   * human response's own delivery, so this is what still catches it. `runTurn()` itself deliberately stays
+   * pause/destroy-immune (its own docstring); this exists as a private, identically-shaped variant purely
+   * so only this loop's own automatic advancement is ever held back.
+   *
+   * The `waitWhilePaused()` below remains as a separate, narrower concern once `runAutoplayTurn()` has
+   * already resolved (meaning the Engine has already committed): the still-open microtask gap between that
+   * commit and this method's own continuation, in which a fresh `pause()` could in principle land - full
+   * event fidelity is preserved by suspending publication until `resume()`, not merely delayed submission.
+   */
+  private async runTurnForAutoplay(): Promise<{ readonly accepted: boolean }> {
+    const result = await this.session.runner.runAutoplayTurn();
+    if (!result.accepted) return { accepted: false };
+    // Only actually awaits anything when paused, so the overwhelmingly common (unpaused) case adds no
+    // extra microtask hop beyond what `runAutoplayTurn()` above already takes for the same accepted-Turn
+    // path.
+    if (this.pauseCount > 0 && !this.destroyed) await this.waitWhilePaused();
+    if (this.destroyed) return { accepted: true };
+    this.publish(result.events);
+    return { accepted: true };
+  }
+
+  private publish(events: readonly GameEvent[]): void {
+    this.snapshot = this.project([...this.snapshot.events, ...events]);
+    this.listeners.forEach((listener) => listener());
+    const roundWaiters = this.roundWaiters.splice(0);
+    roundWaiters.forEach((resolve) => resolve());
+  }
+
+  private project(events: readonly GameEvent[]): SessionPresentationSnapshot {
+    const view = this.session.runner.getPlayerView('south');
+    const round = view.round;
+    const roundEvents = events.filter((event) => 'roundNumber' in event && event.roundNumber === view.roundNumber);
+    const passed = new Set<PlayerId>();
+    let lastPlay: Extract<GameEvent, { type: 'CARDS_PLAYED' }> | undefined;
+    // Per-seat Play trail (ui-ux.md §5.4): unlike `passed`, a seat's own last-played combination is
+    // NOT cleared by a later Play — only by the response cycle itself actually ending (Trick reset/free
+    // lead), so an already-beaten Play keeps showing (grayed, via `beaten` below) until then.
+    const lastPlaysBySeat = new Map<PlayerId, Combination>();
+    // A seat that has itself finished (1st-3rd; M4-T12.5 follow-up) never takes another Turn this
+    // Round, so its own final Play stays visible at its seat for the rest of the Round rather than
+    // being wiped by the very next mid-Round Trick reset - matching how the 3rd-place finisher's own
+    // final Play already survives Round completion below, but now applied uniformly to every
+    // finisher rather than only the one whose finish happens to also end the Round. Once its own Trick
+    // has concluded that Play is no longer the live hand to beat, so the `center`-based `beaten`
+    // comparison below grays it whether or not anything ever topped it.
+    const finishedSeats = new Set<PlayerId>();
+    for (const [index, event] of roundEvents.entries()) {
+      if (event.type === 'CARDS_PLAYED') { lastPlay = event; passed.clear(); lastPlaysBySeat.set(event.playerId, event.combination); }
+      if (event.type === 'PLAYER_FINISHED') finishedSeats.add(event.playerId);
+      if (event.type === 'TRICK_ENDED') {
+        // GameEngine.submitMove always emits TRICK_ENDED immediately followed, in the same batch, by
+        // either TURN_CHANGED (the Round continues into a free lead) or ROUND_ENDED (this same Trick end
+        // is also the Round's own completion, e.g. the 3rd-place finisher's final Play). The latter needs
+        // no special handling here — nothing plays again this Round, so every seat's trail is already
+        // left as-is; the former is an actual mid-Round reset, but must still preserve (rather than wipe)
+        // any already-finished seat's own final Play (which is grayed from here on: its Trick is over).
+        if (roundEvents[index + 1]?.type !== 'ROUND_ENDED') {
+          for (const id of [...lastPlaysBySeat.keys()]) {
+            if (!finishedSeats.has(id)) lastPlaysBySeat.delete(id);
+          }
+          // A Pass that itself closes the response cycle (nobody left to out-bid the current hand) emits
+          // PLAYER_PASSED immediately followed by this very TRICK_ENDED in the SAME Turn's event batch
+          // (GameEngine.submitMove) - so without this exemption, that seat's own `passed.add` two lines
+          // below would be wiped by this same sweep before `project()` ever publishes a snapshot showing
+          // it, and the person's own closing Pass would never show a PASS status at all (the person's own
+          // follow-up report: "the player passed but no Pass indicator on the seat panel ... it doesn't
+          // happen always" - it only ever broke for a cycle-closing Pass, never a mid-cycle one). Keeping
+          // it exempted here matches `passed`'s own established convention elsewhere (and `lastPlay`'s,
+          // above): it persists until this same seat's own next Turn, not retroactively erased by the
+          // very reset its own action caused.
+          const closingPass = roundEvents[index - 1];
+          const closingPasserId = closingPass?.type === 'PLAYER_PASSED' ? closingPass.playerId : null;
+          for (const id of [...passed]) if (!finishedSeats.has(id) && id !== closingPasserId) passed.delete(id);
+        }
+      }
+      // A seat's own Pass immediately clears its own `lastPlaysBySeat` entry too, not only `passed`
+      // (M4-T12.5 follow-up: "I passed, but my previous play was still present"). Without this, a
+      // later Play by someone else in this same still-open response cycle unconditionally clears the
+      // whole `passed` Set above (line ~301: the Engine's own `passedPlayerIds` reset, since that later
+      // Play makes every previously-passed player newly eligible to respond again to the new higher
+      // bid) - `passed.has(seat)` would then read false again for this seat even though it never took a
+      // new Turn of its own, and its stale pre-Pass combination (still sitting in `lastPlaysBySeat`,
+      // otherwise untouched by a Pass) would reappear at its seat as if freshly Played. Deleting it here
+      // means a Pass always immediately empties this seat's own trail, and it only reappears once this
+      // same seat actually Plays again.
+      if (event.type === 'PLAYER_PASSED') { passed.add(event.playerId); lastPlaysBySeat.delete(event.playerId); }
+    }
+    let center: SessionPresentationSnapshot['center'] = { kind: 'empty' };
+    if (round?.trick?.kind === 'response' || round?.status === 'completed') {
+      if (!lastPlay) throw new Error('Current hand presentation requires the public Play history.');
+      center = { kind: 'hand', playerId: lastPlay.playerId, combination: round.trick?.kind === 'response' ? round.trick.current : lastPlay.combination };
+    } else if (round?.trick) {
+      center = { kind: round.trick.kind };
+    }
+    const roundCheckpoint = round?.status === 'completed' ? view.completedRounds.at(-1)! : null;
+    const seats = (['south', 'west', 'north', 'east'] as const).map((seat): PresentedSeat => {
+      const player = round?.players.find((entry) => entry.playerId === seat);
+      const standing = view.standings.find((entry) => entry.playerId === seat);
+      const name = this.session.names[seat];
+      if (!view.playerIds.includes(seat) || !standing || name === undefined || (round && !player)) throw new Error(`Missing presentation participant ${seat}.`);
+      const finishIndex = round?.finishOrder.indexOf(seat) ?? -1;
+      const placement = roundCheckpoint?.placements.find((entry) => entry.playerId === seat)?.placement
+        ?? (finishIndex === -1 ? null : (finishIndex + 1) as 1 | 2 | 3);
+      const seatLastPlay = lastPlaysBySeat.get(seat);
+      const lastPlayPresentation = seatLastPlay === undefined || passed.has(seat) ? null
+        : { combination: seatLastPlay, beaten: roundCheckpoint !== null || !(center.kind === 'hand' && center.playerId === seat) };
+      return {
+        seat, playerId: seat, name, cardCount: player?.cardCount ?? 0, totalScore: standing.totalScore,
+        isCurrentTurn: round?.currentPlayerId === seat, passed: passed.has(seat), done: player?.finished ?? false, placement,
+        lastPlay: lastPlayPresentation,
+      };
+    });
+    return freeze(structuredClone({
+      status: this.session.runner.getStatus(), roundNumber: view.roundNumber, seats, humanHand: view.hand,
+      currentPlayerId: round?.currentPlayerId ?? null, center, playedCards: round?.playedCards ?? [],
+      events, roundEvents, standings: view.standings, completedRounds: view.completedRounds,
+      roundCheckpoint, sessionResult: view.result, reveal: this.session.runner.getCompletedRoundReveal(),
+    }));
+  }
+}

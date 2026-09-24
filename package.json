@@ -1,0 +1,35 @@
+{
+  "name": "pusoy-dos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline web-based Pusoy Dos (Filipino Big Two) implementation. Shared domain model and Game Engine (M1).",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test --config tests/browser/playwright.config.ts",
+    "test:acceptance:m3": "vitest run --config tests/acceptance/m3.config.ts",
+    "simulate:trace": "node scripts/simulation-trace.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.6.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.0.0"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

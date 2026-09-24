@@ -1,0 +1,107 @@
+/* This component's root is the bottom bar's own "right" container (App.module.css's `.bottomBar`,
+ * round-4 follow-up) - `justify-content: center` keeps Play/Pass vertically centered within it even
+ * when the row's shared height (set by whichever container is tallest) exceeds this one's own content. */
+.controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Play above Pass, both fixed to this (rightmost) column - Sort moved to the true middle column
+ * instead (App.module.css's `.bottomBar`), per the person's own follow-up request. */
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.play,
+.pass {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* Fixed (not min-) width/height regardless of whether a sub-label line is rendered or how long its
+   * text is, so Play and Pass never change size as a recognized-combination/reason/glow state appears,
+   * disappears, or changes (the person's own follow-up report) - content is centered within this
+   * reserved box either way, and a longer sub-label wraps (`.subLabel` below) rather than growing it. */
+  width: 150px;
+  height: 72px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The Play/Pass label itself reads as clearly primary - roughly 3/4 of the button's own text weight,
+ * the sub-label the remaining 1/4 (the person's own round-4 follow-up request: "Maybe 3/4 of the
+ * button is for the Play/Pass text while 1/4 for the undertext"), within the fixed box above. */
+.mainLabel {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* The recognized combination / invalid reason / "No valid plays" text, now inside the button itself
+ * (the person's own follow-up request) rather than as separate text beneath it. Wraps within the
+ * button's own fixed width instead of growing it. */
+.subLabel {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
+/* Play defaults to a neutral gray/white look and only turns green - with a glowing yellow highlight -
+ * once the current selection is a valid, legal Play (the person's own follow-up request); it is
+ * otherwise indistinguishable in color from any other disabled control. Pass keeps its own always-blue
+ * treatment (unchanged) and is separately highlighted only when it is the only useful action. */
+.play {
+  background: #d9d4c2;
+  color: #4a4a3e;
+}
+
+.play:not(:disabled) {
+  background: #2f9e58;
+  color: #f7f4e9;
+  box-shadow: 0 0 0 3px rgba(255, 224, 130, 0.65), 0 0 18px 2px rgba(255, 224, 130, 0.5);
+}
+
+.play:hover:not(:disabled) {
+  background: #38b869;
+}
+
+.pass {
+  background: #2f6fd6;
+  color: #f7f4e9;
+}
+
+.pass:hover:not(:disabled) {
+  background: #3d80ea;
+}
+
+.play:focus-visible,
+.pass:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
+.play:disabled {
+  cursor: not-allowed;
+}
+
+.pass:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Pass is highlighted (not just enabled) the moment it is the player's only viable action. */
+.passHighlight:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(255, 224, 130, 0.65), 0 0 18px 2px rgba(255, 224, 130, 0.5);
+}

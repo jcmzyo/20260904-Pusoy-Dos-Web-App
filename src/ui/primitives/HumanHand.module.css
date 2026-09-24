@@ -1,0 +1,104 @@
+/* This is the bottom bar's own "middle" container (App.module.css's `.bottomBar`, round-4 follow-up):
+ * cards on top, Sort Rank/Sort Suit stacked below, both centered. Its own WIDTH is reserved for the
+ * maximum possible 13-card hand (a hard Pusoy Dos hand-size ceiling) and held constant as cards are
+ * played away during a Round (the person's own round-5 follow-up request: "do not adjust the width of
+ * the middle container when held cards decrease") - the same first-card-full-width-plus-exposed-strip-
+ * per-card overlap math as `.cardSlot` below, at that same card width (`--card-width`, set once by
+ * PlayArea.module.css's `.playArea` in the play area's own design units, M4-T14). A hand with fewer
+ * cards simply centers within this reserved width rather than narrowing it. Height still sizes to
+ * content (cards plus the Sort row) rather than a fixed value.
+ *
+ * `--card-exposed` is how much of every card after the first stays visible: 70% of the card, except that
+ * PlayArea scales the whole area down on a small viewport and the visible strip must still be at least
+ * 28px ON SCREEN (MINIMUM_EXPOSED_CARD_WIDTH_PX, tests/browser/viewportMatrix.ts; human-hand.e2e.ts
+ * verifies exactly that) for reliable click/tap targeting (ui-ux.md §6: "enough of each card remains
+ * exposed for reliable click/tap and drag targeting"). So it is the larger of 70% of the card and 28px
+ * divided by the play area's own scale (`--play-area-scale`, PlayArea.tsx), capped at the whole card. */
+.handArea {
+  --card-exposed: min(var(--card-width, 56px), max(var(--card-width, 56px) * 0.7, 28px / var(--play-area-scale, 1)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(var(--card-width, 56px) + 12 * var(--card-exposed));
+}
+
+/* Fixed (not min-) height, exactly matching a held card's own rendered height (Card.module.css's
+ * `width: var(--card-width)` at its own `aspect-ratio: 5 / 7`) - the person's own follow-up
+ * report: an empty hand (no cards to establish the row's own content height) fell back to an
+ * approximate `min-height` a few px shorter than a real card at wider viewports, so Sort Rank/Sort
+ * Suit (below, in the same `.handArea` column) visibly shifted vertically the instant the last card
+ * was played. A `height` derived from the exact same formula Card.module.css itself uses holds this
+ * row - and everything anchored beneath it - at one fixed position regardless of how many cards (if
+ * any) are actually held. */
+.handRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px;
+  height: calc(var(--card-width, 56px) * 7 / 5 + 18px);
+}
+
+.cardSlot {
+  position: relative;
+  flex: 0 0 auto;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Each card after the first overlaps its neighbor so that only `--card-exposed` (`.handArea` above) of
+ * it stays visible. Shares Card.module.css's own `--card-width` custom property (M4-T14) instead of
+ * restating a width expression, so the two can no longer drift apart. */
+.cardSlot:not(:first-child) {
+  margin-left: calc(var(--card-exposed) - var(--card-width, 56px));
+}
+
+.cardSlot.dragging {
+  z-index: 20;
+  cursor: grabbing;
+}
+
+.lift {
+  transition: transform 120ms ease;
+}
+
+.lift.selected {
+  transform: translateY(-18px);
+}
+
+/* Sort Rank/Sort Suit side by side, centered, below the hand within the same middle container
+ * (`.handArea` above) - the person's own round-4 follow-up request. */
+.sortControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Deliberately smaller/quieter than Play/Pass (App.module.css's `.bottomBar`/PlayPassControls) so the
+ * large action controls read as primary and Sort as a secondary convenience, per the person's own T08
+ * follow-up request. */
+.sortButton {
+  min-height: 44px;
+  padding: 6px 16px;
+  border: 1px solid #ead8a7;
+  border-radius: 6px;
+  background: rgba(234, 216, 167, 0.15);
+  color: #f7f4e9;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  background: rgba(234, 216, 167, 0.28);
+}
+
+.sortButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}

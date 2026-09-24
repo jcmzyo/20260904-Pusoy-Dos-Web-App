@@ -1,0 +1,86 @@
+import type { Combination, Move } from '../../domain';
+import { canBeat, defaultRuleset, inspectCombination } from '../../engine';
+import type { RulesetConfig } from '../../engine';
+import type { PlayerTurnRequest } from '../../orchestrator';
+import { buildCandidates } from '../candidates/buildCandidates';
+import type { MoveCandidate } from '../candidates/buildCandidates';
+import { createHandDecomposer } from '../decomposition/minPlays';
+import type { DecompositionMetrics } from '../decomposition/minPlays';
+
+export interface CandidateEvaluation extends MoveCandidate {
+  readonly minPlays: number;
+  readonly cardsShed: number;
+  readonly passOpportunityCost: number;
+  readonly twosSpent: number;
+  readonly singleTwoReserveCost: number;
+  readonly responseControl: Combination | null;
+}
+
+/**
+ * PLAY and PASS share one lexicographic policy: finish first, then urgent
+ * response pressure, then remaining minPlays (plus the narrow reserve cost
+ * below), fewer 2s spent, then more cards shed.
+ * An active opponent with 1–2 public cards creates urgent response pressure:
+ * release the lone-2 reserve and prefer ANY legal beating Play over PASS
+ * ahead of hand efficiency (M4-T12.5 correction — contesting/denying control
+ * from a player about to finish outranks preserving a Pair/Straight/other
+ * structure intact; a bot may legitimately break a five-card structure into
+ * a single here). Counts imply urgency, never specific unseen holdings or
+ * inability after a voluntary PASS. Own/finished players create no pressure.
+ * Without that pressure, minPlays remains primary and PASS still preserves
+ * structure over an unnecessary Play, exactly as before.
+ * At low pressure, a responding lone 2 leaving multiple Plays costs one step:
+ * preserve it over PASS's unchanged hand, but use it to finish or reach one Play.
+ * This is a tactical reserve, not a second penalty for breaking hand structure.
+ * Pair/five-card damage is represented only by exact decomposition.
+ * Among tied Plays, prefer fewer 2s spent, then more cards shed, then the
+ * weakest Engine-ranked commitment that still takes the current Trick.
+ * Control is an immediate contest heuristic, never a prediction of winning it.
+ * Returns preference order; exact ties retain the canonical candidate order.
+ */
+export function evaluateCandidates(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset, onDecomposition?: (metrics: DecompositionMetrics) => void): readonly CandidateEvaluation[] {
+  const candidates = buildCandidates(request, ruleset);
+  const decomposer = createHandDecomposer(request.view.hand, ruleset, { collectMetrics: onDecomposition !== undefined });
+  const responding = request.view.round!.trick!.kind === 'response';
+  const opponentPressure = responding && request.view.round!.players.some((player) =>
+    player.playerId !== request.playerId && !player.finished && player.cardCount > 0 && player.cardCount <= 2);
+  const hasPlay = candidates.some(({ move }) => move.kind === 'play');
+  const evaluations = candidates.map((candidate): CandidateEvaluation => {
+    const move = candidate.move;
+    const remaining = move.kind === 'pass' ? request.view.hand : request.view.hand.filter((card) =>
+      !move.cards.some((played) => played.rank === card.rank && played.suit === card.suit));
+    const minPlays = decomposer.minPlays(remaining);
+    const twosSpent = move.kind === 'pass' ? 0 : move.cards.filter((card) => card.rank === '2').length;
+    const singleTwoReserveCost = Number(responding && !opponentPressure &&
+      move.kind === 'play' && move.cards.length === 1 && twosSpent === 1 && minPlays > 1);
+    let responseControl: Combination | null = null;
+    if (responding && move.kind === 'play') {
+      const inspected = inspectCombination(move.cards, ruleset);
+      if (!inspected.valid) throw new Error('Evaluation requires Engine-authorized combinations.');
+      responseControl = inspected.combination;
+    }
+    return { ...candidate, minPlays, twosSpent, singleTwoReserveCost, cardsShed: request.view.hand.length - remaining.length,
+      passOpportunityCost: Number(move.kind === 'pass' && hasPlay), responseControl };
+  });
+  if (onDecomposition) onDecomposition(decomposer.getMetrics()!);
+  return evaluations.sort((a, b) => Number(b.immediateFinish) - Number(a.immediateFinish) ||
+    (opponentPressure ? a.passOpportunityCost - b.passOpportunityCost : 0) ||
+    (a.minPlays + a.singleTwoReserveCost) - (b.minPlays + b.singleTwoReserveCost) ||
+    a.twosSpent - b.twosSpent ||
+    b.cardsShed - a.cardsShed || a.passOpportunityCost - b.passOpportunityCost ||
+    (a.responseControl && b.responseControl ? Number(canBeat(a.responseControl, b.responseControl, ruleset)) -
+      Number(canBeat(b.responseControl, a.responseControl, ruleset)) : 0));
+}
+
+export interface DecisionTrace {
+  readonly requestId: string;
+  readonly evaluations: readonly CandidateEvaluation[];
+  readonly selectedMove: Move;
+}
+
+export function chooseBaselineMove(request: PlayerTurnRequest, ruleset: RulesetConfig = defaultRuleset, onDecision?: (trace: DecisionTrace) => void, onDecomposition?: (metrics: DecompositionMetrics) => void): Move {
+  const evaluations = evaluateCandidates(request, ruleset, onDecomposition);
+  const selectedMove = evaluations[0]!.move;
+  if (onDecision) onDecision(JSON.parse(JSON.stringify({ requestId: request.requestId, evaluations, selectedMove })) as DecisionTrace);
+  return selectedMove;
+}

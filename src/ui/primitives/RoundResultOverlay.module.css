@@ -1,0 +1,122 @@
+/* Non-dismissible (M4-T12; ui-ux.md §12) - unlike Overlay.module.css's own `.backdrop`, this has no
+ * Close control and no Escape handling; a click here only skips the scoring animation to its settled
+ * state (RoundResultOverlay.tsx's own `handleSkip`), it never closes/dismisses anything. Slightly higher
+ * z-index than Overlay.module.css's `.backdrop` (40): in practice the two are never open at once (a
+ * Round can only complete while nothing else is already paused/blocking human input), but this keeps the
+ * stacking order correct if that ever changed. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: rgba(6, 20, 16, 0.72);
+  z-index: 45;
+  cursor: pointer;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(480px, 100%);
+  max-height: min(560px, 100%);
+  padding: 24px;
+  border: 1px solid #66866b;
+  border-radius: 20px;
+  background: #123c2d;
+  color: #f7f4e9;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  cursor: default;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  text-align: center;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.table th,
+.table td {
+  padding: 8px 6px;
+  text-align: left;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2),
+.table th:nth-child(3),
+.table td:nth-child(3),
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  text-align: right;
+}
+
+/* Settled state's own Previous/Round columns (RoundResultOverlay.tsx) - hidden, not removed, so
+ * settling never narrows/reflows the table (person's own explicit follow-up request: "nothing will
+ * shorten or size adjustment"). Each column keeps its own reserved width throughout. */
+.settledHidden {
+  visibility: hidden;
+}
+
+.table thead th {
+  border-bottom: 1px solid #66866b;
+  color: #c8d8cd;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Rows reorder by swapping table position (RoundResultOverlay.tsx's own `displayOrder`) rather than an
+ * animated position transition — Phase 1 keeps this a discrete stage change (ui-ux.md §15: "elaborate
+ * animation remains deferred"), not a continuous reflow animation. */
+.table tbody tr {
+  border-bottom: 1px solid rgba(102, 134, 107, 0.35);
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* The human player's own seat (ui-ux.md §13 follow-up, M4-T13 UI refinement) - just the seat's own name
+ * cell gets a restrained teal text color, not the whole row (the person's own later follow-up report:
+ * "only the text color should glow cyan and not the background" - an earlier full-row background here
+ * both looked heavier than intended and, on a Final Ranking row that is also gold/silver/bronze, visibly
+ * fought with that medal color underneath it). Distinct from the gold/silver/bronze medal palette used
+ * elsewhere (SessionSummary.module.css, PlayerPanel.module.css) and from the warm tan already used for
+ * buttons/the Turn status pill, so "this is you" never gets confused with a placement or turn indicator.
+ * The row's own "You" name text already carries the meaning (§15's label-plus-color rule); this is purely
+ * an additional glance-able cue. */
+.you td:first-child {
+  font-weight: 700;
+  color: #7fe3d4;
+}
+
+.continueButton {
+  align-self: center;
+  margin-top: 4px;
+  padding: 12px 28px;
+  border: 1px solid #ead8a7;
+  border-radius: 10px;
+  background: #ead8a7;
+  color: #163b2d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.continueButton:hover {
+  background: #f8e7ba;
+}
+
+.continueButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
