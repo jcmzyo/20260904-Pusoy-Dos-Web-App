@@ -270,6 +270,18 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     expect(screen.getByText(`Round ${roundBefore + 1} started.`)).toBeTruthy();
   });
 
+  // 45000ms (M4-T15/PR#92 acceptance fix): this test's own probe loop drives up to two full Rounds
+  // twice over (once to find a seed with two consecutive bot 4th-place finishes, once again through the
+  // mounted component) - each Turn crosses one genuinely real, deliberately un-fake-timer-mockable
+  // macrotask (GameRunner's own `yieldToMacrotask`, the approved lifecycle guard; see orchestrator.md),
+  // exactly the inherent per-Turn cost `session-summary.test.tsx`'s own full-Session tests already
+  // document and measure. This file's three heaviest tests here had no explicit timeout at all and were
+  // silently relying on Vitest's 5000ms default, which the default full-suite run's CPU contention alone
+  // can exceed even though each test still passes 15/15 in an uncontended, isolated run. Reproduced
+  // directly under six CPU-saturating background processes on this two-core sandbox (matching the same
+  // synthetic-load methodology used for the sibling files): this test completed in ~11.6s worst case
+  // across three repeated runs - deterministic, never hung. 45000ms reuses the same already-measured and
+  // documented bound as the sibling full-Session tests, keeping generous headroom without masking a hang.
   it('never flashes a new Round\'s Result overlay open using the previous Round\'s own leftover settled phase before that new Round\'s own reveal actually runs (person\'s own follow-up report: "the previous result window pops for a second")', async () => {
     vi.useFakeTimers();
     try {
@@ -350,8 +362,12 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     } finally {
       vi.useRealTimers();
     }
-  });
+  }, 45000);
 
+  // 45000ms (M4-T15/PR#92 acceptance fix): this drives a real, fully-automatic five-Round Session end to
+  // end - the same inherent per-Turn cost `session-summary.test.tsx`'s own two full-Session tests already
+  // document and measure (same reasoning; see the comment above the first fix in this file). Same
+  // justification, same value.
   it('shows no continuation button once the Basic Session\'s own official result exists, and automatically replaces itself with Session Summary rather than continuing (ui-ux.md §12/§13 follow-up: M4-T13 UI refinement)', async () => {
     const presentation = fixture(5);
     for (let round = 1; round <= 5; round++) {
@@ -380,7 +396,7 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     expect(await screen.findByRole('dialog', { name: 'Session Summary' })).toBeTruthy();
     expect(screen.queryByRole('dialog', { name: 'Round 5 Result' })).toBeNull();
     expect(continueToNextRoundSpy).not.toHaveBeenCalled();
-  });
+  }, 45000);
 });
 
 async function seedWithBotFourthPlace(): Promise<number> {
@@ -408,6 +424,8 @@ describe('Reveal and result isolation, and presentation timers under blocked lay
     expect(playContent.className).toContain('tableDimmed');
   });
 
+  // 45000ms (M4-T15/PR#92 acceptance fix): drives one full Round one Turn at a time - the same inherent
+  // per-Turn cost documented above the first fix in this file. Same justification, same value.
   it('keeps a Round Result that opens behind an Event Log from receiving input, so Next Round cannot start the next Round beneath it (reviewer repro)', async () => {
     const presentation = fixture(await seedWithBotFourthPlace());
     render(<SessionTable presentation={presentation} revealDurationMs={0} resultStageDelayMs={0} />);
@@ -432,7 +450,7 @@ describe('Reveal and result isolation, and presentation timers under blocked lay
     expect(screen.getByRole('dialog', { name: 'Round 1 Result' }).closest('[inert]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Next Round' }));
     expect(presentation.getSnapshot().roundNumber).toBe(2);
-  });
+  }, 45000);
 
   it('freezes the reveal timer while presentationPaused, then finishes the interrupted reveal once it clears', async () => {
     vi.useFakeTimers();
