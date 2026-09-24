@@ -116,6 +116,22 @@ describe('production Session presentation', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  // 45000ms (M4-T15/PR#92 acceptance fix): drives a full five-Round Session end to end via
+  // `presentation.runTurn()`, which calls `GameRunner.runTurn()` - `executeTurn(false)` submits straight
+  // to `submitResponse()` and never reaches `commitWhenSubmissionAllowed()`/`yieldToMacrotask()`; that
+  // macrotask-boundary guard exists solely on the `runAutoplayTurn()` path production's `driveTurns` uses
+  // (see GameRunner.ts), so this test crosses no macrotask. The actual cost is ordinary CPU-bound work -
+  // AI candidate/decomposition search plus Engine state transitions - repeated across many real Turns;
+  // under full-suite CPU contention the single-threaded process gets fewer timeslices, so the same
+  // synchronous/microtask work takes longer in wall-clock time (the same cause documented in the
+  // `session-table-round-result.test.tsx` sibling fix - a different, non-macrotask cost from
+  // `session-summary.test.tsx`'s full-Session tests, which do cross that macrotask via the production
+  // autoplay path). This test had no explicit timeout at all and was silently relying on Vitest's 5000ms
+  // default, which that contention alone can exceed even though it passes 34/34 in isolation and 49/49
+  // together with session-table-round-result.test.tsx. Reproduced directly under 6-8 CPU-saturating
+  // background processes on this two-core sandbox: this test completed in ~7.4s worst case across three
+  // repeated runs - deterministic, never hung. 45000ms reuses the same already-measured bound, generous
+  // headroom without masking a genuine hang.
   it('maps all five production Rounds with ordered events and an explicit fourth-hand reveal boundary', async () => {
     const { session, presentation } = fixture();
     const runTurn = vi.spyOn(session.runner, 'runTurn');
@@ -187,7 +203,7 @@ describe('production Session presentation', () => {
     const final = presentation.getSnapshot();
     expect(() => presentation.continueToNextRound()).toThrow('Continuation requires');
     expect(presentation.getSnapshot()).toBe(final);
-  });
+  }, 45000);
 
   it('uses the unchanged production Baseline and human controller path', async () => {
     const session = startSession<PlayerController>(createSessionConfiguration(), { engineRng: { next: () => 0 }, humanController: { playerId: 'south', chooseMove: async (request) => singleFirst(request) } });
