@@ -143,7 +143,7 @@ An approved measurable contract that implementation agents can follow without in
   - at least 24px exposed per overlapped card;
   - a selected card rises at least 16px;
   - 14px text and 44×44px controls apply literally in portrait. Portrait does not inherit the landscape phone-tier exemption.
-  - Excluded by this decision: an iPhone SE-class screen in Safari with its toolbars shown (about 375×550) is below the minimum. So SE-class devices cannot play in portrait (or in landscape). The frozen matrix row `portrait-phone-se-toolbar` (375×553) asserts this.
+  - Excluded by this decision: an iPhone SE-class screen in Safari with its toolbars shown (about 375×550) is below the minimum. With Safari's toolbars shown, an SE-class viewport (375×553) is below the portrait minimum and its 553×375 landscape is also unsupported, so that state gets 'This screen is too small to play'. With the toolbars collapsed the device is supported (375×667, or 667×375 which rotates to it). The frozen matrix row `portrait-phone-se-toolbar` (375×553) asserts this.
 - **Keyboard:**
   - the hand is a listbox with a roving `tabindex`;
   - ←/→ and Home/End move focus;
