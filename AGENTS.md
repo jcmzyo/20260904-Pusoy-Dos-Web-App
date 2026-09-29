@@ -2,7 +2,7 @@
 
 ## Project and Current Scope
 
-Only Phase 1 is committed.
+Phase 1 (M1–M4) is the completed baseline. Phase 2 (M5–M8) is committed for portrait/mobile gameplay, scripted tutorial infrastructure/content, Rules / How to Play, and scoped accessibility improvements. See `md files/requirements.md` and `md files/phase-2-expansion-plan.md`. Phase 2 functionality is planned until its implementation and acceptance are complete.
 
 Known deferred designs may inform small extension seams where currently justified, but must not expand the current task's implementation scope.
 
@@ -30,6 +30,7 @@ Authority and ownership:
    - `ai.md` — AI behavior
    - `testing-simulation.md` — testing/simulation/QA
    - `ui-ux.md` — UI/UX
+   - `tutorial.md` — tutorial scenario execution, objectives, guidance, and content contracts; no independent rules authority
 4. Current task breakdown — implementation sequencing, task scope, and Definition of Done.
 5. Existing code and tests are evidence of prior implementation, not higher authority than current canonical documentation.
 
@@ -228,14 +229,14 @@ Use the testing layer appropriate to the behavior instead of forcing every UI re
 
 For UI tasks:
 
-1. Read the current M4 task's Automated Tests and Manual Tests sections.
+1. Read the current UI task's Automated Tests and Manual Tests sections.
 2. Add/run the required Vitest/RTL and/or Playwright tests. Do not duplicate Engine rule coverage in UI tests.
 3. Use the milestone's frozen viewport matrix for browser checks once defined.
 4. Prefer state/event assertions over fragile exact animation-duration assertions unless precise timing is explicitly part of the requirement.
 5. For manual checks, describe actions and human-observable expected results. Do not ask a tester to verify millisecond timing, hidden/internal state, implementation details, or facts that require developer tooling.
 6. Never report a manual test as passed unless the user/human tester actually performed it and reported the result. Mark it **MANUAL VERIFICATION PENDING** when applicable.
 7. UI acceptance must include keyboard/mouse/touch-relevant behavior only where the task/document requires it; do not silently expand accessibility scope.
-8. Responsive acceptance must verify that overlapped cards remain targetable, selected cards remain visibly raised, critical controls remain usable, and unsupported portrait/undersized states fail gracefully.
+8. Responsive acceptance must verify that overlapped cards remain targetable, selected cards remain visibly raised, critical controls remain usable, and unsupported/undersized states fail gracefully. Phase 2 supported portrait is playable; the M4 portrait rejection requirement remains historical.
 
 
 If an unrelated existing failure appears, determine whether your changes caused it. Do not silently repair unrelated problems.

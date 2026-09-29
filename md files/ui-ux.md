@@ -1,13 +1,15 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.11)
+## UI / UX Document (v1.12)
 
-**Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 19, 2026  
-**Parent document:** `requirements.md` v1.16  
-**Committed scope:** Phase 1 — Minimal Playable Basic Game UI
+**Status:** Phase 1 baseline plus committed Phase 2 design contracts  
+**Last Modified:** September 29, 2026  
+**Parent document:** `requirements.md` v1.17  
+**Committed scope:** Phase 2 M5–M8, preserving the completed Phase 1 UI
 
 ---
+
+> §§1–18 record the Phase 1 baseline. §19 defines the approved Phase 2 changes; portrait rejection and uniform landscape composition do not apply to supported Phase 2 portrait. Features described in §19 are planned until their tasks pass acceptance.
 
 # 1. Product Experience Goal
 
@@ -272,8 +274,45 @@ Human checks should include whether the tester can understand whose turn it is, 
 
 # 17. Deferred Approved UI Ideas
 
-Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; additional accessibility controls; an adaptive playable-portrait layout (Phase 2 idea — §14's landscape-first contract, including rotate guidance for portrait, remains Phase 1 behavior; a portrait-specific reflowed layout is not Phase 1 scope). Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
+Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; accessibility/preferences beyond §19. Adaptive playable portrait and scoped keyboard/focus/reduced-motion support are now committed Phase 2 work (§19). Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
 
 # 18. Phase 1 UI Acceptance
 
 M4/Phase 1 is complete when a human can start a Basic Session immediately from Home, play a complete five-Round Session against three Baseline bots through production Engine/Orchestrator boundaries, use selection/sorting/manual arrangement and Play/Pass correctly, inspect public Discard/Event history without hidden-information leakage, understand Round/Session results, and use the same coherent landscape-first UI across the documented supported viewport matrix.
+
+# 19. Phase 2 Presentation and Accessibility Contract
+
+## 19.1 Responsive foundation (M5)
+
+Supported portrait phone/tablet layouts use an intentional narrow-screen composition, reusing production presentation state and intent rather than a parallel game loop. §14's uniform-scale geometry remains the landscape baseline only. Reorganizing opponent/status panels is allowed; all critical information/actions listed in requirements §3.6 must remain accessible. No portrait support is claimed merely because a rotate overlay was removed.
+
+M5-T01 freezes representative CSS viewport sizes, portrait minima, real-device/browser targets, card ratio, exposed-card targeting, core text/control minima, safe inset/browser-chrome behavior, overlay overflow, and measurable contrast criteria. Portrait sizing is not yet approved. Existing landscape minimum 844×390, full-scale threshold 896×656, and landscape phone-tier 14px/44×44px exemption remain unchanged. The 28px exposed-card rule remains applicable to the existing landscape hand. Portrait must define its own usable exposure/target contract and cannot silently inherit the phone exemption.
+
+Human cards share a horizontal baseline; selected cards rise without changing display order. Selection, sorting, bounded manual rearrangement, and Engine-derived Play/Pass feedback remain independent of layout. If a 13-card portrait hand cannot satisfy the approved geometry, resolve that design in M5-T01 before implementation rather than silently changing the baseline/selection requirements.
+
+Supported portrait/landscape transitions preserve the active execution, pending Turn, selection, display order, overlay, and result checkpoint where applicable. Below-minimum states pause/prevent gameplay; restoring supported dimensions resumes coherently. Guidance must match device capability: never instruct a fine-pointer desktop window to physically rotate. An overlay or other remaining pause reason must not be cleared by a viewport recovery.
+
+## 19.2 Navigation and tutorial presentation (M7)
+
+The main menu (Home) provides **Play** and **How to Play**. **Play → choice window → Tutorial or Basic Game** is the approved M7 entry flow. Opening the window must not create a Session or tutorial run. Selecting **Tutorial** starts the scripted game with step-by-step guidance; selecting **Basic Game** starts the existing five-Round game against three Baseline bots. Closing/cancelling the window returns to the main menu without starting gameplay. Repeated activation must not start duplicate runs. Apply modal keyboard/focus entry, containment, and return to this choice window. It is an application flow selector, not a new Engine GameMode or a difficulty/settings screen.
+
+**How to Play** is available directly on the main menu without opening Play or starting a game. It opens a comprehensive, organized reference covering all current Basic house rules, combination comparisons and examples, Round/Session scoring and tiebreaks, and app controls. Include clear section navigation and a return to the main menu; a compact summary may supplement, but cannot replace, the full explanation. Retain reference access from gameplay/tutorial context without losing the current run; when shown over active gameplay it uses the existing pause/modal boundary. M7-T01 finalizes remaining content, retry/replay, completion, and return navigation details within this approved entry flow. No persistence is introduced.
+
+Tutorial guidance uses concise contextual text and visible cues, with less guidance in the final portion. It must not obscure cards or required controls, and focus must not jump on every bot event. Distinguish a legal action that does not satisfy the current lesson from an illegal Move. Feedback explains the relevant reason and allows retry. Do not add general move suggestions to normal Basic gameplay.
+
+Normal result presentation still follows §§12–13, including explicit Next Round for Rounds 1–4 and automatic Round 5 transition to Summary. Tutorial completion is a separate application checkpoint; it must not pretend an unfinished Engine Session is complete.
+
+## 19.3 Mandatory keyboard and focus behavior
+
+- Applicable controls are reachable in a sensible keyboard order with visible focus and meaningful accessible names; activation uses the expected button interaction.
+- Card selection, bounded rearrangement, Sort Rank/Suit, Play/Pass, navigation, tutorial actions, and results have keyboard-operable equivalents. M5-T01 freezes exact card navigation/reorder bindings and their visible instructions; this document does not invent those bindings.
+- Modal focus enters the dialog, remains within its active interaction surface, and returns appropriately on close. Background controls cannot consume keyboard input. Non-dismissible result checkpoints retain their lifecycle rather than acquiring an Escape-to-skip rule.
+- Disabled-action reasons, validation feedback, selection, current Turn, PASS/DONE, and completion remain understandable without color alone. Provide text/semantic cues as appropriate to the component.
+
+## 19.4 Mandatory reduced-motion behavior
+
+Respect the system/browser reduced-motion preference without requiring a Settings screen. Simplify/remove meaningful movement in cards, score/results, and guidance while preserving selection emphasis, final scores/placements, instructional content, and progression. Do not make lifecycle completion depend on an animation event that no longer fires. A skip/continue input must not accidentally trigger the next action. Instant scoring presentation does not auto-start Rounds 2–5 or alter bot strategy.
+
+## 19.5 Delivery and acceptance
+
+Implement these behaviors with the relevant M5 and M7 components; M8 verifies and fixes integration gaps. This is scoped accessibility support, not a claim of full standard conformance. Automated browser/component evidence and actual human keyboard, touch/mouse, readability, and tutorial-comprehension checks are required. Use the frozen matrix and record MANUAL VERIFICATION PENDING until humans report results. Do not widen scope into an unrestricted visual redesign.

@@ -105,4 +105,20 @@ npm run test:browser
 
 ## Status
 
-The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 deterministic simulation and developer trace tooling, and the M4 playable UI (Home, a five-Round Basic Session against three Baseline bots, and the Session Summary). M4 is in its pre-completion issue sweep (M4-T14.5) ahead of the M4-T15 acceptance gate.
+The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 deterministic simulation and developer trace tooling, and the M4 playable UI (Home, a five-Round Basic Session against three Baseline bots, and the Session Summary). Phase 1 is the completed baseline. Phase 2 M5–M8 is approved for planning/implementation; this documentation update does not implement portrait gameplay or tutorials.
+
+## Phase 2 planning
+
+- [Expansion plan](md%20files/phase-2-expansion-plan.md)
+- [Canonical requirements](md%20files/requirements.md) — §1.6 roadmap and §3.6 scope/acceptance
+- [Tutorial contract](md%20files/tutorial.md)
+- [M5 — Portrait & Mobile](md%20files/m5-portrait-mobile-task-breakdown.md)
+- [M6 — Tutorial Framework](md%20files/m6-tutorial-framework-task-breakdown.md)
+- [M7 — Tutorial & Rules](md%20files/m7-tutorial-rules-task-breakdown.md)
+- [M8 — Phase 2 Acceptance](md%20files/m8-phase2-acceptance-task-breakdown.md)
+
+The viewport matrix above describes implemented Phase 1 behavior. M5-T01 must approve/freeze the portrait matrix and sizing before implementation updates that table. Existing landscape-phone sizing exemptions remain; portrait does not inherit them. Keyboard/focus and reduced motion are mandatory Phase 2 requirements. HOW_TO_PLAY.md continues to describe the current app until M7 synchronizes its instructions with delivered Tutorial/Rules navigation.
+
+Planned M7 main-menu flow: **Play → Tutorial / Basic Game choice window**, plus a separate **How to Play** entry opening the comprehensive guide. Tutorial provides guided scripted gameplay; Basic Game retains normal five-Round play. These entry points are documentation commitments, not implemented by this update.
+
+The [five-Round tutorial script](md%20files/tutorial-script.md) contains the authored lesson sequence, exact teaching deals, allowed alternatives, and Engine-checked reference traces. It is content planning, not an implemented tutorial.

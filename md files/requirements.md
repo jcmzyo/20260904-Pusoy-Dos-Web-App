@@ -1,16 +1,16 @@
 # Pusoy Dos --- Offline Web Game
 
-## Requirements & Planning Document (v1.16)
+## Requirements & Planning Document (v1.17)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 18, 2026
+**Last Modified:** September 29, 2026
 **Phase 1 scope:** Offline, single-device, Basic Mode, Human vs 3 Baseline bots, headless simulation, and minimal playable UI\
-**Committed roadmap:** Phase 1 only\
+**Committed roadmap:** Completed Phase 1 M1–M4 baseline; Phase 2 M5–M8\
 **Future scope:** Deferred or possible directions only; no committed timeline
 
 ------------------------------------------------------------------------
 
-> **Committed delivery scope — Phase 1 only.** Phase 1 ends with a human-playable Basic Mode web game. Competitive Mode, persistence, advanced AI, personalities, statistics/settings, online play, and other expansions are preserved only as deferred or possible future work unless explicitly stated otherwise. Detailed future designs are **not implementation commitments**.
+> **Committed delivery scope — Phase 2 M5–M8.** Preserve the completed Phase 1 Basic product while adding portrait/mobile gameplay, an Engine-authoritative scripted tutorial, Rules / How to Play, and scoped accessibility improvements. Competitive Mode, persistence, advanced AI, personalities, persistent statistics/general settings, and online play remain deferred. Historical Phase 1 sections describe the baseline; §1.6 and §3.6 define its approved expansion.
 
 ## 1. Overview
 
@@ -64,6 +64,7 @@ Detailed design and implementation decisions belong in dedicated subsystem docum
 | `orchestrator.md` | Game Orchestrator | Coordinates game flow, player controllers, engine execution, events, and round/session progression |
 | `ai.md` | AI System | Phase 1 Baseline move selection, permitted game information, deterministic decision behavior, and deferred stronger-strategy extension boundaries |
 | `ui-ux.md` | UI Layer | Screens, interactions, presentation, feedback, accessibility, responsive behavior, and quality-of-life features |
+| `tutorial.md` | Tutorial | Scenario execution, objectives, guidance, content coverage, and production integration without rules ownership |
 | `persistence.md` | Game Persistence | Saving/loading resumable state, settings, statistics, storage schema, versioning, and migrations |
 | `events-logging.md` | Event & Logging System | Structured gameplay events, game history, debug logging, formatting, and event consumers |
 | `testing-simulation.md` | Testing & Simulation | Unit/integration testing, headless games, deterministic reliability simulation, replay/regression testing, and future evaluation support |
@@ -133,7 +134,7 @@ When a later section needs to specify the detailed behavior of one of these term
 
 # 1.5 Committed Phase 1 Roadmap
 
-A **milestone** must produce a concrete, testable technical output. A **phase** must end with an integrated working version of the product. Only Phase 1 is committed.
+A **milestone** must produce a concrete, testable technical output. A **phase** must end with an integrated working version of the product. M1–M4 describe the completed Phase 1 baseline; the committed Phase 2 expansion is in §1.6.
 
 ## M1 — Basic Engine Core
 
@@ -158,6 +159,21 @@ At Phase 1 completion, a human can play a complete five-Round Basic Pusoy Dos Se
 ### Post-Phase-1 planning rule
 
 After the working UI exists, the product must be played and evaluated before a new committed phase or milestone roadmap is defined. Existing deferred designs may inform that decision, but they do not create a delivery promise.
+
+# 1.6 Committed Phase 2 Roadmap
+
+Phase 1 is the completed production baseline. Phase 2 commits to M5–M8 only, as described in [phase-2-expansion-plan.md](phase-2-expansion-plan.md). That plan records intent; this document remains product authority. Detailed task plans sequence implementation without changing canonical rules.
+
+| Milestone | Required technical output | Task plan |
+|---|---|---|
+| M5 — Portrait & Mobile Experience | Full five-Round Basic gameplay in supported portrait phone/tablet layouts, retaining supported landscape behavior | [M5 breakdown](m5-portrait-mobile-task-breakdown.md) |
+| M6 — Tutorial Framework & Scripted Scenario Infrastructure | Deterministic scenario execution through production Engine/Orchestrator/controller boundaries, proved by a representative scenario | [M6 breakdown](m6-tutorial-framework-task-breakdown.md) |
+| M7 — Scripted Pusoy Dos Tutorial & Rules Reference | Complete progressively less-guided scripted tutorial and comprehensive in-app How to Play | [M7 breakdown](m7-tutorial-rules-task-breakdown.md) |
+| M8 — Player Experience, Accessibility & Phase 2 Acceptance | Integrated responsive/input/accessibility verification, human acceptance, and full Phase 1 regression evidence | [M8 breakdown](m8-phase2-acceptance-task-breakdown.md) |
+
+Dependency order: completed Phase 1 → M5 → M6 → M7 → M8. Early M6 design may overlap M5 without conflicting contract/file changes; tutorial presentation must use the accepted M5 responsive foundation. M8 does not postpone known M5–M7 correctness or accessibility work.
+
+After Phase 2 is completed and evaluated, select the next committed phase. No Phase 3 roadmap is implied.
 
 # 2. Game Rules Specification
 
@@ -774,6 +790,55 @@ Online multiplayer, backend/server infrastructure, additional modes/modifiers, P
 - No "Suggest a Move" feature in Phase 1.
 - No speculative framework whose only purpose is an uncommitted future feature.
 
+## 3.6 Phase 2 — Committed Scope and Acceptance
+
+Phase 2 expands the existing offline Basic product; it does not rewrite Engine, Orchestrator, Baseline AI, or simulation. All §2 house rules and the five-Round normal Basic Session remain unchanged.
+
+### Required product behavior
+
+- Complete Basic Sessions on approved portrait phone/tablet targets and all existing supported landscape/desktop targets.
+- Intentional portrait composition with ratio-preserving cards; common baseline for unselected human cards, selected cards raised, reliable selection, bounded reorder preserving selection, Sort Rank/Suit, Play/Pass and Engine-derived feedback.
+- Accessible current Turn, current combination or Free Lead and player attribution, opponent counts, PASS/DONE, Round/Session context, scores, Event Log, Discard Pile, Round Result, and Session Summary.
+- Supported orientation/viewport transitions preserve execution, selection, and display order. Below-minimum layouts prevent unsafe interaction and recover coherently.
+- A deterministic hands-on scripted tutorial comprising one complete five-Round Basic Session, with Engine-authoritative validation, objectives, corrective feedback/retry, open-practice segments, and an unrestricted final Round. Winning is not required. Multiple Engine-valid solutions satisfying an objective are accepted unless the lesson explicitly requires a specific action.
+- Main menu **Play** opens a choice window with **Tutorial** and **Basic Game**. Opening or dismissing this window starts no gameplay; selecting Tutorial starts the guided scripted game, while selecting Basic Game starts the normal five-Round Basic Session against three Baseline bots. This M7 navigation replaces the Phase 1 immediate Start Game entry while preserving production startup/gameplay semantics.
+- A directly accessible **How to Play** entry on the main menu opens a comprehensive in-app reference, independently of Play or starting a game. Cover all current Basic house rules, comparisons, scoring/tiebreaks, and app controls with clear sections and physically valid worked examples. Keep it scannable, but do not limit it to a quick-reference summary; it remains explanatory, never another rules authority.
+- Responsive, input, accessibility, automated-browser, human usability, and Phase 1 regression verification.
+
+### Approved accessibility commitment (September 29, 2026)
+
+Keyboard/focus support and reduced-motion handling are MUST requirements for Phase 2, promoted from SHOULD in the original plan by explicit user approval. Required keyboard scope includes navigation, card selection and bounded rearrangement, sorting, Play/Pass, dialogs, results, and tutorial actions. Focus must be visible, ordered sensibly, moved into dialogs and returned appropriately; background modal controls must not be operable. Reduced-motion preference must simplify or remove meaningful movement while preserving visible results, guidance, and progression. No Settings screen or full accessibility-standard certification is implied.
+
+Readable typography, usable controls, sufficient contrast, and status/feedback that does not rely on color alone are required. M5-T01 must freeze measurable portrait sizing, contrast, focus, keyboard interaction, and reduced-motion criteria before dependent UI implementation. Preserve the existing landscape-phone exemption from literal 14px text / 44×44px controls; it does not extend automatically to portrait. Existing full-scale landscape minima and exposed-card targeting remain in force. Exact portrait viewport/minimum values require approval in M5-T01, not invention in this roadmap.
+
+### Tutorial and reference boundaries
+
+Tutorial execution is guided Basic gameplay, not a new GameMode or sandbox. Tutorial run progress is application-owned and is not an authoritative Session result; normal Sessions remain exactly five Rounds. Tutorial scenarios may be deliberately arranged, but setup must preserve physical card uniqueness and valid Engine state, and all gameplay transitions must go through production authority. M6-T01 freezes the concrete setup contract and obtains approval for any substantial public-contract change. No hidden-opponent-hand presentation is authorized by default.
+
+Teach shedding, turns, 3♣ opening, Singles/Pairs/Triples, all five-card categories and hierarchy, relevant same-type comparisons, response size/type, voluntary Pass and no-legal-Play, Trick reset/Free Lead, finishing, Basic Round points, and Session context. The reference must also explain Session tiebreaks and canonical house-rule comparison details. Content must respect §2, including special Straights, suit-first Flush comparison, rank-first Straight Flush comparison, and explicit active-player response Turns after a finisher.
+
+Tutorial replay/restart and understandable current-run progress remain SHOULD items; the M7 plan includes them as the selected delivery approach. Core mistake retry/continue is mandatory. Any later deferral must be explicitly approved and cannot prevent required tutorial completion. Basic non-essential sound, minor visual polish, and small presentation preferences remain optional and are not task-plan completion gates.
+
+### Exclusions
+
+No Competitive Mode, difficulty levels, advanced AI/search, personalities, Mystery Bots/Surprise Me, persistence/Resume, persistent statistics, progression/unlocks, accounts, networking, sandbox, separate tutorial rules engine, auto-pass, major art/audio redesign, or speculative future-phase framework. Optional polish requires a bounded task after core stability; it cannot introduce those systems.
+
+### Phase 2 Definition of Done
+
+- [ ] M5–M8 milestone Definitions of Done are satisfied.
+- [ ] Five-Round Basic Sessions complete on approved portrait phone/tablet and existing supported landscape targets.
+- [ ] Gameplay-critical information, selection/elevation, rearrangement, sorting, Play/Pass, overlays, and results remain usable.
+- [ ] Supported orientation changes preserve coherent state; below-minimum behavior is graceful and recoverable.
+- [ ] A new player can enter and complete the scripted tutorial, retry mistakes, and apply rules with materially less final guidance.
+- [ ] Scenario setup and every accepted Move preserve production Engine authority; illegal scripts fail diagnostically rather than bypassing rules.
+- [ ] Main menu Play opens the Tutorial / Basic Game choice; only selecting an option starts the corresponding execution.
+- [ ] Comprehensive How to Play is directly accessible from the main menu, covers current Basic rules and controls, and is synchronized with §2.
+- [ ] Keyboard/focus, reduced motion, contrast, non-color cues, and approved sizing criteria pass the defined checks.
+- [ ] High-value portrait/tutorial flows have deterministic automated browser coverage.
+- [ ] Real humans have performed the documented functional/usability checks; no blocking responsive, comprehension, or progression issue remains.
+- [ ] Phase 1 automated regressions and deterministic headless reliability remain green.
+- [ ] No unresolved blocking correctness or architecture defect, or dependency on excluded features, remains.
+
 # 4. Non-Functional Requirements
 
 ## 4.1 Offline-first
@@ -1123,7 +1188,7 @@ This separation is intended to prevent duplicate models, hidden-information leak
 
 # 8. UI / UX
 
-`ui-ux.md` is the authoritative UI/UX design document. Phase 1 implements only its Phase 1 sections.
+`ui-ux.md` is the authoritative UI/UX design document. Its Phase 1 sections preserve the landscape baseline; its Phase 2 contract defines the approved portrait, tutorial/reference, and accessibility expansion.
 
 The Phase 1 UI is intentionally small but complete: Home, Game Table, Round Result overlay, and Session Summary. **Start Game** immediately starts the fixed Basic Session in Phase 1; startup must still pass through a clean application/configuration boundary so a future setup sub-screen can be inserted when real options such as game mode or difficulty enter scope. It integrates with the production Engine/Orchestrator rather than reproducing game rules in React.
 
@@ -1219,7 +1284,7 @@ This section is informational only and is not part of v1 implementation.
 The architecture should make future online play possible without
 rewriting the rules engine.
 
-Potential Phase 2 architecture:
+Potential future online architecture (outside committed Phase 2):
 
 1.  Package `/engine` as a reusable TypeScript module.
 2.  Add a Node.js server.
@@ -1570,7 +1635,7 @@ Stronger AI, AI difficulty/personality systems, Competitive strategy, persistenc
 
 # 15. Delivery Scope and Future Direction
 
-The committed roadmap is the Phase 1 M1–M4 plan in §1.5. No milestone numbers are assigned beyond M4.
+The completed baseline is Phase 1 M1–M4 (§1.5). The committed expansion is Phase 2 M5–M8 (§1.6 and §3.6). No milestone numbers are assigned beyond M8.
 
 ## 15.1 Deferred approved designs
 
@@ -1582,7 +1647,7 @@ These have meaningful prior design decisions that should be preserved, but they 
 - Persistence/Resume, persistent statistics, and Settings.
 - Auto-pass convenience.
 - Two-color/four-color suit preference; Phase 1 uses four-color suits by default with no toggle.
-- Additional UI polish beyond the committed manual rearrangement, responsive layout, and result-transition requirements.
+- UI polish beyond the explicitly committed Phase 2 responsive/accessibility/tutorial work; minor polish remains optional, not a new delivery system.
 - Progression/achievement concepts already discussed.
 
 ## 15.2 Possible future directions — not committed
@@ -1591,7 +1656,7 @@ Online multiplayer, backend/server infrastructure, additional game modes/modifie
 
 ## 15.3 Scope-control rule
 
-Known future requirements justify small, clean extension seams when they are inexpensive and improve separation of concerns. They do **not** justify speculative frameworks or implementation of deferred behavior during Phase 1. Phase 1 correctness and a working playable product take priority.
+Known future requirements justify small, clean extension seams when they are inexpensive and improve separation of concerns. They do **not** justify speculative frameworks or implementation of deferred behavior during either committed phase. Preserve Phase 1 correctness while delivering only the approved M5–M8 expansion.
 
 # 16. Rules Summary --- Quick Reference
 
@@ -1659,3 +1724,7 @@ Highest session total wins, followed by:
 2.  Best average placement across the 5 Rounds; lower average is better.
 3.  Highest single best-round score.
 4.  Genuine tie if still tied.
+
+## Phase 2 Authored Tutorial Script
+
+[tutorial-script.md](tutorial-script.md) owns the teaching copy, complete authored deals, example traces, and topic coverage under tutorial.md. Teach all 1-, 2-, 3-, and 5-card categories through player actions, rank/suit/category improvement, required and voluntary Pass, history/reference tools, practical non-mandatory strategy tips, Free Lead, and explicit continuation after a finisher. Free play here is the final portion of the tutorial, not a separate sandbox mode. The real five-Round results and Session totals remain Engine-owned.

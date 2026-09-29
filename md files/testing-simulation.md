@@ -1,19 +1,21 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.8)
+## Testing & Simulation Document (v1.9)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 15, 2026
-**Parent document:** `requirements.md` v1.14  
-**Shared model:** `domain-model.md` v1.3  
-**Engine design:** `engine.md` v1.7  
-**Orchestrator design:** `orchestrator.md` v1.6  
-**AI design:** `ai.md` v1.5  
+**Last Modified:** September 29, 2026
+**Parent document:** `requirements.md` v1.17  
+**Shared model:** `domain-model.md` v1.4  
+**Engine design:** `engine.md` v1.8  
+**Orchestrator design:** `orchestrator.md` v1.7  
+**AI design:** `ai.md` v1.7  
 **Module:** Testing & Simulation  
 **Primary POC target:** Fully headless five-Round game/session execution  
 **Language/tooling:** TypeScript + Vitest + React Testing Library + Playwright + headless Node.js execution
 
 ---
+
+> Earlier Phase 1/POC sections are the preserved baseline and historical sequencing. The Phase 2 Verification Contract below extends them for M5–M8; supported portrait replaces the old portrait-rejection expectation only after the approved M5 contract is implemented.
 
 # 1. Purpose
 
@@ -2034,3 +2036,37 @@ A valid deal must not be silently skipped as "unplayable." A failure either term
 Confirmed simulation defects should create focused regression coverage and/or a retained deterministic failing-seed fixture. The original seed must be replayed after the fix, followed by the broader deterministic regression batch.
 
 Normal successful batch logs should remain compact; detailed traces may be captured on failure/replay to avoid unnecessary log volume.
+
+# Phase 2 Verification Contract
+
+## Test layers and execution
+
+Use existing Vitest/RTL for responsive classification, selection/reordering, focus, reduced motion, objective progression, scenario validation, and production integration. Use focused Playwright coverage for geometry/targetability, orientation/resize, drag, overlays and pause, keyboard flows, tutorial progression/completion, and responsive results. Test rules authoritatively in Engine tests; do not duplicate their algorithms in UI/tutorial assertions.
+
+For each code task run focused tests, npm test, and npm run typecheck. Run npm run build for UI/integration changes and at milestone gates. Run npm run test:browser for affected browser contracts and the full suite at each milestone gate. Run npm run test:acceptance:m3 at milestone gates and when Engine/runner/deterministic setup changes can affect reliability. Use Node >=24 and npm ci only if installation is necessary. There is no lint script in the current package; do not invent a passing lint result or add tooling solely for this plan.
+
+Contract-only planning tasks verify documentation links, consistency, approval records, and scope; they do not claim runtime tests. Existing tests that expect all portrait to be rejected must be updated narrowly for the approved M5 support classification, while below-minimum and landscape regressions remain meaningful.
+
+## Frozen acceptance matrix
+
+M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/coarse input, real mobile browser-chrome/inset behavior, and keyboard/reduced-motion/contrast criteria. Preserve existing supported landscape cases and their approved sizing exception. Include immediately below-minimum and threshold sizes; distinguish emulator evidence from actual touch-device usability. The same matrix is reused by M6–M8. Requirements §12.5 lists Chrome, Edge, Firefox, Safari, Android Chrome, and iOS Safari; M5-T01 assigns reproducible versions/devices and automated versus human coverage. Current Playwright configuration is Chromium-only; Safari/iOS evidence must not be claimed from that suite. Browser availability limitations remain NOT VERIFIED until covered, not silently removed from the matrix.
+
+## Scenario falsification and reproducibility
+
+Record scenario/revision, deterministic setup inputs, checkpoint, and action sequence in test diagnostics. Check 52-card uniqueness and setup invariants; reject malformed/missing card references, impossible states, and invalid scripts. Verify accepted transitions/events against production Engine outputs, not mirrored rules. Cover rejection with unchanged state/events, multiple satisfying solutions and their scripted continuations, exact-action objectives, duplicate activation, repeated/reordered observation, cancellation, stale responses, restart, and final completion. Require bounded execution so defective scripts cannot loop indefinitely. Keep private scenario/deal data out of normal views/logs and Baseline requests.
+
+Re-run representative scenarios with identical setup/action sequences and assert equivalent authoritative outcomes/objective progression. Reordering or sorting the displayed hand must not change recognition of the same card set. No reliance on unseeded random data or exact animation duration.
+
+## Human evidence and completion
+
+Each applicable task lists concrete actions and expected visible results. A real person verifies card readability/targetability, bounded dragging, keyboard navigation/focus, understandable feedback, Rules discovery, and tutorial comprehension. Ask a new player to complete the tutorial without developer explanation, then play normal Basic gameplay; record confusion separately from functional failures. Human checks never require timing in milliseconds or hidden/internal state inspection.
+
+Record tester/date, build or commit, browser/device/viewport/input, actions, expected/observed result, pass/fail, and issue references. Use MANUAL VERIFICATION PENDING until reported. Task code completion cannot be called COMPLETE while a required task DoD manual check is unverified; milestone acceptance requires the designated human checks and no unresolved blocker. M8 maps every requirements §3.6 / expansion-plan §11 item to concrete evidence, including full five-Round portrait phone/tablet and landscape Sessions, keyboard/focus, reduced motion, tutorial, reference, and headless reliability.
+
+## Phase 2 Main-Menu Entry and Comprehensive Guide Checks
+
+Verify Home → Play opens a Tutorial / Basic Game choice window without starting execution; closing/cancelling starts neither, and selecting either starts exactly one corresponding run even after repeated activation. Cover keyboard focus entry/containment/return and touch/mouse activation. The direct main-menu How to Play entry must work independently of Play or any Session, with navigable comprehensive rules, valid examples, scoring/tiebreak explanations, and current controls. Human checks include finding these topics without developer coaching; a short summary or link to a repository file is insufficient. In-game/tutorial reference access continues to preserve run state and pause/focus behavior. These M7/M8 checks supersede the Phase 1 direct Start Game entry expectation only when the new flow is delivered.
+
+## Authored Tutorial Script Acceptance
+
+Use [tutorial-script.md](tutorial-script.md) as concrete M7 fixture/content input. Reproduce all five full deals, guided prefixes and listed alternative routes; verify real Engine results after five Rounds, no winner requirement, and unrestricted legal actions in Round 5. The deliberate scripted-to-Baseline handoff must occur only at its authored checkpoint, never as illegal-script fallback. Check the difference between required and optional Pass using Engine legal Moves, both finisher-continuation branches, and direct player use of all eight combination categories. Authoring evidence is not runtime/controller/UI or human-acceptance evidence.
