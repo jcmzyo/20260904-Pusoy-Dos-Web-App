@@ -90,3 +90,25 @@ No canonical Pusoy Dos house rule was changed.
 - Clarified that tutorial deal tables define order-insensitive 13-card assignments per seat, not a unique raw shuffle output or RNG sequence. Preserved the explicit Round 5 seed recipe.
 - Distinguished author-reported external probe evidence from the reviewer's independently corroborated results. M6-T01 now requires a repository-contained fixture test and reproducible command using existing APIs, with an explicit test-only exception to its planning-task verification exemption.
 - Retained cosmetic link encoding, intentional Markdown hard breaks, and historical M1 scope wording; no rules or production code changed.
+
+## September 29, 2026 — M5-T01 frozen portrait, input, and accessibility contract
+
+- User approved the M5-T01 proposal: a 360×560 portrait minimum; portrait cards 56–96px wide, all 13 in one row with at least 24px exposed and a selected-card rise of at least 16px; literal 14px/44×44px minimums in portrait; Shift+Arrow card reordering; WCAG 2.2 AA contrast with Diamonds `#c2410c`, Play `#1f7a43`, and Pass `#1d5fc4`; and the rest of the proposal as written.
+- UI/UX v1.13, from v1.12, adds §19.6 "Frozen M5 portrait, input, and accessibility contract":
+  - the pre-M5 baseline;
+  - classification and guidance;
+  - portrait geometry and overflow;
+  - keyboard, focus, and disabled-feedback rules;
+  - contrast and non-color cues;
+  - reduced motion;
+  - task allocation.
+
+  §19.1, §19.3, and §19.4 now point to it.
+- Testing v1.10, from v1.9, adds "Frozen M5 acceptance matrix and evidence assignments": portrait, landscape, and transition cases with the expected guidance per pointer type; automated assertions; and browser/device evidence assignments that keep every requirements §12.5 target.
+- The M5 breakdown moves to v1.1 with an M5-T01 Approval Record. The M6, M7, M8, and tutorial.md headers now cite UI/UX v1.13 and Testing v1.10.
+- Review follow-up (M5-T01):
+  - added the coarse 844×389 "Rotate your device" boundary row;
+  - added the `portrait-phone-se-toolbar` (375×553) exclusion row;
+  - added an explicit focus-indicator assertion (outline at least 2px, contrast at least 3:1);
+  - added this log entry.
+- The landscape contract, requirements, rules, dependencies, and runtime code are unchanged. No portrait behavior is implemented yet.

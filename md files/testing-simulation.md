@@ -2082,6 +2082,7 @@ M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/
 | portrait-below-min-width | 359×560 | coarse | "This screen is too small to play" |
 | portrait-below-min-height | 360×559 | coarse | "This screen is too small to play" |
 | portrait-small-phone | 320×568 | coarse | "This screen is too small to play" |
+| portrait-phone-se-toolbar | 375×553 | coarse | "This screen is too small to play" (iPhone SE-class Safari with toolbars shown; excluded by the approved 560px minimum, and its 553×375 landscape is also unsupported) |
 
 ### Landscape cases
 
@@ -2094,6 +2095,7 @@ M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/
 | landscape-below-min-width | 843×390 | coarse | "Rotate your device to continue" (390×843 would be supported portrait) |
 | landscape-below-min-width | 843×390 | fine | "Resize your window to continue" |
 | landscape-below-min-height | 844×389 | fine | "Resize your window to continue" |
+| landscape-below-min-height | 844×389 | coarse | "Rotate your device to continue" (389×844 would be supported portrait) |
 | small-phone-landscape | 667×375 | coarse | "Rotate your device to continue" |
 | undersized-landscape | 560×320 | coarse | "This screen is too small to play" |
 
@@ -2130,6 +2132,7 @@ Automated checks assert geometry and behavior. They never assert animation durat
   - Round 5 still reaches the Summary;
   - the preference can change during a Session.
 - **Contrast:** computed colors of the listed elements checked against the §19.6.5 thresholds. Color states always have text or shape equivalents.
+- **Focus indicator:** for each focusable control type, and for a focused card, the computed `outline-width` is 2px or more when focused (`:focus-visible`), and the outline color reaches at least 3:1 against the adjacent composited background (§19.6.4).
 
 ### Browser, device, and evidence assignments (requirements §12.5; nothing is removed)
 
