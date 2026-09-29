@@ -12,9 +12,9 @@
 **Engine design:** engine.md v1.8  
 **Orchestrator design:** orchestrator.md v1.7  
 **AI design:** ai.md v1.7  
-**UI/UX design:** ui-ux.md v1.12  
+**UI/UX design:** ui-ux.md v1.13  
 **Tutorial design:** tutorial.md v1.0  
-**Testing strategy:** testing-simulation.md v1.9
+**Testing strategy:** testing-simulation.md v1.10
 
 ---
 

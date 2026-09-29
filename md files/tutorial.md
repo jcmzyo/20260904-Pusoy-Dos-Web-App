@@ -7,7 +7,7 @@
 **Parent document:** requirements.md v1.17  
 **Shared model:** domain-model.md v1.4  
 **Engine / Orchestrator:** engine.md v1.8 / orchestrator.md v1.7  
-**Presentation / QA:** ui-ux.md v1.12 / testing-simulation.md v1.9  
+**Presentation / QA:** ui-ux.md v1.13 / testing-simulation.md v1.10  
 **Milestones:** M6 framework; M7 authored tutorial/reference; M8 integrated acceptance
 
 # 1. Purpose and Authority
