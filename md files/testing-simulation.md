@@ -1,6 +1,6 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.9)
+## Testing & Simulation Document (v1.10)
 
 **Status:** Draft for implementation  
 **Last Modified:** September 29, 2026
@@ -2049,7 +2049,103 @@ Contract-only planning tasks verify documentation links, consistency, approval r
 
 ## Frozen acceptance matrix
 
-M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/coarse input, real mobile browser-chrome/inset behavior, and keyboard/reduced-motion/contrast criteria. Preserve existing supported landscape cases and their approved sizing exception. Include immediately below-minimum and threshold sizes; distinguish emulator evidence from actual touch-device usability. The same matrix is reused by M6–M8. Requirements §12.5 lists Chrome, Edge, Firefox, Safari, Android Chrome, and iOS Safari; M5-T01 assigns reproducible versions/devices and automated versus human coverage. Current Playwright configuration is Chromium-only; Safari/iOS evidence must not be claimed from that suite. Browser availability limitations remain NOT VERIFIED until covered, not silently removed from the matrix.
+M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/coarse input, real mobile browser-chrome/inset behavior, and keyboard/reduced-motion/contrast criteria. Preserve existing supported landscape cases and their approved sizing exception. Include immediately below-minimum and threshold sizes; distinguish emulator evidence from actual touch-device usability. The same matrix is reused by M6–M8. Requirements §12.5 lists Chrome, Edge, Firefox, Safari, Android Chrome, and iOS Safari; M5-T01 assigns reproducible versions/devices and automated versus human coverage. Current Playwright configuration is Chromium-only; Safari/iOS evidence must not be claimed from that suite. Browser availability limitations remain NOT VERIFIED until covered, not silently removed from the matrix. The approved M5-T01 values are recorded in the next section.
+
+## Frozen M5 acceptance matrix and evidence assignments (M5-T01)
+
+**Approved by the user on September 29, 2026 (M5-T01).** The criteria are defined in `ui-ux.md` §19.6. This section freezes the cases and the evidence each case needs. Sizes are CSS px (`innerWidth×innerHeight`). M5-T02 carries these cases into `tests/browser/viewportMatrix.ts`, which already holds the landscape cases. The README's implemented matrix is updated only when the behavior is delivered (M5-T07). None of these cases has passed yet.
+
+### Portrait cases
+
+**Supported portrait:**
+
+| Name | Size | Class | Pointer to exercise |
+|---|---|---|---|
+| portrait-phone-minimum | 360×560 | phone (boundary) | coarse + fine |
+| portrait-phone-360 | 360×640 | phone | coarse |
+| portrait-phone-375 | 375×667 | phone | coarse |
+| portrait-phone-ios-toolbar | 390×664 | phone (iPhone with Safari toolbars) | coarse |
+| portrait-phone-390 | 390×844 | phone (was `portrait-unsupported`) | coarse + fine |
+| portrait-phone-412 | 412×915 | phone | coarse |
+| portrait-phone-class-max | 599×960 | phone (class boundary) | coarse |
+| portrait-tablet-minimum | 600×960 | tablet (class boundary) | coarse |
+| portrait-tablet-768 | 768×1024 | tablet | coarse + fine |
+| portrait-tablet-820 | 820×1180 | tablet | coarse |
+| portrait-tablet-1024 | 1024×1366 | tablet | coarse |
+| portrait-square | 700×700 | tablet (square counts as portrait) | fine |
+
+**Unsupported portrait, with the expected guidance:**
+
+| Name | Size | Pointer | Expected guidance |
+|---|---|---|---|
+| portrait-below-min-width | 359×560 | fine | "Resize your window to continue" |
+| portrait-below-min-width | 359×560 | coarse | "This screen is too small to play" |
+| portrait-below-min-height | 360×559 | coarse | "This screen is too small to play" |
+| portrait-small-phone | 320×568 | coarse | "This screen is too small to play" |
+
+### Landscape cases
+
+- **Supported, unchanged:** large-desktop 1920×1080, laptop 1440×900, windowed-desktop 1280×800, tablet-landscape 1024×768, and large-phone-landscape 844×390, which is the minimum.
+- **Unchanged landscape rules:** the 896×656 full-scale threshold, the phone-tier exemption from 14px text and 44×44px targets, and the 28px exposed-card rule stay exactly as in §14.
+- **Unsupported landscape, with the expected guidance:**
+
+| Name | Size | Pointer | Expected guidance |
+|---|---|---|---|
+| landscape-below-min-width | 843×390 | coarse | "Rotate your device to continue" (390×843 would be supported portrait) |
+| landscape-below-min-width | 843×390 | fine | "Resize your window to continue" |
+| landscape-below-min-height | 844×389 | fine | "Resize your window to continue" |
+| small-phone-landscape | 667×375 | coarse | "Rotate your device to continue" |
+| undersized-landscape | 560×320 | coarse | "This screen is too small to play" |
+
+### Transition cases
+
+For each transition below, assert the same run, pending Turn, selection, display order, and open overlay, with no duplicated commits and no Session reset:
+
+- portrait-phone-390 ↔ large-phone-landscape;
+- portrait-tablet-768 ↔ tablet-landscape;
+- supported → unsupported → supported, while it is a human Turn, while a bot Turn is pending, and while an overlay is open;
+- a resize during an active drag, which must cancel the drag with the order unchanged.
+
+### Automated assertions
+
+Automated checks assert geometry and behavior. They never assert animation durations.
+
+- **Every supported portrait case:**
+  - no page scroll in either direction;
+  - rendered text is 14px or larger, and controls are 44×44px or larger;
+  - with 13 cards, each card has 24px or more exposed, the card ratio is 5:7, unselected cards share one baseline, and selected cards rise 16px or more;
+  - each of the 13 cards can be hit at its exposed-area center;
+  - the listed controls can be reached;
+  - dialogs keep their title and actions visible while their body scrolls.
+- **Keyboard:**
+  - the listbox bindings and their boundaries;
+  - card identity is preserved after sorting and reordering;
+  - focus lands in the right place after a Play;
+  - focus enters, is contained in, and returns from each dialog;
+  - no background element responds to keyboard input;
+  - Next Round is never focused automatically, and a skip never continues.
+- **Reduced motion** (`page.emulateMedia({ reducedMotion: 'reduce' })` plus RTL `matchMedia` stubs):
+  - the Round Result is settled when it opens;
+  - Next Round is still required for Rounds 1–4;
+  - Round 5 still reaches the Summary;
+  - the preference can change during a Session.
+- **Contrast:** computed colors of the listed elements checked against the §19.6.5 thresholds. Color states always have text or shape equivalents.
+
+### Browser, device, and evidence assignments (requirements §12.5; nothing is removed)
+
+| Target | Automated evidence | Human evidence |
+|---|---|---|
+| Chrome, desktop (current stable; record the version) | Playwright Chromium, full matrix, plus Chromium mobile-emulation projects (`hasTouch`/`isMobile`, coarse pointer) for the portrait and guidance cases | Portrait-shaped window and landscape smoke; keyboard-only Round |
+| Edge, desktop (current stable) | None separately. Chromium results count as **engine-level only**. | Smoke: start, play a Round, dialogs, keyboard |
+| Firefox, desktop (current stable) | None in M5 | Smoke: start, play a Round, dialogs, keyboard, reduced motion |
+| Safari, macOS (current stable) | None. Playwright WebKit is not Safari evidence. | Smoke. **NOT VERIFIED** if no Mac is available. |
+| Android Chrome, real phone 360–412px wide | Chromium emulation is **not** device evidence | **Required (M5-T08):** a full five-Round portrait Session; rotation both ways; toolbar collapse/expand; touch drag and selection of every card |
+| iOS Safari, real iPhone | None | **Required (M5-T08):** a portrait Session smoke; rotation; toolbar behavior; touch drag and selection |
+| Tablet portrait, real device (iPad Safari or an Android tablet in Chrome) | Tablet emulation is not device evidence | **Required (M5-T08):** a full five-Round portrait Session |
+
+- An unavailable browser or device is recorded as **NOT VERIFIED** with the reason. It is never dropped from the matrix.
+- Human records use the fields listed under "Human evidence and completion" above.
+- Emulator, automated, and prototype observations never count as human or device evidence.
 
 ## Scenario falsification and reproducibility
 

@@ -1,6 +1,6 @@
 # Pusoy Dos --- M5 Portrait & Mobile Experience
 
-## Milestone Design + Task Breakdown (v1.0)
+## Milestone Design + Task Breakdown (v1.1)
 
 **Status:** Phase 2 implementation plan based on approved scope; detailed decisions gated by the named contract tasks  
 **Last Modified:** September 29, 2026  
@@ -12,9 +12,9 @@
 **Engine design:** engine.md v1.8  
 **Orchestrator design:** orchestrator.md v1.7  
 **AI design:** ai.md v1.7  
-**UI/UX design:** ui-ux.md v1.12  
+**UI/UX design:** ui-ux.md v1.13  
 **Tutorial design:** tutorial.md v1.0  
-**Testing strategy:** testing-simulation.md v1.9
+**Testing strategy:** testing-simulation.md v1.10
 
 ---
 
@@ -40,7 +40,7 @@ Overlays and unsupported layouts coordinate pause without dropping other pause r
 
 # 6. Responsive and Accessibility Contract
 
-M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and input/accessibility criteria. Retain all existing supported landscape matrix cases, 844×390 minimum, full-scale constraints, and the approved landscape-phone text/target exemption. Portrait cannot inherit that exemption silently. Do not claim support by removing rotate guidance alone.
+M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and input/accessibility criteria. Retain all existing supported landscape matrix cases, 844×390 minimum, full-scale constraints, and the approved landscape-phone text/target exemption. Portrait cannot inherit that exemption silently. Do not claim support by removing rotate guidance alone. The approved contract is frozen in [ui-ux.md](ui-ux.md) §19.6 and the testing-simulation.md frozen M5 matrix (see the M5-T01 Approval Record).
 
 # 7. Testing Contract
 
@@ -127,6 +127,51 @@ An approved measurable contract that implementation agents can follow without in
 - [ ] All blocking product choices resolved before T02.
 - [ ] Required document approvals and consistency/link checks recorded.
 - [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Approval Record (M5-T01)
+
+**Approved:** by the user, September 29, 2026, in the M5-T01 session, on branch `dev/M5/T1-Freeze_Portrait_Input_and_Accessibility_Contracts` at base `27abb0d`. The decisions below were selected explicitly; the remaining proposal was approved as written. The full contract is in [ui-ux.md](ui-ux.md) §19.6, and the matrix and evidence assignments are in [testing-simulation.md](testing-simulation.md) under "Frozen M5 acceptance matrix and evidence assignments".
+
+**Decisions:**
+
+- **Portrait minimum:** 360×560 CSS px, for any pointer type.
+  - Landscape is when width > height; a square viewport counts as portrait.
+  - Phone portrait is 360–599px wide; tablet portrait is 600px or wider.
+- **Portrait hand geometry:**
+  - card ratio 5:7, card width 56–96px;
+  - all 13 cards in one row on one baseline;
+  - at least 24px exposed per overlapped card;
+  - a selected card rises at least 16px;
+  - 14px text and 44×44px controls apply literally in portrait. Portrait does not inherit the landscape phone-tier exemption.
+  - Excluded by this decision: an iPhone SE-class screen in Safari with its toolbars shown (about 375×550) is below the minimum.
+- **Keyboard:**
+  - the hand is a listbox with a roving `tabindex`;
+  - ←/→ and Home/End move focus;
+  - Space/Enter select;
+  - Shift+←/→ and Shift+Home/End reorder the focused card;
+  - a visible hint is shown while the hand has focus;
+  - Play and Pass use `aria-disabled` so their disabled reason can be reached.
+- **Dialog focus:**
+  - focus moves in on open, stays inside, and returns on close; Escape closes only the dismissible dialogs (for Leave, Escape means Stay);
+  - Round Result never focuses Next Round automatically.
+- **Contrast:**
+  - WCAG 2.2 AA everywhere, including card suits;
+  - Diamonds `#c2410c`, enabled Play `#1f7a43`, Pass `#1d5fc4`.
+- **Reduced motion:** Round Result opens already settled, and every explicit continuation is kept.
+- **Phone portrait opponents:** compact panels without the card fan or the per-seat Play trail. Tablet portrait keeps the trail.
+- **Browsers:**
+  - Playwright Chromium, plus mobile emulation, is the automated gate. Firefox and WebKit are not added to Playwright in M5.
+  - Edge, Firefox, and macOS Safari are covered by human checks.
+  - Real Android Chrome, iOS Safari, and portrait-tablet sessions are required human evidence for M5-T08.
+- **Landscape:** unchanged. The 844×390 minimum, the 896×656 full-scale threshold, the phone-tier 14px/44×44px exemption, and the 28px exposure rule all stand.
+
+**Baseline observations:** recorded in ui-ux.md §19.6.1. They describe the code before M5 and are not portrait acceptance evidence.
+
+**Remaining limitations:**
+
+- No runtime behavior has changed.
+- The vertical budget at 360×560 is an estimate that M5-T03 must confirm. If it does not fit, M5-T03 reports a contract conflict rather than relaxing a minimum.
+- Real-device availability for iOS, macOS Safari, and tablets is not yet confirmed.
 
 # M5-T02 — Responsive Layout Classification and Safe Orientation Transitions
 
