@@ -1,9 +1,9 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.13)
+## UI / UX Document (v1.14)
 
 **Status:** Phase 1 baseline plus committed Phase 2 design contracts  
-**Last Modified:** September 29, 2026  
+**Last Modified:** September 30, 2026  
 **Parent document:** `requirements.md` v1.17  
 **Committed scope:** Phase 2 M5–M8, preserving the completed Phase 1 UI
 
@@ -474,7 +474,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
 
 ### 19.6.7 Task allocation
 
-- **M5-T02:** classification and guidance (§19.6.2).
+- **M5-T02:** classification and guidance (§19.6.2), including the unsupported-layout notice's focus entry and return (§19.6.4).
 - **M5-T03:** table, opponents, controls, the Play/Pass `aria-disabled` change, and the approved colors (§§19.6.3–19.6.5).
 - **M5-T04:** hand geometry and keyboard bindings.
 - **M5-T05:** dialogs.

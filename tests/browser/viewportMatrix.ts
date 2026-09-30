@@ -11,7 +11,7 @@
  * `tests/` is the wrong direction for code that ships. This file re-exports them so every existing
  * `tests/browser/viewportMatrix` import keeps working unchanged.
  */
-export {
+import {
   FULL_SCALE_LANDSCAPE_HEIGHT_PX,
   FULL_SCALE_LANDSCAPE_WIDTH_PX,
   MINIMUM_EXPOSED_CARD_WIDTH_PX,
@@ -23,13 +23,19 @@ export {
   MINIMUM_TABLET_PORTRAIT_WIDTH_PX,
   MINIMUM_TOUCH_TARGET_SIZE_PX,
 } from '../../src/ui/primitives/layoutThresholds';
-import {
+
+export {
+  FULL_SCALE_LANDSCAPE_HEIGHT_PX,
+  FULL_SCALE_LANDSCAPE_WIDTH_PX,
+  MINIMUM_EXPOSED_CARD_WIDTH_PX,
+  MINIMUM_READABLE_TEXT_SIZE_PX,
   MINIMUM_SUPPORTED_LANDSCAPE_HEIGHT_PX,
   MINIMUM_SUPPORTED_LANDSCAPE_WIDTH_PX,
   MINIMUM_SUPPORTED_PORTRAIT_HEIGHT_PX,
   MINIMUM_SUPPORTED_PORTRAIT_WIDTH_PX,
   MINIMUM_TABLET_PORTRAIT_WIDTH_PX,
-} from '../../src/ui/primitives/layoutThresholds';
+  MINIMUM_TOUCH_TARGET_SIZE_PX,
+};
 
 /** `supported` cases are playable; `unsupported` cases show below-minimum guidance instead. */
 export type ViewportCategory = 'supported' | 'unsupported';

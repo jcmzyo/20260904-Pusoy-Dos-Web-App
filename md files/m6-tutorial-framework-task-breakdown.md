@@ -3,7 +3,7 @@
 ## Milestone Design + Task Breakdown (v1.0)
 
 **Status:** Phase 2 implementation plan based on approved scope; detailed decisions gated by the named contract tasks  
-**Last Modified:** September 29, 2026  
+**Last Modified:** October 1, 2026  
 **Milestone:** M6 --- Tutorial Framework & Scripted Scenario Infrastructure  
 **Phase:** Phase 2 --- Mobile Accessibility, Onboarding, and Player Experience Expansion  
 **Parent requirements:** requirements.md v1.17  
@@ -12,7 +12,7 @@
 **Engine design:** engine.md v1.8  
 **Orchestrator design:** orchestrator.md v1.7  
 **AI design:** ai.md v1.7  
-**UI/UX design:** ui-ux.md v1.13  
+**UI/UX design:** ui-ux.md v1.14  
 **Tutorial design:** tutorial.md v1.0  
 **Testing strategy:** testing-simulation.md v1.10
 

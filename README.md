@@ -117,7 +117,7 @@ The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 det
 - [M7 — Tutorial & Rules](md%20files/m7-tutorial-rules-task-breakdown.md)
 - [M8 — Phase 2 Acceptance](md%20files/m8-phase2-acceptance-task-breakdown.md)
 
-The viewport matrix above describes implemented Phase 1 behavior. M5-T01 must approve/freeze the portrait matrix and sizing before implementation updates that table. Existing landscape-phone sizing exemptions remain; portrait does not inherit them. Keyboard/focus and reduced motion are mandatory Phase 2 requirements. HOW_TO_PLAY.md continues to describe the current app until M7 synchronizes its instructions with delivered Tutorial/Rules navigation.
+The viewport matrix above describes implemented Phase 1 behavior. M5-T01 has frozen the portrait matrix and sizing (`md files/testing-simulation.md`, "Frozen M5 acceptance matrix"), and M5-T07 updates this table once supported portrait is delivered. Until then, the `portrait-unsupported` row and the portrait rotate-guidance sentence above are superseded: since M5-T02, 390 x 844 is classified as supported phone portrait, whose playable layout arrives in M5-T03. Existing landscape-phone sizing exemptions remain; portrait does not inherit them. Keyboard/focus and reduced motion are mandatory Phase 2 requirements. HOW_TO_PLAY.md continues to describe the current app until M7 synchronizes its instructions with delivered Tutorial/Rules navigation.
 
 Planned M7 main-menu flow: **Play → Tutorial / Basic Game choice window**, plus a separate **How to Play** entry opening the comprehensive guide. Tutorial provides guided scripted gameplay; Basic Game retains normal five-Round play. These entry points are documentation commitments, not implemented by this update.
 
