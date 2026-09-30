@@ -6,8 +6,11 @@ import {
   MINIMUM_EXPOSED_CARD_WIDTH_PX,
   MINIMUM_READABLE_TEXT_SIZE_PX,
   MINIMUM_TOUCH_TARGET_SIZE_PX,
+  SUPPORTED_LANDSCAPE_VIEWPORTS,
   VIEWPORT_MATRIX,
+  guidanceCases,
 } from './viewportMatrix';
+import type { GuidanceCase } from './viewportMatrix';
 import { currentSelectionCap, waitForSelectableTurn, waitForYourTurn } from './turnHelpers';
 
 /**
@@ -33,8 +36,9 @@ interface Size {
   readonly height: number;
 }
 
-const SUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported');
-const UNSUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category !== 'supported');
+// Landscape only: these suites assert §14's scaled landscape geometry. Supported portrait has its own
+// composition and geometry contract (ui-ux.md §19.6.3), asserted by the later M5 portrait tasks.
+const SUPPORTED_VIEWPORTS: readonly Size[] = SUPPORTED_LANDSCAPE_VIEWPORTS;
 
 // Reproducible deal (M4-P1 review finding: the required deterministic browser acceptance suite was
 // missing) for the one test below that must reliably drive a full five-Round Session to Session Summary -
@@ -744,11 +748,11 @@ test('Round Result and Session Summary stay inside the viewport with their actio
   }
 });
 
-for (const viewport of UNSUPPORTED_VIEWPORTS) {
-  test(`the unsupported-layout guidance fits its viewport without scrolling at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+function guidanceFitTest({ spec, pointer, heading }: GuidanceCase) {
+  test(`the unsupported-layout guidance fits its viewport without scrolling at ${spec.name} (${spec.width}x${spec.height}, ${pointer} pointer)`, async ({ page }) => {
+    await page.setViewportSize({ width: spec.width, height: spec.height });
     await page.goto('/');
-    await expectTargetable(page.getByRole('heading', { name: 'Resize your window to continue', exact: true }), 'guidance heading');
+    await expectTargetable(page.getByRole('heading', { name: heading, exact: true }), 'guidance heading');
     const scrolls = await page.evaluate(() => {
       const root = document.documentElement;
       return root.scrollWidth > root.clientWidth || root.scrollHeight > root.clientHeight;
@@ -756,3 +760,10 @@ for (const viewport of UNSUPPORTED_VIEWPORTS) {
     expect(scrolls, 'guidance page scrolls').toBe(false);
   });
 }
+
+for (const guidanceCase of guidanceCases('fine')) guidanceFitTest(guidanceCase);
+
+test.describe('coarse-pointer (touch) context', () => {
+  test.use({ hasTouch: true });
+  for (const guidanceCase of guidanceCases('coarse')) guidanceFitTest(guidanceCase);
+});
