@@ -18,7 +18,8 @@ import { HUMAN_PLAYER_ID } from './primitives/humanPlayer';
 import { PlayPassControls } from './primitives/PlayPassControls';
 import { RoundResultOverlay } from './primitives/RoundResultOverlay';
 import { SessionSummary } from './primitives/SessionSummary';
-import { useLayoutSupport } from './primitives/useLayoutSupport';
+import { isSupportedLayout, useLayoutSupport } from './primitives/useLayoutSupport';
+import type { SupportedLayout, UnsupportedLayout } from './primitives/useLayoutSupport';
 import styles from './App.module.css';
 
 /** How long the 4th-place reveal shows before the Round Result overlay appears, absent an earlier
@@ -67,18 +68,43 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const layout = useLayoutSupport();
+  const supported = isSupportedLayout(layout);
 
-  // Portrait/undersized layouts pause live progression the same way an open overlay does (M4-T11;
-  // ui-ux.md §14: "Portrait ... pause/prevent interaction"). This is a second, independent pause source
+  // The composition the table is laid out for (ui-ux.md §19.6.2): switches between supported portrait and
+  // landscape without remounting the table or replacing controllers, and keeps the last supported one while
+  // an unsupported notice covers the table, so nothing behind the notice is recomposed. The render-time
+  // update is React's own "adjusting state when a prop changes" pattern.
+  const [composition, setComposition] = useState<SupportedLayout>(supported ? layout : 'landscape');
+  if (supported && layout !== composition) setComposition(layout);
+
+  // The last element outside the unsupported-layout notice to receive focus, so the notice can hand focus
+  // back on recovery (ui-ux.md §19.6.4). Tracked continuously rather than read from `document.activeElement`
+  // when the notice appears: hiding the table can blur its focused element to <body> before any effect gets
+  // to look. Focus inside the notice is ignored, so the notice focusing itself (twice, under StrictMode's
+  // development effect replay) never becomes the element it later tries to restore.
+  const lastFocusedRef = useRef<Element | null>(null);
+  useEffect(() => {
+    function trackFocus(event: FocusEvent) {
+      if (!(event.target instanceof Element) || event.target.closest('[data-unsupported-layout-notice]') !== null) return;
+      lastFocusedRef.current = event.target;
+    }
+    document.addEventListener('focusin', trackFocus);
+    return () => document.removeEventListener('focusin', trackFocus);
+  }, []);
+  const getLastFocused = useCallback(() => lastFocusedRef.current, []);
+
+  // Unsupported layouts pause live progression the same way an open overlay does (M4-T11; ui-ux.md §14,
+  // §19.6.2). Keyed on `supported`, not `layout`, so a supported portrait <-> landscape switch, or a change
+  // between two kinds of unsupported guidance, neither pauses nor resumes. This is a second, independent pause source
   // from SessionTable's own overlay/Leave-confirm pausing below — both can be active together (e.g. the
   // window shrinks below the supported size while Leave confirmation is already open) — which is exactly
   // why `SessionPresentation.pause`/`resume` are reference-counted rather than a single shared flag.
   // Nothing to pause before a Session exists (Home has no progression).
   useEffect(() => {
-    if (!session || layout === 'supported') return;
+    if (!session || supported) return;
     session.pause();
     return () => session.resume();
-  }, [session, layout]);
+  }, [session, supported]);
 
   // Safety-net teardown for a true component unmount (test-reproduced defect, M4-T15 stabilization
   // round): every other exit path (`handleLeave`/`handlePlayAgain` below) already calls
@@ -182,15 +208,15 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
   if (session) {
     return (
       <>
-        {layout !== 'supported' && <UnsupportedLayoutNotice category={layout} />}
-        <div hidden={layout !== 'supported'} inert={layout !== 'supported'}>
+        {!supported && <UnsupportedLayoutNotice category={layout} getPreviousFocus={getLastFocused} />}
+        <div hidden={!supported} inert={!supported} data-layout={composition}>
           <SessionTable
             presentation={session}
             onLeave={handleLeave}
             onPlayAgain={handlePlayAgain}
             onHome={handleLeave}
             showInitialTransition
-            presentationPaused={layout !== 'supported'}
+            presentationPaused={!supported}
             {...(revealDurationMs !== undefined ? { revealDurationMs } : {})}
             {...(resultStageDelayMs !== undefined ? { resultStageDelayMs } : {})}
             {...(roundTransitionDurationMs !== undefined ? { roundTransitionDurationMs } : {})}
@@ -201,8 +227,8 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
     );
   }
 
-  if (layout !== 'supported') {
-    return <UnsupportedLayoutNotice category={layout} />;
+  if (!supported) {
+    return <UnsupportedLayoutNotice category={layout} getPreviousFocus={getLastFocused} />;
   }
 
   return (
@@ -218,13 +244,30 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
   );
 }
 
-/** Portrait/undersized-landscape guidance (M4-T11; ui-ux.md §14). `category` is never `'supported'` —
- *  callers only render this once `useLayoutSupport` has already left that case. */
-function UnsupportedLayoutNotice({ category }: { readonly category: 'portrait' | 'undersized' }) {
+const UNSUPPORTED_LAYOUT_GUIDANCE: Record<UnsupportedLayout, { readonly heading: string; readonly detail: string }> = {
+  'unsupported-rotate': { heading: 'Rotate your device to continue', detail: 'Pusoy Dos fits this screen in the other orientation.' },
+  'unsupported-resize': { heading: 'Resize your window to continue', detail: 'Make the window larger to keep playing.' },
+  'unsupported-too-small': { heading: 'This screen is too small to play', detail: 'Pusoy Dos needs a larger screen to stay playable.' },
+};
+
+/** Below-minimum guidance matching what the device can actually do (ui-ux.md §19.6.2). Takes focus when it
+ *  appears and, when the size recovers, gives it back to the previously focused element if that still
+ *  exists and is reachable (§19.6.4). Its cleanup runs after the commit that un-hides the table, so the
+ *  restored element is already focusable by then. */
+function UnsupportedLayoutNotice({ category, getPreviousFocus }: { readonly category: UnsupportedLayout; readonly getPreviousFocus: () => Element | null }) {
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  useEffect(() => {
+    const previous = getPreviousFocus();
+    headingRef.current?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected && previous.closest('[inert], [hidden]') === null) previous.focus();
+    };
+  }, [getPreviousFocus]);
+  const guidance = UNSUPPORTED_LAYOUT_GUIDANCE[category];
   return (
-    <main className={`${styles.shell} ${styles.unsupportedLayout}`}>
-      <h1>{category === 'portrait' ? 'Rotate your device to continue' : 'Resize your window to continue'}</h1>
-      <p>Pusoy Dos needs a wider landscape view to stay playable.</p>
+    <main className={`${styles.shell} ${styles.unsupportedLayout}`} data-unsupported-layout-notice>
+      <h1 ref={headingRef} tabIndex={-1}>{guidance.heading}</h1>
+      <p>{guidance.detail}</p>
     </main>
   );
 }

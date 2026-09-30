@@ -3,11 +3,11 @@
 ## Tutorial Framework and Content Contract (v1.0)
 
 **Status:** Approved Phase 2 scope; detailed scenario/API/content decisions gated by M6-T01 and M7-T01  
-**Last Modified:** September 29, 2026  
+**Last Modified:** October 1, 2026  
 **Parent document:** requirements.md v1.17  
 **Shared model:** domain-model.md v1.4  
 **Engine / Orchestrator:** engine.md v1.8 / orchestrator.md v1.7  
-**Presentation / QA:** ui-ux.md v1.13 / testing-simulation.md v1.10  
+**Presentation / QA:** ui-ux.md v1.14 / testing-simulation.md v1.10  
 **Milestones:** M6 framework; M7 authored tutorial/reference; M8 integrated acceptance
 
 # 1. Purpose and Authority

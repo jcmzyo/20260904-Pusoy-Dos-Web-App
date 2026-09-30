@@ -384,6 +384,8 @@ Report blockers with the relevant document sections and concrete options.
 
 Completion Report must be present after explicit task implementation/ code review with all the indicated format. If not applicable, write "N/A".
 
+If additional changes were requested, create the completion report as a whole, not just the items for the additional changes. Include all the details done for this task and the additional changes.
+
 For implementation tasks report:
 
 ### Task
@@ -413,6 +415,10 @@ Created/modified files.
 ### Issues / Conflicts
 
 Issues or `None`.
+
+### Manual Items to Check
+
+Tasks to be checked by the person manually, or `None`.
 
 ### Pre-existing Changes
 

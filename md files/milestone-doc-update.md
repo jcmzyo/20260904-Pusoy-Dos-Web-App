@@ -1,6 +1,6 @@
 # Pusoy Dos --- September 11, 2026 Milestone Documentation Update
 
-**Last Modified:** September 29, 2026
+**Last Modified:** October 1, 2026
 **Purpose:** Record the documentation changes made after approval of the M2 Baseline AI algorithm and M3/M4 milestone planning decisions.
 
 ## New milestone documents
@@ -112,3 +112,13 @@ No canonical Pusoy Dos house rule was changed.
   - added an explicit focus-indicator assertion (outline at least 2px, contrast at least 3:1);
   - added this log entry.
 - The landscape contract, requirements, rules, dependencies, and runtime code are unchanged. No portrait behavior is implemented yet.
+
+## September 30 – October 1, 2026 — M5-T02 portrait spare-height rule and review follow-up
+
+- User approved (September 30, M5-T02 review) a portrait layout rule for M5-T03: the table and opponent area stays at its natural height and is never stretched; spare height goes to the bottom controls section, not the table center.
+- UI/UX v1.14, from v1.13 (September 30, 2026):
+  - §19.6.3 adds the "Spare vertical height" bullet;
+  - §19.6.7 records that M5-T02 also delivered the unsupported-layout notice's focus entry and return (§19.6.4).
+- The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.14 (October 1, 2026).
+- README notes that its `portrait-unsupported` row is superseded since M5-T02 and that the table itself is updated in M5-T07.
+- No other contract, requirement, rule, or dependency changed.
