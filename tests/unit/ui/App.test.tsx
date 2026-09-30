@@ -180,36 +180,53 @@ describe('Home and immediate Session startup', () => {
   });
 });
 
-describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
-  it('replaces Home with rotate guidance in a portrait viewport on a touch device, and with resize guidance in an undersized landscape viewport', () => {
+describe('Unsupported-layout guidance (M4-T11; ui-ux.md §14, §19.6.2)', () => {
+  it('on a touch device, replaces Home with rotate guidance only when the other orientation fits, and with too-small guidance otherwise', () => {
     mockCoarsePointer(); // a phone/tablet - the only kind of device that can actually be rotated
     render(<App />);
     expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
 
-    // Portrait: matches the T04 matrix's own `portrait-unsupported` entry (390x844).
-    act(() => resizeWindowTo(390, 844));
-    expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
+    // `small-phone-landscape` (667x375): 375x667 would be supported portrait.
+    act(() => resizeWindowTo(667, 375));
+    expect(screen.getByRole('heading', { name: 'Rotate your device to continue' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
 
     // Back to a supported size restores Home.
     act(() => resizeWindowTo(1024, 768));
     expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
 
-    // Undersized landscape: matches the T04 matrix's own `undersized-landscape` entry (560x320).
+    // `undersized-landscape` (560x320): supported in neither orientation.
     act(() => resizeWindowTo(560, 320));
-    expect(screen.getByText(/resize/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'This screen is too small to play' })).toBeTruthy();
+    expect(screen.queryByText('Rotate your device to continue')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+
+    // `portrait-small-phone` (320x568).
+    act(() => resizeWindowTo(320, 568));
+    expect(screen.getByRole('heading', { name: 'This screen is too small to play' })).toBeTruthy();
+
+    // `portrait-phone-390` (390x844, formerly M4's rejected portrait) is supported portrait now.
+    act(() => resizeWindowTo(390, 844));
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: /continue|too small/ })).toBeNull();
   });
 
-  it('shows resize guidance, not rotate, for a portrait-shaped window on a fine-pointer (mouse/trackpad) desktop device (M4-T11 follow-up)', () => {
+  it('on a fine-pointer (mouse/trackpad) device, supports a portrait-shaped window at or above 360x560 and otherwise asks to resize, never to rotate', () => {
     // No mockCoarsePointer() here: jsdom's default (no matchMedia at all) is already treated as a
     // fine-pointer/desktop device - the person cannot physically rotate a desktop monitor, so asking
     // them to would be an impossible instruction.
     render(<App />);
-    act(() => resizeWindowTo(390, 844)); // same portrait-shaped dimensions as the touch-device test above
-    expect(screen.getByText('Resize your window to continue')).toBeTruthy();
-    expect(screen.queryByText('Rotate your device to continue')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+    act(() => resizeWindowTo(390, 844));
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+    act(() => resizeWindowTo(360, 560));
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+
+    for (const [width, height] of [[359, 560], [360, 559], [667, 375]] as const) {
+      act(() => resizeWindowTo(width, height));
+      expect(screen.getByRole('heading', { name: 'Resize your window to continue' })).toBeTruthy();
+      expect(screen.queryByText('Rotate your device to continue')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Start Game' })).toBeNull();
+    }
   });
 
   it('preserves a live Session across an unsupported-layout interruption and shows it again once supported', async () => {
@@ -220,7 +237,7 @@ describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
     expect(await screen.findByRole('region', { name: 'Game Table' })).toBeTruthy();
     expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
 
-    act(() => resizeWindowTo(390, 844));
+    act(() => resizeWindowTo(667, 375));
     expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
 
@@ -261,7 +278,7 @@ describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
     expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
 
-    act(() => resizeWindowTo(390, 844));
+    act(() => resizeWindowTo(667, 375));
     expect(screen.getByText('Rotate your device to continue')).toBeTruthy();
     // Nothing of the table (including the open Event Log) is reachable behind the notice, and Escape
     // does not close an overlay the person cannot currently see.
@@ -337,7 +354,7 @@ describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
     const pauseCallsBeforeResize = pauseSpy.mock.calls.length;
     const resumeCallsBeforeResize = resumeSpy.mock.calls.length;
 
-    act(() => resizeWindowTo(390, 844));
+    act(() => resizeWindowTo(667, 375));
     expect(pauseSpy.mock.calls.length).toBeGreaterThan(pauseCallsBeforeResize);
 
     act(() => resizeWindowTo(1024, 768));
@@ -350,9 +367,173 @@ describe('Portrait/undersized layout guidance (M4-T11; ui-ux.md §14)', () => {
   it('does not pause anything on Home, where there is no Session yet', () => {
     const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
     render(<App />);
-    act(() => resizeWindowTo(390, 844));
+    act(() => resizeWindowTo(359, 560));
     expect(pauseSpy).not.toHaveBeenCalled();
     pauseSpy.mockRestore();
+  });
+});
+
+describe('Supported orientation transitions (M5-T02; ui-ux.md §19.6.2)', () => {
+  /** A dealt, started Round with a non-default hand arrangement and one selected card. */
+  async function startArrangedSession() {
+    let seed = 26;
+    const engineRng = { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } };
+    render(<App start={(configuration) => startSession(configuration, { engineRng })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    const table = await screen.findByRole('region', { name: 'Game Table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sort Suit' }));
+    fireEvent.click(document.querySelectorAll('[data-card-key]')[2]!);
+    return table;
+  }
+  const handKeys = () => Array.from(document.querySelectorAll('[data-card-key]')).map((slot) => slot.getAttribute('data-card-key'));
+  const selectedKeys = () => Array.from(document.querySelectorAll('[data-card-key][data-selected="true"]')).map((slot) => slot.getAttribute('data-card-key'));
+  const composition = () => document.querySelector('[data-layout]')!.getAttribute('data-layout');
+
+  it('switches composition between landscape, phone portrait, and tablet portrait without remounting the table or touching pause', async () => {
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    const resumeSpy = vi.spyOn(SessionPresentation.prototype, 'resume');
+    try {
+      const table = await startArrangedSession();
+      const arranged = handKeys();
+      const selection = selectedKeys();
+      expect(selection).toHaveLength(1);
+      expect(composition()).toBe('landscape');
+      fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+      expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+      const pauses = pauseSpy.mock.calls.length;
+      const resumes = resumeSpy.mock.calls.length;
+
+      for (const [width, height, expected] of [[390, 844, 'portrait-phone'], [768, 1024, 'portrait-tablet'], [700, 700, 'portrait-tablet'], [844, 390, 'landscape'], [360, 560, 'portrait-phone']] as const) {
+        act(() => resizeWindowTo(width, height));
+        expect(composition()).toBe(expected);
+        // The very same table element: nothing was remounted, so no presentation state was rebuilt.
+        expect(screen.getByRole('region', { name: 'Game Table' })).toBe(table);
+        // Inert only because the Event Log is open, never hidden behind a notice.
+        expect(table.closest('[hidden]')).toBeNull();
+        expect(handKeys()).toEqual(arranged);
+        expect(selectedKeys()).toEqual(selection);
+        expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+        expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull();
+      }
+      // Supported <-> supported never pauses or resumes anything.
+      expect(pauseSpy.mock.calls.length).toBe(pauses);
+      expect(resumeSpy.mock.calls.length).toBe(resumes);
+    } finally {
+      pauseSpy.mockRestore();
+      resumeSpy.mockRestore();
+    }
+  });
+
+  it('keeps the last supported composition behind an unsupported notice, and changing guidance kind does not re-pause', async () => {
+    mockCoarsePointer();
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    const resumeSpy = vi.spyOn(SessionPresentation.prototype, 'resume');
+    try {
+      await startArrangedSession();
+      act(() => resizeWindowTo(390, 844));
+      expect(composition()).toBe('portrait-phone');
+      const pauses = pauseSpy.mock.calls.length;
+      const resumes = resumeSpy.mock.calls.length;
+
+      act(() => resizeWindowTo(667, 375)); // rotate guidance
+      expect(screen.getByRole('heading', { name: 'Rotate your device to continue' })).toBeTruthy();
+      act(() => resizeWindowTo(560, 320)); // too-small guidance
+      expect(screen.getByRole('heading', { name: 'This screen is too small to play' })).toBeTruthy();
+      expect(composition()).toBe('portrait-phone');
+      expect(pauseSpy.mock.calls.length).toBe(pauses + 1);
+      expect(resumeSpy.mock.calls.length).toBe(resumes);
+
+      act(() => resizeWindowTo(1024, 768));
+      expect(composition()).toBe('landscape');
+      expect(resumeSpy.mock.calls.length).toBe(resumes + 1);
+    } finally {
+      pauseSpy.mockRestore();
+      resumeSpy.mockRestore();
+    }
+  });
+});
+
+describe('Unsupported-layout pause composition (M5-T02; ui-ux.md §19.6.2, orchestrator.md Phase 2)', () => {
+  it('recovering the size neither closes an open overlay nor releases its pause; closing it afterwards does', async () => {
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    try {
+      const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+      render(<App start={start} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+      await screen.findByRole('region', { name: 'Game Table' });
+      fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+      // The Round-start transition's own pause is the first call; its `this` is the live Session.
+      const presentation = pauseSpy.mock.contexts[0] as SessionPresentation;
+      expect(presentation.isPaused()).toBe(false);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+      expect(presentation.isPaused()).toBe(true);
+      act(() => resizeWindowTo(560, 320));
+      expect(presentation.isPaused()).toBe(true);
+      act(() => resizeWindowTo(390, 844));
+      expect(screen.getByRole('dialog', { name: 'Event Log' })).toBeTruthy();
+      expect(presentation.isPaused()).toBe(true);
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByRole('dialog', { name: 'Event Log' })).toBeNull();
+      expect(presentation.isPaused()).toBe(false);
+    } finally {
+      pauseSpy.mockRestore();
+    }
+  });
+
+  it('closing an overlay while the layout is unsupported does not release the layout pause', async () => {
+    const pauseSpy = vi.spyOn(SessionPresentation.prototype, 'pause');
+    try {
+      const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+      render(<App start={start} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+      await screen.findByRole('region', { name: 'Game Table' });
+      fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+      const presentation = pauseSpy.mock.contexts[0] as SessionPresentation;
+      fireEvent.click(screen.getByRole('button', { name: 'Event Log' }));
+      act(() => resizeWindowTo(560, 320));
+      // Close the (hidden) overlay through its own control, as a still-mounted overlay could be closed.
+      fireEvent.click(screen.getByRole('button', { name: 'Close Event Log', hidden: true }));
+      expect(screen.queryByRole('dialog', { name: 'Event Log', hidden: true })).toBeNull();
+      expect(presentation.isPaused()).toBe(true);
+      act(() => resizeWindowTo(1024, 768));
+      expect(presentation.isPaused()).toBe(false);
+    } finally {
+      pauseSpy.mockRestore();
+    }
+  });
+});
+
+describe('Unsupported-layout notice focus (M5-T02; ui-ux.md §19.6.4)', () => {
+  it('takes focus when it appears and returns it to the previously focused control on recovery (under StrictMode, as main.tsx renders)', async () => {
+    const start = vi.fn((configuration) => startSession(configuration, { engineRng: { next: () => 0 } }));
+    render(<StrictMode><App start={start} /></StrictMode>);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+    await screen.findByRole('region', { name: 'Game Table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Starting Round 1' }));
+    const sortRank = screen.getByRole('button', { name: 'Sort Rank' });
+    act(() => sortRank.focus());
+    expect(document.activeElement).toBe(sortRank);
+
+    act(() => resizeWindowTo(359, 560));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Resize your window to continue' }));
+
+    act(() => resizeWindowTo(390, 844));
+    expect(document.activeElement).toBe(sortRank);
+  });
+
+  it('takes focus on Home too, and leaves focus alone on recovery when the previous element no longer exists', () => {
+    render(<App />);
+    act(() => resizeWindowTo(359, 560));
+    const heading = screen.getByRole('heading', { name: 'Resize your window to continue' });
+    expect(document.activeElement).toBe(heading);
+    act(() => resizeWindowTo(1024, 768));
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy();
+    expect(heading.isConnected).toBe(false);
+    expect(document.activeElement).toBe(document.body);
   });
 });
 

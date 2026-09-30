@@ -63,6 +63,8 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const dragStateRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
+  /** A drag cancelled by a resize (below) while its pointer is still down; see `handlePointerUp`. */
+  const layoutCancelledDragRef = useRef<{ readonly key: string; readonly pointerId: number; readonly dragged: boolean } | null>(null);
 
   // Reconciles display order/selection against the authoritative card set. `cards` is a fresh array
   // every SessionPresentation snapshot even when its contents are unchanged (bot Turns re-render the
@@ -125,6 +127,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
 
   function handlePointerDown(key: string, event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
+    layoutCancelledDragRef.current = null;
     const cardEl = cardRefs.current.get(key);
     const containerEl = handRef.current;
     if (!cardEl || !containerEl) return;
@@ -180,6 +183,39 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     releaseDrag(state, event.pointerId);
   }
 
+  // A resize or orientation change during an active drag cancels it exactly like `pointercancel`: nothing
+  // is dropped and the order is unchanged (ui-ux.md §19.6.2). The rects captured at pointerdown no longer
+  // describe the re-laid-out hand, so continuing the drag would drop against stale geometry.
+  useEffect(() => {
+    if (dragKey === null) return;
+    function cancelForLayoutChange() {
+      const state = dragStateRef.current;
+      if (!state) return;
+      layoutCancelledDragRef.current = { key: state.key, pointerId: state.pointerId, dragged: state.dragged };
+      releaseDrag(state, state.pointerId);
+    }
+    window.addEventListener('resize', cancelForLayoutChange);
+    window.addEventListener('orientationchange', cancelForLayoutChange);
+    return () => {
+      window.removeEventListener('resize', cancelForLayoutChange);
+      window.removeEventListener('orientationchange', cancelForLayoutChange);
+    };
+  }, [dragKey]);
+
+  /** Unlike a real `pointercancel`, a layout-cancelled gesture still has its pointer down, so its release
+   *  can produce a click. When that gesture had already become a drag and is released on its own card (the
+   *  only case where the click lands on that card), the click is swallowed so the cancelled drag does not
+   *  turn into a selection toggle. */
+  function handlePointerUp(key: string, event: ReactPointerEvent<HTMLDivElement>) {
+    const cancelled = layoutCancelledDragRef.current;
+    if (cancelled && cancelled.pointerId === event.pointerId) {
+      layoutCancelledDragRef.current = null;
+      if (cancelled.dragged && cancelled.key === key) suppressClickRef.current = true;
+      return;
+    }
+    endDrag(event);
+  }
+
   function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
     if (!state || event.pointerId !== state.pointerId) return;
@@ -209,7 +245,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
               data-selected={isSelected}
               onPointerDown={(event) => handlePointerDown(key, event)}
               onPointerMove={handlePointerMove}
-              onPointerUp={endDrag}
+              onPointerUp={(event) => handlePointerUp(key, event)}
               onPointerCancel={cancelDrag}
               onClick={() => toggleSelected(key)}
             >

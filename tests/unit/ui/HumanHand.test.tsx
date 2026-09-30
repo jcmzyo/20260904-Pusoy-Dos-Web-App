@@ -185,6 +185,69 @@ describe('Drag reorder does not affect selection (M4-T07)', () => {
   });
 });
 
+describe('A resize or orientation change during a drag cancels it (M5-T02; ui-ux.md §19.6.2)', () => {
+  it.each(['resize', 'orientationchange'])('%s mid-drag drops nothing, keeps the order, and the release neither reorders nor selects', (eventType) => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const orderBefore = orderedKeys();
+    const dragged = slotOf('3', 'Clubs');
+    fireEvent.pointerDown(dragged, { pointerId: 20, clientX: 100, button: 0 });
+    fireEvent.pointerMove(dragged, { pointerId: 20, clientX: 400 });
+    expect(dragged.style.transform).not.toBe('');
+
+    fireEvent(window, new Event(eventType));
+    expect(dragged.style.transform).toBe('');
+    expect(dragged.className).not.toContain('dragging');
+
+    // The pointer is still down: further movement and the release are ignored, and the click the release
+    // produces on the same card does not turn the cancelled drag into a selection.
+    fireEvent.pointerMove(dragged, { pointerId: 20, clientX: 500 });
+    expect(dragged.style.transform).toBe('');
+    fireEvent.pointerUp(dragged, { pointerId: 20, clientX: 500 });
+    fireEvent.click(dragged);
+    expect(orderedKeys()).toEqual(orderBefore);
+    expect(dragged.dataset.selected).toBe('false');
+
+    // Nothing extra is swallowed afterwards.
+    fireEvent.click(dragged);
+    expect(dragged.dataset.selected).toBe('true');
+  });
+
+  it('a layout-cancelled press that never became a drag still releases as an ordinary tap', () => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const target = slotOf('A', 'Spades');
+    fireEvent.pointerDown(target, { pointerId: 21, clientX: 100, button: 0 });
+    fireEvent(window, new Event('resize'));
+    fireEvent.pointerUp(target, { pointerId: 21, clientX: 100 });
+    fireEvent.click(target);
+    expect(target.dataset.selected).toBe('true');
+  });
+
+  it('a layout-cancelled drag released over a different card swallows nothing there', () => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const orderBefore = orderedKeys();
+    const dragged = slotOf('3', 'Clubs');
+    const other = slotOf('7', 'Clubs');
+    fireEvent.pointerDown(dragged, { pointerId: 22, clientX: 100, button: 0 });
+    fireEvent.pointerMove(dragged, { pointerId: 22, clientX: 400 });
+    fireEvent(window, new Event('resize'));
+    // Released over another card: a browser sends no click to either card for that gesture.
+    fireEvent.pointerUp(other, { pointerId: 22, clientX: 400 });
+    expect(orderedKeys()).toEqual(orderBefore);
+    fireEvent.click(other);
+    expect(other.dataset.selected).toBe('true');
+  });
+
+  it('a resize with no drag in progress changes nothing', () => {
+    render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
+    const orderBefore = orderedKeys();
+    fireEvent(window, new Event('resize'));
+    const target = slotOf('2', 'Hearts');
+    fireEvent.click(target);
+    expect(target.dataset.selected).toBe('true');
+    expect(orderedKeys()).toEqual(orderBefore);
+  });
+});
+
 describe('Drag under a scaled play area (M4-T14)', () => {
   /** jsdom performs no layout: give the dragged slot a layout width (`offsetWidth`, unaffected by
    *  transforms) and a rendered rect (`getBoundingClientRect`, affected by the play area's own scale)

@@ -1,23 +1,21 @@
 import { expect, test } from '@playwright/test';
-import { VIEWPORT_MATRIX } from './viewportMatrix';
+import {
+  SUPPORTED_LANDSCAPE_VIEWPORTS,
+  SUPPORTED_PORTRAIT_VIEWPORTS,
+  VIEWPORT_MATRIX,
+  findViewport,
+  guidanceCases,
+} from './viewportMatrix';
+import type { GuidanceCase, ViewportSpec } from './viewportMatrix';
 
-// The visible heading at load depends on the viewport's own category (M4-T11; ui-ux.md §14): "supported"
-// shows the ordinary Home screen, while the two unsupported categories now correctly show rotate/resize
-// guidance instead - before M4-T11 implemented that guidance, every category rendered the same Home
-// screen, which is what this per-category expectation replaces. This loop runs in the default
-// (non-touch, fine-pointer) Playwright context - i.e. an ordinary desktop browser resized small - so
-// the portrait-shaped entry's own expectation is resize guidance too (M4-T11 follow-up: a desktop
-// monitor cannot be physically rotated); the touch-context rotate-guidance path has its own dedicated
-// tests below.
-const EXPECTED_HEADING: Record<(typeof VIEWPORT_MATRIX)[number]['category'], string> = {
-  supported: 'Pusoy Dos',
-  'unsupported-portrait': 'Resize your window to continue',
-  'unsupported-undersized': 'Resize your window to continue',
-};
-
-for (const viewport of VIEWPORT_MATRIX) {
-  test(`app loads without error at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+// The visible heading at load depends on the frozen matrix case (ui-ux.md §14, §19.6.2): every supported
+// case - landscape and, since M5-T02, portrait - shows the ordinary Home screen whatever the pointer type,
+// and every unsupported case shows the guidance its pointer type can follow. The default Playwright context
+// is a fine-pointer desktop browser; the touch (coarse-pointer) cases run in their own `hasTouch` group
+// below (`hasTouch: true` is what flips the CSS `pointer: coarse` media feature Chromium reports).
+function loadTest(spec: ViewportSpec, pointer: string, heading: string) {
+  test(`app loads without error at ${spec.name} (${spec.width}x${spec.height}, ${pointer} pointer)`, async ({ page }) => {
+    await page.setViewportSize({ width: spec.width, height: spec.height });
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
@@ -26,21 +24,64 @@ for (const viewport of VIEWPORT_MATRIX) {
     const response = await page.goto('/');
     expect(response?.ok()).toBe(true);
     await expect(page).toHaveTitle('Pusoy Dos');
-    await expect(page.getByRole('heading', { name: EXPECTED_HEADING[viewport.category], exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 }
 
-// Pixel-level overlap/clipping/fit verification across this matrix lives in
-// `responsive-hardening.e2e.ts` (M4-T14, Full Responsive Hardening). This check only confirms the
-// M4-T06 table hierarchy's core elements (all four seats and the Discard Pile button) are actually
-// visible, not just present, at every supported viewport.
-for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
+function guidanceTest({ spec, pointer, heading }: GuidanceCase) {
+  test(`${spec.name} (${spec.width}x${spec.height}, ${pointer} pointer) shows "${heading}" instead of gameplay`, async ({ page }) => {
+    await page.setViewportSize({ width: spec.width, height: spec.height });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    // Exactly one kind of guidance, and no way into gameplay.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Start Game' })).toHaveCount(0);
+  });
+}
+
+for (const spec of VIEWPORT_MATRIX) {
+  if (spec.category === 'supported') loadTest(spec, 'fine', 'Pusoy Dos');
+}
+for (const guidanceCase of guidanceCases('fine')) {
+  loadTest(guidanceCase.spec, 'fine', guidanceCase.heading);
+  guidanceTest(guidanceCase);
+}
+
+test.describe('touch-capable (phone/tablet, coarse-pointer) context', () => {
+  test.use({ hasTouch: true });
+
+  test('the touch context really reports a coarse primary pointer', async ({ page }) => {
+    await page.goto('/');
+    expect(await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)).toBe(true);
+  });
+
+  for (const spec of VIEWPORT_MATRIX) {
+    if (spec.category === 'supported' && spec.pointers.includes('coarse')) loadTest(spec, 'coarse', 'Pusoy Dos');
+  }
+  for (const guidanceCase of guidanceCases('coarse')) guidanceTest(guidanceCase);
+});
+
+test('the default desktop context really reports a fine primary pointer', async ({ page }) => {
+  await page.goto('/');
+  expect(await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches)).toBe(false);
+});
+
+// Pixel-level overlap/clipping/fit verification of the landscape table lives in
+// `responsive-hardening.e2e.ts` (M4-T14). This check only confirms a Session can be started and the table
+// hierarchy's core elements (all four seats and the Discard Pile button) are actually visible, not just
+// present, at every supported viewport - including supported portrait, where the composition the table
+// uses is reported on its wrapper (`data-layout`, ui-ux.md §19.6.2).
+for (const viewport of [...SUPPORTED_LANDSCAPE_VIEWPORTS, ...SUPPORTED_PORTRAIT_VIEWPORTS]) {
   test(`Game Table core elements are visible at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
     await page.getByRole('button', { name: 'Start Game', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
+    await expect(page.locator('[data-layout]')).toHaveAttribute(
+      'data-layout',
+      viewport.orientation === 'landscape' ? 'landscape' : `portrait-${viewport.portraitClass}`,
+    );
     await expect(page.getByRole('region', { name: 'You panel' })).toBeVisible();
     await expect(page.getByRole('region', { name: /^(West|North|East) panel$/ })).toHaveCount(3);
     for (const name of ['West', 'North', 'East']) {
@@ -53,8 +94,9 @@ for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'sup
 // Regression for a reported UI bug: West/East bot hands previously overlapped horizontally and
 // spilled past the table's left/right border at narrower supported viewports. Cards now stack
 // lengthwise (vertically) on the outer edge with player details toward center (ui-ux.md §5), so
-// this verifies the card stack's own layout box stays within the table's horizontal bounds.
-for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported')) {
+// this verifies the card stack's own layout box stays within the table's horizontal bounds. Landscape
+// only: phone portrait drops the card fan entirely (ui-ux.md §19.6.3, M5-T03).
+for (const viewport of SUPPORTED_LANDSCAPE_VIEWPORTS) {
   test(`West/East card stacks stay within the table border at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
@@ -73,76 +115,19 @@ for (const viewport of VIEWPORT_MATRIX.filter((entry) => entry.category === 'sup
   });
 }
 
-// Rotate/resize guidance (M4-T11: Leave Confirmation and Unsupported-Layout Pause).
-test(
-  'undersized landscape viewport shows resize guidance instead of gameplay (M4-T11)',
-  async ({ page }) => {
-    const spec = VIEWPORT_MATRIX.find((entry) => entry.category === 'unsupported-undersized');
-    if (!spec) throw new Error('Viewport matrix is missing its undersized-landscape entry.');
-    await page.setViewportSize({ width: spec.width, height: spec.height });
-    await page.goto('/');
-    await expect(page.getByText(/resize/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Start Game' })).not.toBeVisible();
-  },
-);
-
-// A portrait-shaped viewport in the default (non-touch, fine-pointer) context - an ordinary desktop
-// browser window resized small - gets the same resize guidance rather than an impossible "rotate your
-// device" instruction, since nobody can physically rotate a desktop monitor (M4-T11 follow-up).
-test(
-  'a portrait-shaped desktop browser window shows resize guidance, not rotate, since it cannot be physically rotated (M4-T11 follow-up)',
-  async ({ page }) => {
-    const spec = VIEWPORT_MATRIX.find((entry) => entry.category === 'unsupported-portrait');
-    if (!spec) throw new Error('Viewport matrix is missing its portrait-unsupported entry.');
-    await page.setViewportSize({ width: spec.width, height: spec.height });
-    await page.goto('/');
-    await expect(page.getByText('Resize your window to continue')).toBeVisible();
-    await expect(page.getByText('Rotate your device to continue')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Start Game' })).not.toBeVisible();
-  },
-);
-
-// The rotate-guidance path only applies to a touch/coarse-pointer context - an actual phone or tablet,
-// the only kind of device someone can physically rotate (M4-T11 follow-up). `hasTouch: true` is what
-// flips the CSS `pointer: coarse` media feature Chromium reports, mirroring a real touch device.
-test.describe('touch-capable (phone/tablet) context', () => {
-  test.use({ hasTouch: true });
-
-  test(
-    'portrait viewport shows rotate guidance instead of gameplay (M4-T11)',
-    async ({ page }) => {
-      const spec = VIEWPORT_MATRIX.find((entry) => entry.category === 'unsupported-portrait');
-      if (!spec) throw new Error('Viewport matrix is missing its portrait-unsupported entry.');
-      await page.setViewportSize({ width: spec.width, height: spec.height });
-      await page.goto('/');
-      await expect(page.getByText('Rotate your device to continue')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Start Game' })).not.toBeVisible();
-    },
-  );
-
-  // Returning to a supported viewport mid-Session restores the same Session rather than losing it
-  // (M4-T11; ui-ux.md §14: "returning to landscape restores coherent state").
-  test(
-    'returning from a portrait viewport to a supported one resumes the same live Session',
-    async ({ page }) => {
-      const supported = VIEWPORT_MATRIX.find((entry) => entry.name === 'large-phone-landscape');
-      const portrait = VIEWPORT_MATRIX.find((entry) => entry.category === 'unsupported-portrait');
-      if (!supported || !portrait) throw new Error('Viewport matrix is missing a required entry.');
-      await page.setViewportSize({ width: supported.width, height: supported.height });
-      await page.goto('/');
-      await page.getByRole('button', { name: 'Start Game', exact: true }).click();
-      await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
-      await expect(page.getByText('Basic · Round 1 of 5')).toBeVisible();
-
-      await page.setViewportSize({ width: portrait.width, height: portrait.height });
-      await expect(page.getByText('Rotate your device to continue')).toBeVisible();
-      await expect(page.getByRole('region', { name: 'Game Table' })).not.toBeVisible();
-
-      await page.setViewportSize({ width: supported.width, height: supported.height });
-      await expect(page.getByRole('region', { name: 'Game Table' })).toBeVisible();
-      await expect(page.getByText('Basic · Round 1 of 5')).toBeVisible();
-    },
-  );
+// A portrait-shaped desktop window at or above 360x560 is supported portrait, not "resize" (ui-ux.md
+// §19.6.2 supersedes M4's all-portrait rejection); below the minimum it still gets resize guidance and is
+// never told to rotate.
+test('a portrait-shaped desktop window is playable at or above the portrait minimum and told to resize below it', async ({ page }) => {
+  const supported = findViewport('portrait-phone-390');
+  const below = findViewport('portrait-below-min-width');
+  await page.setViewportSize({ width: supported.width, height: supported.height });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Start Game', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: below.width, height: below.height });
+  await expect(page.getByRole('heading', { name: 'Resize your window to continue', exact: true })).toBeVisible();
+  await expect(page.getByText('Rotate your device to continue')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start Game' })).toHaveCount(0);
 });
 
 // Leave Game confirmation (M4-T11; ui-ux.md §10): cancelling keeps the Session, confirming returns to

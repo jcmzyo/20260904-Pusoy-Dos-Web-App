@@ -393,6 +393,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
   - Sort about 44px,
   - utility row about 44px,
   - plus gaps: about 520px in total.
+- **Spare vertical height (approved by the user on September 30, 2026, during M5-T02 review):** in every supported portrait layout, the table and opponent area stays at its natural height at the top and is never stretched to fill a tall viewport. Any spare height goes to the bottom controls section (hand, Play/Pass, Sort, and the utility row), never to empty space in the table center.
 - **Overflow:**
   - The gameplay screen has no page scroll, vertical or horizontal, at any supported portrait or landscape size.
   - A dialog panel is at most the viewport height minus 16px. Only the dialog body scrolls; the title, the close button, and action buttons such as Next Round, Home, Play Again, Stay, and Leave stay visible. Body scroll stays locked.
