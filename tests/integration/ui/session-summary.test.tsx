@@ -46,6 +46,9 @@ function buildAutomaticSession(seed: number): StartedSession {
   };
 }
 
+/** Upper bound for a test that drives a whole five-Round Session (reasoning in the first test below). */
+const FULL_SESSION_TIMEOUT_MS = 90000;
+
 /** Drives the mounted `<App>` through every screen between a live Round and the next: the (near-instant,
  *  `revealDurationMs`/`resultStageDelayMs`/`roundTransitionDurationMs` all `0`) 4th-place reveal, Round
  *  Result overlay, and round-start transition all resolve on their own. Rounds 1-4 still require an
@@ -62,7 +65,9 @@ async function clickThroughRoundResult(): Promise<'more' | 'done'> {
     const summary = screen.queryByRole('dialog', { name: 'Session Summary' });
     if (summary) return { kind: 'done' as const };
     throw new Error('Neither the Next Round button nor Session Summary has appeared yet.');
-  }, { timeout: 10000 });
+    // As long as the calling test's own timeout (M5-T03 review): a per-Round limit tighter than the test's
+    // made one slow Round under CPU contention fail the test even with whole-test headroom left.
+  }, { timeout: FULL_SESSION_TIMEOUT_MS });
   if (outcome.kind === 'more') {
     await act(async () => { fireEvent.click(outcome.button); });
     return 'more';
@@ -83,7 +88,12 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     // directly: under six CPU-saturating background processes on this two-core sandbox (a synthetic load
     // well beyond anything a real full-suite run creates, since that run itself only ever spawns about
     // one worker per core), this exact test still completed - deterministically, never hung - in ~35s;
-    // 45000ms keeps meaningful headroom above that measured worst case without masking a genuine hang.
+    // 45000ms kept meaningful headroom above that measured worst case without masking a genuine hang.
+    // FULL_SESSION_TIMEOUT_MS (90000ms, M5-T03 review): full-suite runs on the reviewer's machine still
+    // failed these tests intermittently, and a re-measurement under four CPU-saturating processes on a
+    // two-core sandbox put each full-Session test at ~28-29s with Rounds averaging ~5.6s, so a single slow
+    // Round could also exceed the former 10000ms per-Round wait. Both limits now share this one bound.
+    // The hang protection is unchanged in kind: a Session that genuinely stops still fails, just later.
     const start = vi.fn()
       .mockImplementationOnce(() => buildAutomaticSession(5))
       .mockImplementationOnce(() => buildAutomaticSession(11));
@@ -117,7 +127,7 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     expect(screen.getByText('Basic · Round 1 of 5')).toBeTruthy();
     expect(screen.queryByRole('dialog', { name: 'Session Summary' })).toBeNull();
     expect(start).toHaveBeenCalledTimes(2);
-  }, 45000);
+  }, FULL_SESSION_TIMEOUT_MS);
 
   it('Home returns Session Summary to the Home screen, abandoning the finished Session', async () => {
     const start = vi.fn(() => buildAutomaticSession(5));
@@ -141,5 +151,5 @@ describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md 
     expect(screen.queryByRole('dialog', { name: 'Session Summary' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Game Table' })).toBeNull();
     expect(start).toHaveBeenCalledOnce();
-  }, 45000);
+  }, FULL_SESSION_TIMEOUT_MS);
 });

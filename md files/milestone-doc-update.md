@@ -132,5 +132,5 @@ No canonical Pusoy Dos house rule was changed.
   - **Card width:** held and center cards keep the 56px floor, take at most 14.5vw, and are capped at 88px on touch devices and 72px in a fine-pointer (desktop) window.
 - UI/UX v1.15, from v1.14 (October 2, 2026): §19.6.3 records the above, plus the compact panel's separate "deciding" row, the fixed Pass/Play, Sort, and utility-button sizes, and room for the human panel's glow; §19.6.4 records the portrait Tab order.
 - The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.15.
-- Deferred findings recorded in the M5 breakdown: the portrait Session Summary's Round-by-Round table (M5-T06) and the clipped focus outline in the Leave Game confirmation (M5-T05).
+- Deferred findings recorded in the M5 breakdown: the portrait Session Summary's Round-by-Round table (M5-T06), the clipped focus outline in the Leave Game confirmation (M5-T05), wrong-card and ignored taps on neighboring held cards (M5-T04), and the frozen "deciding" spinner under reduced motion (M5-T06).
 - No requirement, rule, Engine/Orchestrator contract, or dependency changed.

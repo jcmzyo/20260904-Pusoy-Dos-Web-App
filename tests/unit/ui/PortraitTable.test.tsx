@@ -137,7 +137,12 @@ describe('Phone portrait opponents and status (ui-ux.md §19.6.3)', () => {
     expect(finished.placement).toBe(1);
     expect(within(panel(finished.name)).getByText('DONE · 1st')).toBeTruthy();
     expect(within(panel(finished.name)).getByText(finished.seat === 'south' ? `0 cards · ${finished.totalScore} pts` : '0 cards')).toBeTruthy();
-  });
+    // 20000ms (M5-T03 review): driving to the first finish runs up to 200 real Turns, each crossing the same
+    // real per-Turn macrotask that session-summary.test.tsx's full-Session tests document. It took ~1.4s in
+    // isolation and ~2.6s under synthetic full-suite CPU contention (four CPU-saturating processes on a
+    // two-core sandbox), and it timed out at Vitest's 5000ms default in two consecutive full-suite runs on
+    // the reviewer's machine; 20000ms keeps meaningful headroom without masking a genuine hang.
+  }, 20000);
 
   it.each([PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX - 1, PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX])('keeps the human\'s own name, count, score, and status visible at height %ipx', async (height) => {
     window.innerHeight = height;
