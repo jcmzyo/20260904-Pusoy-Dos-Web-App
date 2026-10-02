@@ -1,6 +1,6 @@
 # Pusoy Dos --- September 11, 2026 Milestone Documentation Update
 
-**Last Modified:** October 1, 2026
+**Last Modified:** October 2, 2026
 **Purpose:** Record the documentation changes made after approval of the M2 Baseline AI algorithm and M3/M4 milestone planning decisions.
 
 ## New milestone documents
@@ -122,3 +122,15 @@ No canonical Pusoy Dos house rule was changed.
 - The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.14 (October 1, 2026).
 - README notes that its `portrait-unsupported` row is superseded since M5-T02 and that the table itself is updated in M5-T07.
 - No other contract, requirement, rule, or dependency changed.
+
+## October 2, 2026 — M5-T03 portrait layout revisions
+
+- User approved (October 2, M5-T03 review) these portrait contract revisions, recorded in the M5 breakdown's M5-T01 Approval Record under "Revisions":
+  - **Table height:** the table takes spare height first, up to 5/8 of the viewport height, and the controls get the rest. This supersedes the September 30 spare-height rule.
+  - **Height tiers:** a tall tier from 662px for phones and 690px for tablets (`PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX`, `PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX`). In it, opponents show their face-down fan again (restored on phones; M5-T01 had removed it) and the human's own panel is stacked. Below it there is no fan and the human's panel is a one-row strip, so 360×560 still fits. Phones still have no per-seat Play trail.
+  - **Controls and Tab order:** portrait reads Event Log / Discard Pile / Leave Game, the hand, Sort Rank / Sort Suit, then Pass | Play (Play on the right), and its Tab order follows: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play. Landscape is unchanged.
+  - **Card width:** held and center cards keep the 56px floor, take at most 14.5vw, and are capped at 88px on touch devices and 72px in a fine-pointer (desktop) window.
+- UI/UX v1.15, from v1.14 (October 2, 2026): §19.6.3 records the above, plus the compact panel's separate "deciding" row, the fixed Pass/Play, Sort, and utility-button sizes, and room for the human panel's glow; §19.6.4 records the portrait Tab order.
+- The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.15.
+- Deferred findings recorded in the M5 breakdown: the portrait Session Summary's Round-by-Round table (M5-T06) and the clipped focus outline in the Leave Game confirmation (M5-T05).
+- No requirement, rule, Engine/Orchestrator contract, or dependency changed.

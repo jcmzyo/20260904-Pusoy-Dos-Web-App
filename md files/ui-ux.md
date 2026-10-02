@@ -1,6 +1,6 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.14)
+## UI / UX Document (v1.15)
 
 **Status:** Phase 1 baseline plus committed Phase 2 design contracts  
 **Last Modified:** October 2, 2026  
