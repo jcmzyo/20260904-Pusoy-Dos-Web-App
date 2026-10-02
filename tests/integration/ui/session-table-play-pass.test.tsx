@@ -41,7 +41,7 @@ function fixture() {
 
 function slotFor(card: Card): HTMLElement {
   const suitLabel = card.suit[0]!.toUpperCase() + card.suit.slice(1);
-  return within(screen.getByRole('group', { name: 'Your hand' }))
+  return within(screen.getByRole('listbox', { name: 'Your hand' }))
     .getByRole('img', { name: `${card.rank} of ${suitLabel}` })
     .closest('[data-card-key]') as HTMLElement;
 }

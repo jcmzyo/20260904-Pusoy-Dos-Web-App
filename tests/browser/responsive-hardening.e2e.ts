@@ -217,7 +217,7 @@ async function waitForCardsOnCenterTable(page: Page) {
     .poll(async () => (await centerCard.count()) > 0 || (await youPanel.getAttribute('aria-current')) === 'true', { timeout: 20_000 })
     .toBe(true);
   if ((await centerCard.count()) > 0) return;
-  await page.getByRole('group', { name: 'Your hand' }).getByRole('img', { name: '3 of Clubs', exact: true }).click();
+  await page.getByRole('listbox', { name: 'Your hand' }).getByRole('img', { name: '3 of Clubs', exact: true }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(centerCard.first()).toBeVisible();
 }
@@ -251,7 +251,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
       ['Check Discard Pile', page.getByRole('button', { name: 'Check Discard Pile', exact: true })],
       ['Event Log', page.getByRole('button', { name: 'Event Log', exact: true })],
       ['Leave Game', page.getByRole('button', { name: 'Leave Game', exact: true })],
-      ['Your hand', page.getByRole('group', { name: 'Your hand' })],
+      ['Your hand', page.getByRole('listbox', { name: 'Your hand' })],
       ['You panel', page.getByRole('region', { name: 'You panel' })],
       ['West panel', page.getByRole('region', { name: 'West panel' })],
       ['North panel', page.getByRole('region', { name: 'North panel' })],
@@ -480,7 +480,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`held cards share one baseline and only selected cards rise at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const hand = page.getByRole('group', { name: 'Your hand' });
+    const hand = page.getByRole('listbox', { name: 'Your hand' });
     const cards = hand.getByRole('img');
     const slots = hand.locator('[data-card-key]');
     await expect(cards).toHaveCount(13);
@@ -510,7 +510,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`all 13 overlapped cards are independently targetable, each with >= ${MINIMUM_EXPOSED_CARD_WIDTH_PX}px exposed, at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const hand = page.getByRole('group', { name: 'Your hand' });
+    const hand = page.getByRole('listbox', { name: 'Your hand' });
     const cards = hand.getByRole('img');
     const slots = hand.locator('[data-card-key]');
     await expect(cards).toHaveCount(13);
@@ -536,7 +536,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`dragging a held card follows the pointer 1:1 under the scaled play area at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const slots = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]');
+    const slots = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]');
     await expect(slots).toHaveCount(13);
     const slot = slots.nth(6);
     const start = (await slot.boundingBox())!;
@@ -633,7 +633,7 @@ async function driveUnderFakeClock(page: Page, until: 'roundResult' | 'sessionSu
   const passButton = page.getByRole('button', { name: 'Pass', exact: true });
   const playButton = page.getByRole('button', { name: 'Play', exact: true });
   const nextRound = page.getByRole('button', { name: 'Next Round', exact: true });
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
 
   for (let step = 0; step < 4000; step++) {
     // Every fact this loop decides on, including whether Pass is enabled and whether this is an

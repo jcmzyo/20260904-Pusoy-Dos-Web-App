@@ -98,7 +98,7 @@ async function driveRoundToResult(page: import('@playwright/test').Page): Promis
   const playButton = page.getByRole('button', { name: 'Play', exact: true });
   const dialog = page.getByRole('dialog');
   const skipReveal = page.getByRole('button', { name: 'Skip reveal', exact: true });
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
 
   for (let turn = 0; turn < TURN_BUDGET; turn++) {
     const decision = await waitForTurnDecision(page);
