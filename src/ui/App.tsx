@@ -19,6 +19,7 @@ import { PlayPassControls } from './primitives/PlayPassControls';
 import { RoundResultOverlay } from './primitives/RoundResultOverlay';
 import { SessionSummary } from './primitives/SessionSummary';
 import { isSupportedLayout, useLayoutSupport } from './primitives/useLayoutSupport';
+import { usePortraitTier } from './primitives/usePortraitTier';
 import type { SupportedLayout, UnsupportedLayout } from './primitives/useLayoutSupport';
 import styles from './App.module.css';
 
@@ -217,6 +218,7 @@ export function App({ start = startSession, botNames, botTurnDelayMs, revealDura
             onHome={handleLeave}
             showInitialTransition
             presentationPaused={!supported}
+            composition={composition}
             {...(revealDurationMs !== undefined ? { revealDurationMs } : {})}
             {...(resultStageDelayMs !== undefined ? { resultStageDelayMs } : {})}
             {...(roundTransitionDurationMs !== undefined ? { roundTransitionDurationMs } : {})}
@@ -278,6 +280,14 @@ const SEAT_POSITION_CLASS: Record<PresentedSeat['seat'], string | undefined> = {
   north: styles.seatNorth, west: styles.seatWest, east: styles.seatEast, south: styles.seatSouth,
 };
 
+/** Portrait classes carry both `.portrait` (shared portrait rules) and their own class (phone/tablet
+ *  differences), plus `.portraitTall` in the tall tier; landscape adds nothing, so §14's layout is untouched. */
+const COMPOSITION_CLASS: Record<SupportedLayout, string> = {
+  landscape: '',
+  'portrait-phone': `${styles.portrait} ${styles.portraitPhone}`,
+  'portrait-tablet': `${styles.portrait} ${styles.portraitTablet}`,
+};
+
 /** Bot hands render as overlapping face-down cards plus the PlayerPanel's numeric count; per ui-ux.md §4
  *  the UI never reveals bot card faces during active play, so only `CardBack` is used here. West/East
  *  render each card rotated 90° (`rotated`): their hands already stack lengthwise/vertically (ui-ux.md
@@ -308,7 +318,7 @@ function BotHand({ cardCount, rotated = false }: { readonly cardCount: number; r
 function RevealedHand({ cards, rotated = false }: { readonly cards: readonly Card[]; readonly rotated?: boolean }) {
   const sorted = [...cards].sort(compareByRank);
   return (
-    <div className={styles.botHand}>
+    <div className={`${styles.botHand} ${styles.revealedHand}`}>
       {sorted.map((card) => (
         rotated
           ? <div key={cardKey(card)} className={styles.rotatedCard}><PlayingCard card={card} widthPx={40} /></div>
@@ -339,27 +349,43 @@ function SeatPlayTrail({ lastPlay }: { readonly lastPlay: PresentedSeat['lastPla
   );
 }
 
-function Seat({ seat, overlayOpen, revealedCards }: { readonly seat: PresentedSeat; readonly overlayOpen: boolean; readonly revealedCards?: readonly Card[] }) {
-  const rotated = seat.seat === 'west' || seat.seat === 'east';
+/** Per-composition seat presentation (ui-ux.md §19.6.3, revised October 2, 2026). Landscape keeps §§5.3-5.7
+ *  unchanged. Portrait holds bot cards upright; phone opponents are compact panels without a Play trail
+ *  (the center shows the current hand and who played it; the Event Log keeps the history), tablet opponents
+ *  keep the full panel and its trail. In the tall tier every opponent shows its face-down fan and the human's
+ *  panel stacks like the others; below it there is no fan and the human's panel is a one-row strip. */
+function seatPresentation(composition: SupportedLayout, tall: boolean, isHuman: boolean) {
+  if (composition === 'landscape') return { variant: 'full', fan: true, trail: true } as const;
+  if (isHuman) return { variant: tall ? 'self' : 'strip', fan: false, trail: false } as const;
+  return composition === 'portrait-phone'
+    ? { variant: 'compact', fan: tall, trail: false } as const
+    : { variant: 'full', fan: tall, trail: true } as const;
+}
+
+function Seat({ seat, overlayOpen, revealedCards, composition, tall }: { readonly seat: PresentedSeat; readonly overlayOpen: boolean; readonly revealedCards?: readonly Card[]; readonly composition: SupportedLayout; readonly tall: boolean }) {
+  const rotated = composition === 'landscape' && (seat.seat === 'west' || seat.seat === 'east');
+  const presentation = seatPresentation(composition, tall, seat.seat === HUMAN_PLAYER_ID);
   // Only a bot's own Turn shows a "deciding" indicator; the human's Turn immediately has its own
   // Play/Pass controls, so a spinner there would misleadingly suggest something is loading (M4-T09
   // slice, per the person's own follow-up request; full stale-input/pacing scope stays M4-T09's).
   const thinking = seat.isCurrentTurn && seat.seat !== HUMAN_PLAYER_ID;
+  // The 4th-place reveal takes the fan's place. Without a fan (short portrait) it is laid over the table just
+  // below that seat's panel instead (App.module.css); its final portrait presentation is M5-T06's.
   return (
     <div className={`${styles.seat} ${SEAT_POSITION_CLASS[seat.seat]}`}>
       {seat.seat !== 'south' && (
         revealedCards
           ? <RevealedHand cards={revealedCards} rotated={rotated} />
-          : <BotHand cardCount={seat.cardCount} rotated={rotated} />
+          : presentation.fan && <BotHand cardCount={seat.cardCount} rotated={rotated} />
       )}
       <PlayerPanel
         name={seat.name} cardCount={seat.cardCount} score={seat.totalScore}
         isCurrentTurn={seat.isCurrentTurn} passed={seat.passed} done={seat.done} placement={seat.placement}
-        thinking={thinking} paused={overlayOpen}
+        thinking={thinking} paused={overlayOpen} variant={presentation.variant}
         // Hidden while the "deciding" spinner shows (the person's own follow-up request): about to be
         // replaced by this seat's next decision anyway, so showing its old Play/Pass trail underneath
         // the spinner just adds noise.
-        playTrail={thinking ? null : <SeatPlayTrail lastPlay={seat.lastPlay} />}
+        playTrail={thinking || !presentation.trail ? null : <SeatPlayTrail lastPlay={seat.lastPlay} />}
       />
     </div>
   );
@@ -381,7 +407,9 @@ function CenterTable({ center, seats }: { readonly center: SessionPresentationSn
           if (!player) throw new Error(`Current hand presentation references an unknown seat ${center.playerId}.`);
           return (
             <div className={styles.handInfo}>
-              <p className={styles.handMeta}>{player.name} played {COMBINATION_LABELS[center.combination.type]}</p>
+              {/* The name is its own element so a long name can shorten with an ellipsis in portrait while
+               *  "played <type>" always stays readable (ui-ux.md §19.6.3). */}
+              <p className={styles.handMeta}><span className={styles.handPlayer}>{player.name}</span> played {COMBINATION_LABELS[center.combination.type]}</p>
               <div className={styles.handCards}>
                 {getDisplayCards(center.combination).map((card) => <PlayingCard key={`${card.rank}-${card.suit}`} card={card} />)}
               </div>
@@ -447,6 +475,10 @@ export function SessionTable({
   // timers below (reveal, Round-start transition, scoring animation) so an interrupted phase resumes
   // rather than finishing unseen. Bot progression is paused separately, by the caller's own effect.
   presentationPaused = false,
+  // The supported composition to lay the table out for (ui-ux.md §19.6.2-§19.6.3). Changing it only
+  // restyles the same elements, so nothing below is remounted. Defaults to landscape for callers (existing
+  // tests) that render `SessionTable` directly.
+  composition = 'landscape',
 }: {
   readonly presentation: SessionPresentation;
   readonly onLeave?: () => void;
@@ -458,6 +490,7 @@ export function SessionTable({
   readonly summaryAutoAdvanceDelayMs?: number;
   readonly showInitialTransition?: boolean;
   readonly presentationPaused?: boolean;
+  readonly composition?: SupportedLayout;
 }) {
   const snapshot = useSyncExternalStore(presentation.subscribe, presentation.getSnapshot);
   const [selectedCards, setSelectedCards] = useState<readonly Card[]>([]);
@@ -621,9 +654,38 @@ export function SessionTable({
 
   const names = Object.fromEntries(snapshot.seats.map((seat) => [seat.playerId, seat.name]));
 
+  const portrait = composition !== 'landscape';
+  const tall = usePortraitTier(composition);
+  // Both compositions read Event Log/Discard Pile/Leave Game, the hand and Sort, then Play/Pass in this DOM
+  // order, which is also their Tab order (ui-ux.md §19.6.4); portrait stacks them, landscape lays them in a row.
+  const bottomControls = [
+    <div key="utility" className={styles.bottomLeft}>
+      {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
+       *  center table's own current hand to beat already shows the latest Play, and a variable-length
+       *  preview line was changing this button's own height as events came in. */}
+      <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
+      {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
+       *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
+       *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
+       *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
+      <button type="button" className={styles.sideButton} onClick={() => setOverlay('discardPile')}>Check Discard Pile</button>
+      <button type="button" className={`${styles.sideButton} ${styles.leaveButton}`} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
+    </div>,
+    <HumanHand key="hand" cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />,
+    <PlayPassControls
+      key="playPass"
+      selected={selectedCards}
+      center={snapshot.center}
+      humanHand={snapshot.humanHand}
+      playerId={HUMAN_PLAYER_ID}
+      isMyTurn={isMyTurn}
+      onSubmit={handleSubmit}
+      layout={portrait ? 'row' : 'stacked'}
+    />,
+  ];
   return (
-    <main className={styles.sessionShell}>
-      <PlayArea>
+    <main className={`${styles.sessionShell} ${COMPOSITION_CLASS[composition]} ${tall ? styles.portraitTall : ''}`}>
+      <PlayArea scaled={!portrait}>
       <header className={styles.header}>
         <h1>Pusoy Dos</h1>
         <p>Basic · Round {snapshot.roundNumber} of 5</p>
@@ -643,6 +705,8 @@ export function SessionTable({
               key={seat.playerId}
               seat={seat}
               overlayOpen={overlayOpen}
+              composition={composition}
+              tall={tall}
               {...(isHandRevealed && snapshot.reveal!.playerId === seat.playerId ? { revealedCards: snapshot.reveal!.cards } : {})}
             />
           ))}
@@ -652,27 +716,7 @@ export function SessionTable({
          *  M4-T10; Leave Game, M4-T11), middle (the human hand plus Sort Rank/Sort Suit, M4-T07; ui-ux.md
          *  §5.2, §6), right (Play/Pass, M4-T08). */}
         <div className={styles.bottomBar}>
-          <div className={styles.bottomLeft}>
-            {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
-             *  center table's own current hand to beat already shows the latest Play, and a variable-length
-             *  preview line was changing this button's own height as events came in. */}
-            <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
-            {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
-             *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
-             *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
-             *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
-            <button type="button" className={styles.sideButton} onClick={() => setOverlay('discardPile')}>Check Discard Pile</button>
-            <button type="button" className={`${styles.sideButton} ${styles.leaveButton}`} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
-          </div>
-          <HumanHand cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />
-          <PlayPassControls
-            selected={selectedCards}
-            center={snapshot.center}
-            humanHand={snapshot.humanHand}
-            playerId={HUMAN_PLAYER_ID}
-            isMyTurn={isMyTurn}
-            onSubmit={handleSubmit}
-          />
+          {bottomControls}
         </div>
       </div>
       </PlayArea>

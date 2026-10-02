@@ -3,7 +3,7 @@
 ## UI / UX Document (v1.14)
 
 **Status:** Phase 1 baseline plus committed Phase 2 design contracts  
-**Last Modified:** September 30, 2026  
+**Last Modified:** October 2, 2026  
 **Parent document:** `requirements.md` v1.17  
 **Committed scope:** Phase 2 M5–M8, preserving the completed Phase 1 UI
 
@@ -361,7 +361,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
 
 - **No scale transform in portrait:** the portrait composition is authored in real CSS px, without §14's uniform scale transform. So the **14px minimum text size** and the **44×44px minimum control target** apply literally to everything rendered in portrait, including the table, controls, card indices, trail badges, and every dialog. **The landscape phone-tier exemption does not apply to portrait.**
 - **Card ratio:** 5:7 everywhere. Cards are never distorted to fit.
-- **Held cards:** the rendered width `W` is 56px ≤ `W` ≤ 96px. `W` and the exposed width are determined only by the viewport, never by how many cards are held, so the hand stays the same size from 13 cards to 0.
+- **Held cards:** the rendered width `W` is 56px ≤ `W` ≤ 96px. `W` and the exposed width are determined only by the viewport, never by how many cards are held, so the hand stays the same size from 13 cards to 0. **Revision (approved by the user on October 2, 2026, during M5-T03 review):** in a fine-pointer (desktop browser) window `W` is capped at 72px instead of 96px; the pointer type sets only that cap. A further revision the same day lowered the touch cap to 88px and the width share to 14.5% of the viewport width, making cards slightly smaller.
 - **One row, one baseline:**
   - All 13 cards sit in a single row on a common baseline for unselected cards, with no horizontal scroll and no clipping.
   - The hand region keeps a side gutter of at least 4px.
@@ -371,20 +371,26 @@ This is the state of the code at M5-T01 (`27abb0d`):
 - **Card hit area:** each card's target is its whole visible area, which is at least 24px wide and the full card height.
 - **Selection:** a selected card rises **at least 16 CSS px** without changing display order. Headroom for the rise is reserved, so a raised card is never clipped and never covers a control.
 - **Hand to beat:** its cards obey the same 56px minimum width, so their index text stays at 14px or larger.
+- **Arrangement:** all three opponents (West, North, East) sit across the top of the table and the human's own panel at its bottom, with the current hand to beat between them.
+- **Height tiers (approved by the user on October 2, 2026, during M5-T03 review):** each portrait class has a *tall* tier from `PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX` (662px) for phones and `PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX` (690px) for tablets (`layoutThresholds.ts`). Each threshold is the smallest height at which that class's tall layout fits with 56px cards and the literal 14px/44px minimums.
+  - In both tiers the human's own panel keeps at least 8px of room inside the table border, so its Turn/placement glow does not run into the border.
+  - Tall tier: every opponent shows its face-down card fan, held upright above its panel, and a revealed 4th-place hand takes the fan's place. The human's own panel is stacked like the other panels: name, then count and score, then status.
+  - Below the tall tier: there is no fan, so everything still fits down to the 360×560 minimum. The human's own panel is a one-row strip. A revealed 4th-place hand is laid over the table just below its panel; its final portrait presentation is M5-T06's.
 - **Phone portrait opponents:** each opponent is a compact panel showing:
   - the name,
   - the remaining card count as a number,
   - the score,
   - a Turn / PASS / DONE-plus-placement status as text,
-  - the current-Turn cue and the "deciding" indicator.
+  - the current-Turn cue, and the "deciding" indicator on its own row below the status, as in the full panel.
 
   In phone portrait:
-  - There is no face-down card fan and no per-seat Play trail. The center shows the current combination (or FREE LEAD) and the player who made it, and the Event Log keeps the history.
+  - There is no per-seat Play trail. The center shows the current combination (or FREE LEAD) and the player who made it, and the Event Log keeps the history. The face-down fan follows the height tiers above. (Revision, October 2, 2026: M5-T01 had removed the phone fan entirely.)
   - §§5.3, 5.4, and 5.7 seat-layout rules do not apply.
   - The human's own name, score, and status stay visible.
-- **Tablet portrait opponents:** the per-seat Play trail is kept. The remaining card count is always shown as a number.
+- **Tablet portrait opponents:** the full panel with the per-seat Play trail is kept. The remaining card count is always shown as a number. The face-down fan follows the height tiers above.
+- **Controls order (approved by the user on October 2, 2026, during M5-T03 review; revised the same day):** below the table, top to bottom: Event Log, Discard Pile, and Leave Game (12px below the table), the hand, Sort Rank and Sort Suit, then Pass and Play side by side (Play on the right). Event Log, Discard Pile, and Leave Game share one width (at most 130px) so Discard Pile sits exactly under the middle of Sort and the hand. Sort Rank/Sort Suit share one width, so the gap between them lines up with the gap between Pass and Play, and are drawn 32px tall inside their full 44px target. Pass and Play are each centered in their own half of the row at a fixed size of up to 160×62px (smaller than a held card), still fitting two lines of 14px reason text. Every control keeps a 44px minimum target. Landscape is unchanged.
 - **Must stay reachable in every supported portrait layout without clipping:** Event Log, Discard Pile, Leave Game, Sort Rank, Sort Suit, Play, and Pass.
-- **Vertical budget at 360×560:** a rough estimate for T03, not a frozen layout:
+- **Vertical budget at 360×560:** a rough estimate for T03, not a frozen layout. M5-T03 confirmed it fits (no page scroll at 360×560 with 56px cards):
   - title/Round row about 28px,
   - opponents about 84px,
   - center about 104px,
@@ -393,7 +399,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
   - Sort about 44px,
   - utility row about 44px,
   - plus gaps: about 520px in total.
-- **Spare vertical height (approved by the user on September 30, 2026, during M5-T02 review):** in every supported portrait layout, the table and opponent area stays at its natural height at the top and is never stretched to fill a tall viewport. Any spare height goes to the bottom controls section (hand, Play/Pass, Sort, and the utility row), never to empty space in the table center.
+- **Spare vertical height (approved by the user on October 2, 2026, during M5-T03 review; replaces the September 30, 2026 rule that kept the table at its natural height and gave all spare height to the controls):** in every supported portrait layout the table takes spare height first, up to **5/8 of the viewport height**, and its extra height goes to the center area. Any height beyond that goes to the controls section below the table. When there is no spare height, the table keeps its natural height and the controls keep their sizes; only gaps compress.
 - **Overflow:**
   - The gameplay screen has no page scroll, vertical or horizontal, at any supported portrait or landscape size.
   - A dialog panel is at most the viewport height minus 16px. Only the dialog body scrolls; the title, the close button, and action buttons such as Next Round, Home, Play Again, Stay, and Leave stay visible. Body scroll stays locked.
@@ -402,7 +408,9 @@ This is the state of the code at M5-T01 (`27abb0d`):
 
 ### 19.6.4 Keyboard, focus, and disabled-feedback contract
 
-- **Tab order** matches visual reading order in both orientations: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Play → Pass. There are no global single-key shortcuts.
+- **Tab order** matches visual reading order in both orientations. There are no global single-key shortcuts.
+  - Landscape: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Play → Pass.
+  - Portrait (approved by the user on October 2, 2026, during M5-T03 review, following the portrait controls order in §19.6.3): Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play.
 - **The hand** is a single Tab stop using a roving `tabindex`. It is exposed as `role="listbox"` with `aria-multiselectable="true"`, a horizontal orientation, and the accessible name "Your hand". Each card is an `option` whose accessible name is its rank and suit, with `aria-selected` reflecting selection. Bindings:
   - **← / →** move focus to the previous or next card. **Home / End** move focus to the first or last card. Focus does not wrap.
   - **Space / Enter** toggle the focused card's selection. The existing selection cap applies: selecting beyond the cap does nothing, as with a pointer. Enter never submits a Play.

@@ -84,7 +84,7 @@ describe('SessionTable seats and center (M4-T06)', () => {
     // Scoped to the center region specifically: the same card also renders at the player's own seat
     // (M4-T08's per-seat Play trail, ui-ux.md §5.4), so an unscoped query would match twice.
     const centerRegion = screen.getByRole('region', { name: 'Current hand to beat' });
-    expect(within(centerRegion).getByText(`${player.name} played Single`)).toBeTruthy();
+    expect(within(centerRegion).getByText('played Single', { exact: false, selector: 'p' }).textContent).toBe(`${player.name} played Single`);
     const [card] = center.combination.cards;
     expect(within(centerRegion).getByRole('img', { name: `${card!.rank} of ${card!.suit[0]!.toUpperCase()}${card!.suit.slice(1)}` })).toBeTruthy();
   });

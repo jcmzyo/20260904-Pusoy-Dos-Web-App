@@ -3,7 +3,7 @@
 ## Milestone Design + Task Breakdown (v1.1)
 
 **Status:** Phase 2 implementation plan based on approved scope; detailed decisions gated by the named contract tasks  
-**Last Modified:** October 1, 2026  
+**Last Modified:** October 2, 2026  
 **Milestone:** M5 --- Portrait & Mobile Experience  
 **Phase:** Phase 2 --- Mobile Accessibility, Onboarding, and Player Experience Expansion  
 **Parent requirements:** requirements.md v1.17  
@@ -164,6 +164,16 @@ An approved measurable contract that implementation agents can follow without in
   - Edge, Firefox, and macOS Safari are covered by human checks.
   - Real Android Chrome, iOS Safari, and portrait-tablet sessions are required human evidence for M5-T08.
 - **Landscape:** unchanged. The 844×390 minimum, the 896×656 full-scale threshold, the phone-tier 14px/44×44px exemption, and the 28px exposure rule all stand.
+
+**Revisions (approved by the user on October 2, 2026, during M5-T03 review):** recorded in ui-ux.md §§19.6.3–19.6.4.
+
+- Phone portrait opponents show the face-down fan again, in the tall height tier (from 662px tall for phones and 690px for tablets). Below that tier there is no fan, so 360×560 still fits. This supersedes the phone-fan part of the **Phone portrait opponents** decision above; phones still have no per-seat Play trail.
+- The table takes spare height first, up to 5/8 of the viewport height, replacing the September 30, 2026 spare-height rule.
+- Portrait controls run Event Log / Discard Pile / Leave Game, the hand, Sort, then Pass | Play (Play on the right). Portrait Tab order follows: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play. This revises the portrait Tab order in ui-ux.md §19.6.4; landscape is unchanged.
+- The compact panel shows the "deciding" indicator on its own row below the status. In the tall tier the human's own panel is stacked like the others rather than a one-row strip.
+- In a fine-pointer (desktop browser) portrait window held cards are capped at 72px wide. Portrait cards are otherwise slightly smaller (at most 14.5% of the viewport width and 88px). The utility buttons sit 12px below the table and share one width so Discard Pile is exactly centered. Sort Rank/Sort Suit share one width (their gap lines up with Pass/Play's) and are drawn 32px tall inside their 44px target. The human's own panel keeps room inside the table border for its glow. Pass/Play are each centered in their own half of the row at up to 160×62px, smaller than a held card.
+- Deferred to M5-T06: in portrait, the Session Summary's Round-by-Round table looks compressed (its title and the last, R5, column).
+- Deferred to M5-T05 (found in M5-T03 desktop keyboard testing, October 2, 2026): in the Leave Game confirmation, the keyboard focus outline on **Stay** and **Yes, Leave Game** is cut off at the bottom right. The dialog body is a scroll container (`Overlay.module.css`, `overflow-y: auto`) that clips the outline drawn 3px outside the buttons. This predates M5.
 
 **Baseline observations:** recorded in ui-ux.md §19.6.1. They describe the code before M5 and are not portrait acceptance evidence.
 
