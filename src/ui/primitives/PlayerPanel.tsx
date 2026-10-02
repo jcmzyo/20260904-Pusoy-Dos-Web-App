@@ -28,7 +28,18 @@ export interface PlayerPanelProps {
    *  own follow-up request. `PlayerPanel` stays agnostic of cards/combinations: the caller renders the
    *  actual trail content (e.g. `App.tsx`'s `SeatPlayTrail`) and passes it through as a slot. */
   readonly playTrail?: ReactNode;
+  /** Presentation density (ui-ux.md §19.6.3). `'full'` (default) is the landscape/tablet-portrait panel.
+   *  `'compact'` is a phone-portrait opponent: name, count, and score on their own lines, the status, and
+   *  the "deciding" indicator on its own row below it, as in the full panel; no Play trail. `'self'` (tall
+   *  portrait) and `'strip'` (short portrait) are the human's own seat - name, "count · score", and status -
+   *  stacked like the other panels, or in one row. Every variant keeps the same text status,
+   *  `aria-current`, and glow. */
+  readonly variant?: 'full' | 'compact' | 'self' | 'strip';
 }
+
+const VARIANT_CLASS: Record<NonNullable<PlayerPanelProps['variant']>, string | undefined> = {
+  full: undefined, compact: styles.compact, self: styles.self, strip: styles.strip,
+};
 
 interface StatusVariant {
   readonly text: string;
@@ -77,9 +88,36 @@ function resolveGlowClass({ isCurrentTurn, done, placement }: PlayerPanelProps):
  * alone, per ui-ux.md's accessibility expectations.
  */
 export function PlayerPanel(props: PlayerPanelProps) {
-  const { name, cardCount, score, isCurrentTurn, thinking = false, paused = false, playTrail } = props;
+  const { name, cardCount, score, isCurrentTurn, thinking = false, paused = false, playTrail, variant = 'full' } = props;
   const status = resolveStatus(props);
   const glowClass = resolveGlowClass(props);
+  const spinner = thinking && (
+    <span
+      className={styles.spinner}
+      style={paused ? { animationPlayState: 'paused' } : undefined}
+      role="status"
+      aria-label={`${name} is deciding`}
+    />
+  );
+  const cards = `${cardCount} card${cardCount === 1 ? '' : 's'}`;
+  if (variant !== 'full') {
+    return (
+      <section
+        className={`${styles.panel} ${VARIANT_CLASS[variant]} ${glowClass ?? ''}`}
+        aria-label={`${name} panel`}
+        aria-current={isCurrentTurn ? 'true' : undefined}
+      >
+        <p className={styles.name}>{name}</p>
+        {variant === 'compact'
+          ? <><p className={styles.meta}>{cards}</p><p className={styles.meta}>{score} pts</p></>
+          : <p className={styles.meta}>{cards} · {score} pts</p>}
+        <div className={styles.statusSlot}>
+          {status !== null && <p className={`${styles.status} ${status.className}`}>{status.text}</p>}
+        </div>
+        {variant === 'compact' && <div className={styles.spinnerSlot}>{spinner}</div>}
+      </section>
+    );
+  }
   return (
     <section
       className={`${styles.panel} ${glowClass ?? ''}`}
@@ -87,7 +125,7 @@ export function PlayerPanel(props: PlayerPanelProps) {
       aria-current={isCurrentTurn ? 'true' : undefined}
     >
       <p className={styles.name}>{name}</p>
-      <p className={styles.meta}>{cardCount} card{cardCount === 1 ? '' : 's'} · {score} pts</p>
+      <p className={styles.meta}>{cards} · {score} pts</p>
       {/* Always-rendered, fixed-height slots (below) so an idle seat's missing status badge, or a seat
        *  with no spinner/trail to show, leaves behind an empty box rather than removing that row
        *  entirely — otherwise the remaining rows would shift position/re-center every time PASS/DONE/
@@ -97,14 +135,7 @@ export function PlayerPanel(props: PlayerPanelProps) {
         {status !== null && <p className={`${styles.status} ${status.className}`}>{status.text}</p>}
       </div>
       <div className={styles.trailSlot}>
-        {thinking && (
-          <span
-            className={styles.spinner}
-            style={paused ? { animationPlayState: 'paused' } : undefined}
-            role="status"
-            aria-label={`${name} is deciding`}
-          />
-        )}
+        {spinner}
         {!thinking && playTrail}
       </div>
     </section>

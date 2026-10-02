@@ -39,3 +39,11 @@ export const MINIMUM_TOUCH_TARGET_SIZE_PX = 44;
 
 /** Smallest exposed (non-overlapped) width an overlapping hand card must keep to stay targetable. */
 export const MINIMUM_EXPOSED_CARD_WIDTH_PX = 28;
+
+/** Supported portrait at or above these heights is the "tall" tier (ui-ux.md §19.6.3, revised October 2,
+ *  2026): opponents show their face-down fan and the human's panel stacks like the others. Below them the
+ *  compact arrangement (no fan, a one-row human strip) keeps everything at the 14px/44px minimums within the
+ *  height. Each is the smallest height at which that class's tall layout fits with 56px cards
+ *  (tests/browser/portrait-table.e2e.ts checks it). */
+export const PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX = 662;
+export const PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX = 690;

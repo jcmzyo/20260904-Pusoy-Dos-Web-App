@@ -43,17 +43,21 @@ async function startGameAt(page: Page, spec: ViewportSpec) {
   await expect(page.getByRole('button', { name: /^Starting Round/ })).toHaveCount(0);
 }
 
-/** Every public fact the table shows about the run's progress: Round header, the four seat panels (card
- *  counts, scores, PASS/DONE, current-Turn marker), and the center hand to beat. Read from textContent and
- *  attributes, so it works while the table is hidden behind an unsupported notice. */
+/** The public game facts on the table: Round, each seat's count, score, Turn, and status, and the center hand.
+ *  Read as facts rather than raw panel text, because the same facts are laid out differently per composition
+ *  (ui-ux.md §19.6.3: the phone-portrait panel puts count and score on separate lines and drops the Play trail). */
 async function progressFingerprint(page: Page): Promise<string> {
   return page.evaluate(() => {
     const parts: string[] = [];
     parts.push(document.querySelector('header p')?.textContent ?? '');
     for (const panel of document.querySelectorAll('[aria-label$=" panel"]')) {
-      parts.push(`${panel.getAttribute('aria-label')}|${panel.getAttribute('aria-current')}|${panel.textContent}`);
+      const text = panel.textContent ?? '';
+      const facts = [/(\d+) cards?/, /(\d+) pts/, /DONE(?: · \w+)?|PASS|Turn/].map((pattern) => text.match(pattern)?.[0] ?? '');
+      parts.push(`${panel.getAttribute('aria-label')}|${panel.getAttribute('aria-current')}|${facts.join('|')}`);
     }
-    parts.push(document.querySelector('[aria-label="Current hand to beat"]')?.textContent ?? '');
+    const center = document.querySelector('[aria-label="Current hand to beat"]');
+    parts.push(center?.querySelector('p')?.textContent ?? '');
+    parts.push(Array.from(center?.querySelectorAll('[role="img"]') ?? []).map((card) => card.getAttribute('aria-label')).join(','));
     return parts.join('\n');
   });
 }

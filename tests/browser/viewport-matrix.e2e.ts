@@ -95,9 +95,8 @@ for (const viewport of [...SUPPORTED_LANDSCAPE_VIEWPORTS, ...SUPPORTED_PORTRAIT_
 // spilled past the table's left/right border at narrower supported viewports. Cards now stack
 // lengthwise (vertically) on the outer edge with player details toward center (ui-ux.md §5), so
 // this verifies the card stack's own layout box stays within the table's horizontal bounds. Landscape
-// only: every portrait class is excluded until M5-T03 delivers the portrait opponent layout (ui-ux.md
-// §19.6.3: phone portrait drops the card fan, tablet portrait keeps the per-seat Play trail), and M5-T03
-// must add portrait geometry checks in its place.
+// only: portrait has its own opponent layout (ui-ux.md §19.6.3: phone portrait drops the card fan, tablet
+// portrait keeps it upright with the per-seat Play trail), whose geometry portrait-table.e2e.ts checks.
 for (const viewport of SUPPORTED_LANDSCAPE_VIEWPORTS) {
   test(`West/East card stacks stay within the table border at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });

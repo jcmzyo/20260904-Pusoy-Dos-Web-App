@@ -650,7 +650,7 @@ async function driveUnderFakeClock(page: Page, until: 'roundResult' | 'sessionSu
         nextRound: [...document.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Next Round'),
         skipReveal: document.querySelector('[aria-label="Skip reveal"]') !== null,
         transition: document.querySelector('[aria-label^="Starting Round"]') !== null,
-        passEnabled: passButtonEl !== null && !passButtonEl.disabled,
+        passEnabled: passButtonEl !== null && passButtonEl.getAttribute('aria-disabled') !== 'true',
         opening: document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false,
       };
     });

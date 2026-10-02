@@ -13,9 +13,11 @@
  * 28px ON SCREEN (MINIMUM_EXPOSED_CARD_WIDTH_PX, tests/browser/viewportMatrix.ts; human-hand.e2e.ts
  * verifies exactly that) for reliable click/tap targeting (ui-ux.md §6: "enough of each card remains
  * exposed for reliable click/tap and drag targeting"). So it is the larger of 70% of the card and 28px
- * divided by the play area's own scale (`--play-area-scale`, PlayArea.tsx), capped at the whole card. */
+ * divided by the play area's own scale (`--play-area-scale`, PlayArea.tsx), capped at the whole card.
+ * The portrait composition supplies its own viewport-derived exposure through `--hand-card-exposed`
+ * (App.module.css, ui-ux.md §19.6.3); landscape leaves it unset. */
 .handArea {
-  --card-exposed: min(var(--card-width, 56px), max(var(--card-width, 56px) * 0.7, 28px / var(--play-area-scale, 1)));
+  --card-exposed: var(--hand-card-exposed, min(var(--card-width, 56px), max(var(--card-width, 56px) * 0.7, 28px / var(--play-area-scale, 1))));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -36,7 +38,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 0 12px;
+  padding: 0 var(--hand-row-padding, 12px);
   height: calc(var(--card-width, 56px) * 7 / 5 + 18px);
 }
 
@@ -72,7 +74,10 @@
 /* Sort Rank/Sort Suit side by side, centered, below the hand within the same middle container
  * (`.handArea` above) - the person's own round-4 follow-up request. */
 .sortControls {
-  display: flex;
+  /* The portrait composition sets `--sort-controls-display: grid` so both buttons share one width and the gap
+   * between them sits on the row's center line, like Pass/Play's (App.module.css). */
+  display: var(--sort-controls-display, flex);
+  grid-template-columns: repeat(2, 1fr);
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -83,10 +88,18 @@
  * follow-up request. */
 .sortButton {
   min-height: 44px;
-  padding: 6px 16px;
-  border: 1px solid #ead8a7;
-  border-radius: 6px;
-  background: rgba(234, 216, 167, 0.15);
+  /* The portrait composition narrows it through `--sort-button-padding`, and draws it shorter than its 44px
+   * target through the `--sort-button-*` properties below (App.module.css): transparent top and bottom bands
+   * keep the whole 44px tappable, while the fill (clipped to the padding box) and an inset ring draw a
+   * shorter visible button. Unset, it renders exactly as the plain bordered button. */
+  padding: var(--sort-button-padding, 6px 16px);
+  border-style: solid;
+  border-color: var(--sort-button-border-color, #ead8a7);
+  border-width: var(--sort-button-border-width, 1px);
+  border-radius: var(--sort-button-radius, 6px);
+  box-shadow: var(--sort-button-ring, none);
+  background-color: rgba(234, 216, 167, 0.15);
+  background-clip: padding-box;
   color: #f7f4e9;
   font: inherit;
   font-size: 14px;
@@ -94,8 +107,9 @@
   cursor: pointer;
 }
 
+/* Same hover tint and contrast reason as App.module.css's `.sideButton:hover` (ui-ux.md §19.6.5). */
 .sortButton:hover {
-  background: rgba(234, 216, 167, 0.28);
+  background-color: rgba(234, 216, 167, 0.22);
 }
 
 .sortButton:focus-visible {

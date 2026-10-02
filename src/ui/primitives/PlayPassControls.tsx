@@ -67,6 +67,9 @@ export interface PlayPassControlsProps {
    *  protection across Turn transitions is M4-T09's job, not this task's. */
   readonly isMyTurn: boolean;
   readonly onSubmit: (move: Move) => void;
+  /** `'stacked'` (default): Play above Pass, the landscape bottom bar's right column. `'row'`: Play beside
+   *  Pass across the full width, the portrait composition's bottom row (ui-ux.md §19.6.3). */
+  readonly layout?: 'stacked' | 'row';
 }
 
 /**
@@ -76,7 +79,7 @@ export interface PlayPassControlsProps {
  * (canonical rule: Pass is illegal during an opening or free-lead Play) and remains available even when
  * a legal beating Play exists — Pass is always a strategic choice, never conditioned on `selected`.
  */
-export function PlayPassControls({ selected, center, humanHand, playerId, isMyTurn, onSubmit }: PlayPassControlsProps) {
+export function PlayPassControls({ selected, center, humanHand, playerId, isMyTurn, onSubmit, layout = 'stacked' }: PlayPassControlsProps) {
   const evaluation = evaluatePlaySelection(selected, center);
   const canPlay = isMyTurn && evaluation.kind === 'valid';
   const canPass = isMyTurn && center.kind === 'hand';
@@ -99,34 +102,46 @@ export function PlayPassControls({ selected, center, humanHand, playerId, isMyTu
     onSubmit({ kind: 'pass', playerId });
   }
 
+  // `aria-label` pins each button's accessible name to the fixed "Play"/"Pass" regardless of the sub-label
+  // text rendered inside it, so the name stays stable for assistive tech and tests alike; `aria-describedby`
+  // still surfaces that sub-label text as the button's accessible description. `aria-disabled` rather than
+  // native `disabled` (ui-ux.md §19.6.4): an unavailable Play/Pass stays focusable so its Engine-derived reason
+  // can be reached, and activating it does nothing because `handlePlay`/`handlePass` re-check availability.
+  const play = (
+    <button
+      key="play"
+      type="button"
+      className={styles.play}
+      onClick={handlePlay}
+      aria-disabled={!canPlay}
+      aria-label="Play"
+      aria-describedby={playSubLabel !== null ? 'play-sublabel' : undefined}
+    >
+      <span className={styles.mainLabel}>Play</span>
+      {playSubLabel !== null && <span id="play-sublabel" className={styles.subLabel}>{playSubLabel}</span>}
+    </button>
+  );
+  const pass = (
+    <button
+      key="pass"
+      type="button"
+      className={`${styles.pass} ${noValidPlay ? styles.passHighlight : ''}`}
+      onClick={handlePass}
+      aria-disabled={!canPass}
+      aria-label="Pass"
+      aria-describedby={noValidPlay ? 'pass-sublabel' : undefined}
+    >
+      <span className={styles.mainLabel}>Pass</span>
+      {noValidPlay && <span id="pass-sublabel" className={styles.subLabel}>No valid plays</span>}
+    </button>
+  );
+
+  // Stacked: Play above Pass. Row (portrait): Pass on the left, Play on the right; the DOM order matches so
+  // the Tab order reads the same way (ui-ux.md §19.6.4).
   return (
-    <div className={styles.controls} role="group" aria-label="Play or Pass">
+    <div className={`${styles.controls} ${layout === 'row' ? styles.row : ''}`} role="group" aria-label="Play or Pass">
       <div className={styles.buttons}>
-        {/* `aria-label` pins each button's accessible name to the fixed "Play"/"Pass" regardless of the
-         *  sub-label text rendered inside it, so the name stays stable for assistive tech and tests alike;
-         *  `aria-describedby` still surfaces that sub-label text as the button's accessible description. */}
-        <button
-          type="button"
-          className={styles.play}
-          onClick={handlePlay}
-          disabled={!canPlay}
-          aria-label="Play"
-          aria-describedby={playSubLabel !== null ? 'play-sublabel' : undefined}
-        >
-          <span className={styles.mainLabel}>Play</span>
-          {playSubLabel !== null && <span id="play-sublabel" className={styles.subLabel}>{playSubLabel}</span>}
-        </button>
-        <button
-          type="button"
-          className={`${styles.pass} ${noValidPlay ? styles.passHighlight : ''}`}
-          onClick={handlePass}
-          disabled={!canPass}
-          aria-label="Pass"
-          aria-describedby={noValidPlay ? 'pass-sublabel' : undefined}
-        >
-          <span className={styles.mainLabel}>Pass</span>
-          {noValidPlay && <span id="pass-sublabel" className={styles.subLabel}>No valid plays</span>}
-        </button>
+        {layout === 'row' ? [pass, play] : [play, pass]}
       </div>
     </div>
   );

@@ -59,7 +59,7 @@ async function waitForTurnDecision(page: import('@playwright/test').Page): Promi
       const panel = document.querySelector('[aria-label="You panel"]');
       if (panel?.getAttribute('aria-current') !== 'true') return null;
       const passButton = document.querySelector('button[aria-label="Pass"]') as HTMLButtonElement | null;
-      if (passButton !== null && !passButton.disabled) return { kind: 'pass' };
+      if (passButton !== null && passButton.getAttribute('aria-disabled') !== 'true') return { kind: 'pass' };
       const opening = document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false;
       return { kind: 'lead', opening };
     },

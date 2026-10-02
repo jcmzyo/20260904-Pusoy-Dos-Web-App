@@ -32,6 +32,9 @@ function buildAutomaticSession(seed: number): StartedSession {
   };
 }
 
+/** Upper bound for a test that drives a whole five-Round Session (see `session-summary.test.tsx`). */
+const FULL_SESSION_TIMEOUT_MS = 90000;
+
 /** Waits for, and clicks through, every Round Result overlay in turn until Session Summary itself
  *  appears - `session-summary.test.tsx`'s own `clickThroughRoundResult` proved this exact polling
  *  approach out first (Rounds 1-4 need an explicit click; Round 5 replaces itself with Session Summary
@@ -44,7 +47,9 @@ async function driveToSessionSummary(): Promise<void> {
       const summary = screen.queryByRole('dialog', { name: 'Session Summary' });
       if (summary) return { kind: 'done' as const };
       throw new Error('Neither the Next Round button nor Session Summary has appeared yet.');
-    }, { timeout: 10000 });
+      // As long as the calling test's own timeout (M5-T03 review): a per-Round limit tighter than the test's
+      // made one slow Round under CPU contention fail the test even with whole-test headroom left.
+    }, { timeout: FULL_SESSION_TIMEOUT_MS });
     if (outcome.kind === 'done') return;
     // eslint-disable-next-line no-await-in-loop
     await act(async () => { fireEvent.click(outcome.button); });
@@ -548,8 +553,13 @@ describe('Best-effort browser unload warning (M4-T11; ui-ux.md §10)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start Game' }));
     await screen.findByRole('region', { name: 'Game Table' });
 
-    const duringSession = new Event('beforeunload', { cancelable: true });
-    expect(window.dispatchEvent(duringSession)).toBe(false); // prevented: unfinished Session progress
+    // Retried for the same reason as the next test's identical check (M5-T03 review: this one flaked under
+    // full-suite CPU contention): the Game Table appearing does not guarantee the `beforeunload` listener's
+    // own effect has already run. The expectation itself is unchanged.
+    await waitFor(() => {
+      const duringSession = new Event('beforeunload', { cancelable: true });
+      expect(window.dispatchEvent(duringSession)).toBe(false); // prevented: unfinished Session progress
+    });
   });
 
   it('stops warning once the Session\'s own official result exists (M4-T13 UI refinement follow-up: no more unload warning once Session Summary is reachable)', async () => {
@@ -575,11 +585,12 @@ describe('Best-effort browser unload warning (M4-T11; ui-ux.md §10)', () => {
 
     const afterSummary = new Event('beforeunload', { cancelable: true });
     expect(window.dispatchEvent(afterSummary)).toBe(true); // no longer prevented: nothing left to lose
-    // 45000ms (M4-T15 stabilization round): `driveToSessionSummary` drives a real, fully-automatic
-    // five-Round Session end to end - the same inherent per-Turn cost `session-summary.test.tsx`'s own
-    // two full-Session tests document and measure (their own comment has the full reasoning and the
-    // measured worst case under synthetic full-suite-level CPU contention). Same justification, same value.
-  }, 45000);
+    // FULL_SESSION_TIMEOUT_MS (M4-T15 stabilization round; raised in M5-T03 review): `driveToSessionSummary`
+    // drives a real, fully-automatic five-Round Session end to end - the same inherent per-Turn cost
+    // `session-summary.test.tsx`'s own two full-Session tests document and measure (their own comment has
+    // the full reasoning and the measured worst case under synthetic full-suite-level CPU contention). Same
+    // justification, same value.
+  }, FULL_SESSION_TIMEOUT_MS);
 });
 
 describe('Leave Game abandons the Session (M4-T11 follow-up)', () => {
