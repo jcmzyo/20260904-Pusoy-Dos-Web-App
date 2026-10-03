@@ -722,6 +722,39 @@
   transform: translateX(-50%);
 }
 
-.portrait:not(.portraitTall) .seat > .revealedHand > *:not(:first-child) {
-  margin-left: -34px;
+.portrait .seat > .revealedHand {
+  width: max-content;
+  min-width: 0;
+  align-self: center;
+  z-index: 2;
+  --card-index-min-font-size: 14px;
+}
+
+.portrait .seat:has(> .revealedHand) {
+  width: 100%;
+}
+
+.portrait .seatWest > .revealedHand,
+.portrait:not(.portraitTall) .seatWest > .revealedHand {
+  align-self: flex-start;
+  left: 0;
+  transform: none;
+}
+
+.portrait .seatEast > .revealedHand,
+.portrait:not(.portraitTall) .seatEast > .revealedHand {
+  align-self: flex-end;
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.portrait .seat > .revealedHand > *:not(:first-child) {
+  margin-left: -16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tableDimmed {
+    transition: none;
+  }
 }
