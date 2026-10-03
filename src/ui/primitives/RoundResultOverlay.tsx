@@ -199,41 +199,41 @@ export function RoundResultOverlay({ roundNumber, seats, placements, priorPlacem
       }}>
         <h2 ref={headingRef} tabIndex={-1} className={styles.title}>Round {roundNumber} Result</h2>
         <div className={styles.body}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col">Player</th>
-              {/* Reduced-motion results retain these columns because their scoring stages were skipped.
-               *  Otherwise Previous/Round are only meaningful while the scoring reveal is in progress -
-               *  once settled (rows already reordered by the new cumulative Total), both become hidden
-               *  (`visibility: hidden`, not removed) rather than dropping out of the table's own layout:
-               *  removing them outright would narrow/reflow the table the instant it settles, which the
-               *  person's own follow-up request explicitly ruled out ("nothing will shorten or size
-               *  adjustment"). `visibility: hidden` keeps each column's own reserved width exactly as it
-               *  was throughout, and - in a real browser - drops it from the accessibility tree the same
-               *  way removing it would (round-result.e2e.ts covers this real-rendering concern; CSS Module
-               *  rules are never actually applied in jsdom, so RoundResultOverlay.test.tsx instead checks
-               *  for this class directly, the same way other jsdom tests here check CSS-driven state). */}
-              <th scope="col" className={hideSettledColumns ? styles.settledHidden : undefined}>Previous</th>
-              <th scope="col" className={hideSettledColumns ? styles.settledHidden : undefined}>Round</th>
-              <th scope="col">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayOrder.map((row) => (
-              // Restrained highlight for the human's own seat (ui-ux.md §13 follow-up, M4-T13 UI
-              // refinement, extended here to Round Result too) - `row.name` is already literally "You"
-              // (SessionPresentation's own seat naming), so this is purely an additional glance-able cue,
-              // not what carries the meaning (§15's label-plus-color rule).
-              <tr key={row.playerId} className={row.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
-                <td>{row.name}</td>
-                <td className={hideSettledColumns ? styles.settledHidden : undefined}>{row.previousTotal}</td>
-                <td className={hideSettledColumns ? styles.settledHidden : undefined}>{showRoundPoints ? `+${row.points}` : '—'}</td>
-                <td>{showTotal ? row.totalScore : '—'}</td>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th scope="col">Player</th>
+                {/* Reduced-motion results retain these columns because their scoring stages were skipped.
+                 *  Otherwise Previous/Round are only meaningful while the scoring reveal is in progress -
+                 *  once settled (rows already reordered by the new cumulative Total), both become hidden
+                 *  (`visibility: hidden`, not removed) rather than dropping out of the table's own layout:
+                 *  removing them outright would narrow/reflow the table the instant it settles, which the
+                 *  person's own follow-up request explicitly ruled out ("nothing will shorten or size
+                 *  adjustment"). `visibility: hidden` keeps each column's own reserved width exactly as it
+                 *  was throughout, and - in a real browser - drops it from the accessibility tree the same
+                 *  way removing it would (round-result.e2e.ts covers this real-rendering concern; CSS Module
+                 *  rules are never actually applied in jsdom, so RoundResultOverlay.test.tsx instead checks
+                 *  for this class directly, the same way other jsdom tests here check CSS-driven state). */}
+                <th scope="col" className={hideSettledColumns ? styles.settledHidden : undefined}>Previous</th>
+                <th scope="col" className={hideSettledColumns ? styles.settledHidden : undefined}>Round</th>
+                <th scope="col">Total</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {displayOrder.map((row) => (
+                // Restrained highlight for the human's own seat (ui-ux.md §13 follow-up, M4-T13 UI
+                // refinement, extended here to Round Result too) - `row.name` is already literally "You"
+                // (SessionPresentation's own seat naming), so this is purely an additional glance-able cue,
+                // not what carries the meaning (§15's label-plus-color rule).
+                <tr key={row.playerId} className={row.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
+                  <td>{row.name}</td>
+                  <td className={hideSettledColumns ? styles.settledHidden : undefined}>{row.previousTotal}</td>
+                  <td className={hideSettledColumns ? styles.settledHidden : undefined}>{showRoundPoints ? `+${row.points}` : '—'}</td>
+                  <td>{showTotal ? row.totalScore : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
         {/* Round 5 has no continuation button at all (ui-ux.md §12 follow-up, M4-T13 UI refinement) - the
          *  settled-stage effect above calls `onContinue` on its own after a short additional delay. */}

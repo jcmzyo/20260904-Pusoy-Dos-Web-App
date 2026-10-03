@@ -434,7 +434,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
   - **Next Round is never focused automatically**; it is the first Tab stop. Enter or Space on the dialog surface only skips to the settled state, and each skip input is used once.
   - There is no Escape handling; the lifecycle in §12 is unchanged.
   - When Round 5 is replaced by the Session Summary, focus moves to the Summary heading. The Summary's Tab order is Event Log → Home → Play Again.
-  - After the Round-start transition, if focus was lost, it moves to the hand.
+  - After Next Round closes a Round Result overlay for Rounds 1–4, completion of the Round-start transition moves focus to the hand’s current tabbable card with `preventScroll: true` only if focus is on `document.body`. If no tabbable hand card exists, recovery does nothing. The opening Round after Start Game does not perform this recovery: focus remains on `document.body`, so the first Tab reaches Event Log. Round 5 → Session Summary keeps focus on the Summary heading. Reduced motion does not change these focus rules.
 - **Unsupported-layout notice:** when the notice appears it takes focus. When the size recovers, the previously focused element gets focus back if it still exists.
 - **Screen readers:** M5 adds no screen-reader live-region announcements. Names, roles, and states are required.
 

@@ -577,11 +577,11 @@ export function SessionTable({
   const isTransitioning = startingRound !== null;
   const wasTransitioning = useRef(isTransitioning);
   useEffect(() => {
-    if (wasTransitioning.current && !isTransitioning && document.activeElement === document.body) {
+    if (wasTransitioning.current && !isTransitioning && resultPhase === 'result' && document.activeElement === document.body) {
       document.querySelector<HTMLElement>('[role="listbox"][aria-label="Your hand"] [tabindex="0"]')?.focus({ preventScroll: true });
     }
     wasTransitioning.current = isTransitioning;
-  }, [isTransitioning]);
+  }, [isTransitioning, resultPhase]);
   useEffect(() => {
     if (!isTransitioning) return;
     presentation.pause();
