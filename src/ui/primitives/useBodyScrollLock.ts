@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
 
+let lockCount = 0;
+let previousOverflow = '';
+
 /**
  * Prevents the page's own body from scrolling behind a full-viewport modal/overlay while one is mounted
  * (the person's own follow-up report: "I can still scroll the background even if the cursor is at the
@@ -16,10 +19,14 @@ import { useEffect } from 'react';
  */
 export function useBodyScrollLock(): void {
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (lockCount === 0) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    lockCount++;
     return () => {
-      document.body.style.overflow = previousOverflow;
+      lockCount--;
+      if (lockCount === 0) document.body.style.overflow = previousOverflow;
     };
   }, []);
 }

@@ -186,14 +186,29 @@ describe('Modal overlays block gameplay, including from the keyboard (review fix
     await waitFor(() => expect(presentation.getSnapshot().events.slice(before)).toContainEqual(expect.objectContaining({ type: 'PLAYER_PASSED', playerId: 'south' })));
   });
 
-  it('returns keyboard focus to the control that opened an overlay once it closes', () => {
+  it.each(['Event Log', 'Check Discard Pile', 'Leave Game'])('returns focus to %s even when its click did not focus it', (name) => {
     render(<SessionTable presentation={fixture()} />);
-    const opener = screen.getByRole('button', { name: 'Event Log' });
-    opener.focus();
+    const opener = screen.getByRole('button', { name });
     fireEvent.click(opener);
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(opener);
+  });
+
+  it('history dialogs expose exactly the publicly played cards, including the current Trick, and no held cards', async () => {
+    const presentation = fixture();
+    for (let turn = 0; turn < 8; turn++) await presentation.runTurn();
+    const snapshot = presentation.getSnapshot();
+    const labels = snapshot.playedCards.map((card) => `${card.rank} of ${card.suit[0]!.toUpperCase()}${card.suit.slice(1)}`).sort();
+    expect(labels.length).toBeGreaterThan(0);
+    render(<SessionTable presentation={presentation} />);
+    for (const name of ['Event Log', 'Check Discard Pile']) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      const shown = within(screen.getByRole('dialog')).getAllByRole('img').map((card) => card.getAttribute('aria-label')).sort();
+      expect(shown).toEqual(labels);
+      fireEvent.keyDown(window, { key: 'Escape' });
+    }
+    presentation.destroy();
   });
 });
 
