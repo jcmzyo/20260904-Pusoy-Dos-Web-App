@@ -4,6 +4,7 @@ import { VIEWPORT_MATRIX, findViewport } from './viewportMatrix';
 import { waitForYourTurn } from './turnHelpers';
 
 async function paintedFocusRing(page: Page, target: Locator, declaredStyle?: { width: number; offset: number; color: number[] }) {
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const rect = (await target.boundingBox())!;
   const style = declaredStyle ?? await target.evaluate((element) => {
     const computed = getComputedStyle(element);
