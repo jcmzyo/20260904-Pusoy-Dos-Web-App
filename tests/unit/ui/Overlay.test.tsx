@@ -10,7 +10,7 @@ import { useBodyScrollLock } from '../../../src/ui/primitives/useBodyScrollLock'
 afterEach(cleanup);
 
 describe('M5-T05 dismissible dialog focus', () => {
-  it.each(['Event Log', 'Discard Pile'])('%s focuses its scrollable body and wraps both keyboard boundaries', (title) => {
+  it.each(['Event Log', 'Discard Pile'])('%s with empty history focuses its scrollable body and wraps both keyboard boundaries', (title) => {
     render(<StrictMode>{title === 'Event Log'
       ? <EventLogOverlay events={[]} names={{}} onClose={() => {}} />
       : <DiscardPileOverlay cards={[]} onClose={() => {}} />}</StrictMode>);

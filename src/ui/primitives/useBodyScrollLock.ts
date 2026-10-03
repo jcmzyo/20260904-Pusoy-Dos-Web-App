@@ -25,7 +25,8 @@ export function useBodyScrollLock(): void {
     }
     lockCount++;
     return () => {
-      lockCount--;
+      // The active-lock count must stay non-negative so later mounts can acquire the lock.
+      lockCount = Math.max(0, lockCount - 1);
       if (lockCount === 0) document.body.style.overflow = previousOverflow;
     };
   }, []);
