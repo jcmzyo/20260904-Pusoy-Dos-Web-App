@@ -272,6 +272,11 @@
   }
 }
 
+.header h2:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 3px;
+}
+
 @media (orientation: portrait) {
   .backdrop {
     padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));

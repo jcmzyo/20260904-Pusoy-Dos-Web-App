@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useReducedMotion } from './useReducedMotion';
 import styles from './PlayerPanel.module.css';
 
 const PLACEMENT_LABELS: Record<1 | 2 | 3 | 4, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
@@ -88,16 +89,17 @@ function resolveGlowClass({ isCurrentTurn, done, placement }: PlayerPanelProps):
  * alone, per ui-ux.md's accessibility expectations.
  */
 export function PlayerPanel(props: PlayerPanelProps) {
+  const reducedMotion = useReducedMotion();
   const { name, cardCount, score, isCurrentTurn, thinking = false, paused = false, playTrail, variant = 'full' } = props;
   const status = resolveStatus(props);
   const glowClass = resolveGlowClass(props);
   const spinner = thinking && (
     <span
-      className={styles.spinner}
+      className={reducedMotion ? styles.deciding : styles.spinner}
       style={paused ? { animationPlayState: 'paused' } : undefined}
       role="status"
       aria-label={`${name} is deciding`}
-    />
+    >{reducedMotion ? 'deciding' : null}</span>
   );
   const cards = `${cardCount} card${cardCount === 1 ? '' : 's'}`;
   if (variant !== 'full') {

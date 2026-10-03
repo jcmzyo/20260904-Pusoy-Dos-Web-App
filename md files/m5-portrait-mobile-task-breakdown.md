@@ -177,7 +177,7 @@ An approved measurable contract that implementation agents can follow without in
 - Resolved in M5-T04 (PR #101; originally found during M5-T03 tablet-portrait manual testing on October 2, 2026): neighboring held-card taps now target the visible card correctly.
   - The raised card's hit target moves with its face, so tapping the exposed strip beneath it reaches the visible neighboring card.
   - Touch taps tolerate up to 12px of horizontal movement before starting a drag; the 4px mouse threshold is unchanged. Automated coverage includes 6px, 10px, and 12px touch movement.
-- Deferred to M5-T06 (found in M5-T03 tablet-portrait manual testing, October 2, 2026): with the device's reduce-motion setting on, the bot "deciding" spinner is a frozen ring that reads as stuck. `PlayerPanel.module.css` only removes the animation; ui-ux.md §19.6.6 requires static "deciding" text instead.
+- Resolved in M5-T06 (PR #103): the reduced-motion bot ‘deciding’ indicator now renders static `deciding` text in `PlayerPanel.tsx`, replacing the frozen spinner ring and satisfying ui-ux.md §19.6.6. Component tests cover live preference changes.
 
 **Baseline observations:** recorded in ui-ux.md §19.6.1. They describe the code before M5 and are not portrait acceptance evidence.
 

@@ -8,7 +8,7 @@ import { GameRunner } from '../../../src/orchestrator';
 import type { PlayerTurnRequest } from '../../../src/orchestrator';
 import { App } from '../../../src/ui/App';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 const ids = ['south', 'west', 'north', 'east'];
 
@@ -76,7 +76,8 @@ async function clickThroughRoundResult(): Promise<'more' | 'done'> {
 }
 
 describe('Session Summary reachable and actionable from <App> (M4-T13; ui-ux.md §3/§13)', () => {
-  it('reaches Session Summary after Round 5, and Play Again starts a genuinely fresh Session through the same startup boundary as Home\'s own Start Game', async () => {
+  it.each([false, true])('reaches Session Summary after Round 5, and Play Again starts a genuinely fresh Session through the same startup boundary as Home\'s own Start Game (reduced motion: %s)', async (reducedMotion) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: reducedMotion && query === '(prefers-reduced-motion: reduce)', addEventListener: () => {}, removeEventListener: () => {} }));
     // Driving a real, fully-automatic five-Round Session through <App> (many Turns across five Tricks
     // per Round) genuinely takes longer than Vitest's 5000ms default test timeout; the sub-`findByRole`
     // calls below already have their own generous 10000ms timeout, so the test itself needs at least as

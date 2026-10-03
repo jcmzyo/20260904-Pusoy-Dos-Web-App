@@ -575,6 +575,13 @@ export function SessionTable({
   // initial transition needs its own explicit pause, the same reference-counted pause/resume every other
   // overlay here already uses, rather than relying on Round-completion status to do it implicitly.
   const isTransitioning = startingRound !== null;
+  const wasTransitioning = useRef(isTransitioning);
+  useEffect(() => {
+    if (wasTransitioning.current && !isTransitioning && resultPhase === 'result' && document.activeElement === document.body) {
+      document.querySelector<HTMLElement>('[role="listbox"][aria-label="Your hand"] [tabindex="0"]')?.focus({ preventScroll: true });
+    }
+    wasTransitioning.current = isTransitioning;
+  }, [isTransitioning, resultPhase]);
   useEffect(() => {
     if (!isTransitioning) return;
     presentation.pause();

@@ -6,6 +6,7 @@ import type { BasicSessionResult } from '../../engine/sessions/basicSessionResul
 import { EventLogOverlay } from './EventLogOverlay';
 import { HUMAN_PLAYER_ID } from './humanPlayer';
 import { useBodyScrollLock } from './useBodyScrollLock';
+import { useResultFocus } from './useResultFocus';
 import styles from './SessionSummary.module.css';
 
 const PLACEMENT_LABELS: Record<1 | 2 | 3 | 4, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
@@ -85,6 +86,7 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
   useBodyScrollLock();
 
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const { panelRef, headingRef, containFocus } = useResultFocus();
   const nameOf = (playerId: PlayerId): string => seats.find((seat) => seat.playerId === playerId)?.name ?? playerId;
   const standingOf = (playerId: PlayerId) => {
     const standing = result.standings.find((entry) => entry.playerId === playerId);
@@ -100,10 +102,10 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
     <div className={styles.backdrop}>
       {/* Inert while its own Event Log popup is open on top of it, so Home/Play Again/Event Log cannot be
        *  reached from the keyboard underneath that modal. */}
-      <section className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen}>
+      <section ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen} onKeyDown={containFocus}>
         <header className={styles.header}>
           <p className={styles.eyebrow}>SESSION COMPLETE</p>
-          <h2>Session Summary</h2>
+          <h2 ref={headingRef} tabIndex={-1}>Session Summary</h2>
         </header>
 
         {tiebreakExplanation !== null && <p className={styles.tiebreak}>{tiebreakExplanation}</p>}
