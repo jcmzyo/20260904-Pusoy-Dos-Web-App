@@ -3,7 +3,7 @@
 ## Milestone Design + Task Breakdown (v1.1)
 
 **Status:** Phase 2 implementation plan based on approved scope; detailed decisions gated by the named contract tasks  
-**Last Modified:** October 2, 2026  
+**Last Modified:** October 3, 2026\
 **Milestone:** M5 --- Portrait & Mobile Experience  
 **Phase:** Phase 2 --- Mobile Accessibility, Onboarding, and Player Experience Expansion  
 **Parent requirements:** requirements.md v1.17  
@@ -172,8 +172,8 @@ An approved measurable contract that implementation agents can follow without in
 - Portrait controls run Event Log / Discard Pile / Leave Game, the hand, Sort, then Pass | Play (Play on the right). Portrait Tab order follows: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play. This revises the portrait Tab order in ui-ux.md §19.6.4; landscape is unchanged.
 - The compact panel shows the "deciding" indicator on its own row below the status. In the tall tier the human's own panel is stacked like the others rather than a one-row strip.
 - In a fine-pointer (desktop browser) portrait window held cards are capped at 72px wide. Portrait cards are otherwise slightly smaller (at most 14.5% of the viewport width and 88px). The utility buttons sit 12px below the table and share one width so Discard Pile is exactly centered. Sort Rank/Sort Suit share one width (their gap lines up with Pass/Play's) and are drawn 32px tall inside their 44px target. The human's own panel keeps room inside the table border for its glow. Pass/Play are each centered in their own half of the row at up to 160×62px, smaller than a held card.
-- Deferred to M5-T06: in portrait, the Session Summary's Round-by-Round table looks compressed (its title and the last, R5, column).
-- Deferred to M5-T05 (found in M5-T03 desktop keyboard testing, October 2, 2026): in the Leave Game confirmation, the keyboard focus outline on **Stay** and **Yes, Leave Game** is cut off at the bottom right. The dialog body is a scroll container (`Overlay.module.css`, `overflow-y: auto`) that clips the outline drawn 3px outside the buttons. This predates M5.
+- Resolved in M5-T05 (PR #102; user-requested refinement, documented October 3, 2026): portrait Session Summary now has equal R1–R5 column spacing, room for Total, a centered Round-by-Round caption, and aligned Event Log/Home/Play Again actions. `summary-layout.e2e.ts` covers the supported viewport matrix. This layout work is no longer deferred to M5-T06; remaining result lifecycle, focus, and reduced-motion work stays in T06.
+- Resolved in M5-T05 (PR #102; originally found in M5-T03 desktop keyboard testing, October 2, 2026): Leave confirmation's **Stay** and **Yes, Leave Game** actions now sit outside the scrolling body in the fixed footer, so their 3px outlines with 3px offsets remain visible. `portrait-dialogs.e2e.ts` verifies painted rings and includes outline-disabled negative controls. Nested scroll locking and pause/cancellation semantics remain intact.
 - Resolved in M5-T04 (PR #101; originally found during M5-T03 tablet-portrait manual testing on October 2, 2026): neighboring held-card taps now target the visible card correctly.
   - The raised card's hit target moves with its face, so tapping the exposed strip beneath it reaches the visible neighboring card.
   - Touch taps tolerate up to 12px of horizontal movement before starting a drag; the 4px mouse threshold is unchanged. Automated coverage includes 6px, 10px, and 12px touch movement.
@@ -343,6 +343,12 @@ Open each dialog using touch and keyboard, scroll long content, close/cancel, an
 
 Portrait overlays retain safe lifecycle behavior and usable focus.
 
+### Amendment and Evidence Record (October 3, 2026)
+
+The user approved keeping Event Log entry focus instead of restoring body focus and explicitly authorized applying the documentation corrections on October 3, 2026. The agent updated ui-ux.md §19.6.4, testing-simulation.md's frozen M5 automated assertions, the two resolved records above, and T06's remaining Summary scope. These edits record implemented behavior; they do not declare the task accepted solely because tests pass.
+
+The user reports that the tester confirmed all M5-T05 manual checks at the first patch and reconfirmed that the gameplay changes are good on October 3, 2026. This includes opening dialogs, scrolling long content, closing/cancelling, confirming Leave in a separate run, and the expected reachable controls, focus return, paused gameplay, and preserved progress after cancellation. Tester identity, actual execution date, browser/version, device/OS, viewport sizes, and input methods were not recorded. Manual-result confirmation is recorded, but the requested evidence provenance remains NOT VERIFIED; DoD item 4 remains incomplete until that record is supplied.
+
 ### Definition of Done
 
 - [ ] History/leave surfaces fit and remain usable across matrix.
@@ -365,7 +371,7 @@ AGENTS.md; this milestone §§1–10 and this task; [requirements.md](requiremen
 
 ### Work
 
-- Adapt fourth-place reveal, Round Result, and Session Summary to portrait, including official ordering/points, five-Round rows, Event Log, Home, and Play Again.
+- Adapt fourth-place reveal and Round Result to portrait. Retain and regression-check the Session Summary layout completed in M5-T05 (official ordering/points, five-Round rows, Event Log, Home, and Play Again); do not redo its column spacing, caption centering, or action alignment. Complete the remaining result lifecycle, keyboard-focus, and reduced-motion work below.
 - Preserve explicit Next Round for Rounds 1–4 and automatic Round 5 Summary; tutorial work must not be introduced here.
 - Apply reduced-motion preference across existing meaningful card/result motion and selection emphasis without removing required feedback or awaiting absent animation events.
 - Ensure skip input is consumed once, keyboard focus lands sensibly through result transitions, and restart/leave cleanup remains intact.

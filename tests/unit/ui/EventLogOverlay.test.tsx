@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Combination } from '../../../src/domain';
 import type { GameEvent } from '../../../src/engine';
@@ -121,6 +121,34 @@ describe('describeEvent / describeEvents (M4-T10; ui-ux.md §9.2)', () => {
 });
 
 describe('EventLogOverlay (M4-T10)', () => {
+  it('focuses the newest event and navigates individual entries with bounded arrows and Home/End', () => {
+    const events: readonly GameEvent[] = [
+      { type: 'ROUND_STARTED', roundNumber: 1 },
+      { type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'west' },
+      { type: 'PLAYER_PASSED', roundNumber: 1, playerId: 'north' },
+    ];
+    render(<EventLogOverlay events={events} names={NAMES} onClose={() => {}} />);
+    const entries = screen.getAllByRole('listitem');
+    expect(document.activeElement).toBe(entries[2]);
+    expect(entries.map((entry) => entry.tabIndex)).toEqual([-1, -1, 0]);
+    expect(screen.getByRole('region', { name: 'Event Log content' }).tabIndex).toBe(-1);
+    fireEvent.keyDown(entries[2]!, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(entries[2]);
+    fireEvent.keyDown(entries[2]!, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(entries[1]);
+    expect(entries.map((entry) => entry.tabIndex)).toEqual([-1, 0, -1]);
+    fireEvent.keyDown(entries[1]!, { key: 'Home' });
+    fireEvent.keyDown(entries[0]!, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(entries[0]);
+    fireEvent.keyDown(entries[0]!, { key: 'End' });
+    expect(document.activeElement).toBe(entries[2]);
+    fireEvent.keyDown(entries[2]!, { key: 'Tab' });
+    const close = screen.getByRole('button', { name: 'Close Event Log' });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(entries[2]);
+  });
+
   it('renders entries oldest-first, top to bottom, so the very first event is literally at the top', () => {
     const events: readonly GameEvent[] = [
       { type: 'ROUND_STARTED', roundNumber: 1 },

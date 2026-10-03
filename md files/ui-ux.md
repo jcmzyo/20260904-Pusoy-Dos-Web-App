@@ -3,7 +3,7 @@
 ## UI / UX Document (v1.15)
 
 **Status:** Phase 1 baseline plus committed Phase 2 design contracts  
-**Last Modified:** October 2, 2026  
+**Last Modified:** October 3, 2026\
 **Parent document:** `requirements.md` v1.17  
 **Committed scope:** Phase 2 M5–M8, preserving the completed Phase 1 UI
 
@@ -424,7 +424,8 @@ This is the state of the code at M5-T01 (`27abb0d`):
 - **Focus indicator:** every focusable element shows a visible indicator: an outline at least 2px thick with at least 3:1 contrast against the adjacent colors. A focused card is raised in stacking order, not moved in position, so its whole outline is visible. Rising in position remains reserved for selection.
 - **Disabled feedback:** Play and Pass use `aria-disabled="true"` instead of native `disabled`, so they stay focusable. Activating either while it is aria-disabled does nothing. The Engine-derived reason text stays visible and is connected through `aria-describedby`.
 - **Dismissible dialogs** (Event Log, Discard Pile, Leave confirmation):
-  - Opening a dialog moves focus into it. Event Log and Discard Pile focus their scrollable body, which is focusable so the arrow keys scroll it. The Leave dialog focuses **Stay**.
+  - Opening a dialog moves focus into it. Discard Pile focuses its scrollable body so the arrow keys scroll it. The Leave dialog focuses **Stay**.
+  - Event Log (approved by the user during M5-T05 review; documented October 3, 2026): opening a nonempty log focuses and highlights the newest entry. Entries retain list/listitem semantics (`<ol>`/`<li>`), not listbox/option or selection semantics. Exactly one entry has `tabindex="0"`; other entries and the scrollable body have `tabindex="-1"`. Arrow Up/Down move to the previous/next entry, Home/End move to the first/last entry, and navigation does not wrap. The focused entry scrolls into view. Tab reaches Close; Shift+Tab from Close returns to the focused entry. An empty log focuses its scrollable body instead. This replaces the earlier Event Log body-focus contract; public chronology and information visibility are unchanged.
   - Tab and Shift+Tab cycle only within the dialog, and background controls are inert.
   - Escape closes the dialog; for Leave, Escape means Stay.
   - On close, focus returns to the opener. If the opener is gone, focus goes to the hand.

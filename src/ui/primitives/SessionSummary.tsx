@@ -167,7 +167,7 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
         {/* Event Log, Home, Play Again, in that order (the person's own follow-up request) - Play Again
          *  last/rightmost as the primary/default action. */}
         <div className={styles.actions}>
-          <button type="button" className={styles.secondaryButton} onClick={() => setIsLogOpen(true)}>Event Log</button>
+          <button type="button" className={styles.secondaryButton} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setIsLogOpen(true); }}>Event Log</button>
           <button type="button" className={styles.secondaryButton} onClick={onHome}>Home</button>
           <button type="button" className={styles.primaryButton} onClick={onPlayAgain}>Play Again</button>
         </div>

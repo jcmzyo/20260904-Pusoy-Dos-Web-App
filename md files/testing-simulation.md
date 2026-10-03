@@ -3,7 +3,7 @@
 ## Testing & Simulation Document (v1.10)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 29, 2026
+**Last Modified:** October 3, 2026
 **Parent document:** `requirements.md` v1.17  
 **Shared model:** `domain-model.md` v1.4  
 **Engine design:** `engine.md` v1.8  
@@ -2124,6 +2124,7 @@ Automated checks assert geometry and behavior. They never assert animation durat
   - card identity is preserved after sorting and reordering;
   - focus lands in the right place after a Play;
   - focus enters, is contained in, and returns from each dialog;
+  - Event Log opens on its newest entry, keeps only the focused entry in the Tab order, navigates with Arrow Up/Down and Home/End without wrapping, and scrolls the focused entry into view; Tab from a middle entry reaches Close directly and Shift+Tab returns to that entry. An empty log and Discard Pile focus their scrollable body; Leave focuses Stay (user-approved M5-T05 amendment, October 3, 2026);
   - no background element responds to keyboard input;
   - Next Round is never focused automatically, and a skip never continues.
 - **Reduced motion** (`page.emulateMedia({ reducedMotion: 'reduce' })` plus RTL `matchMedia` stubs):
@@ -2132,7 +2133,7 @@ Automated checks assert geometry and behavior. They never assert animation durat
   - Round 5 still reaches the Summary;
   - the preference can change during a Session.
 - **Contrast:** computed colors of the listed elements checked against the §19.6.5 thresholds. Color states always have text or shape equivalents.
-- **Focus indicator:** for each focusable control type, and for a focused card, the computed `outline-width` is 2px or more when focused (`:focus-visible`), and the outline color reaches at least 3:1 against the adjacent composited background (§19.6.4).
+- **Focus indicator:** for each focusable control type, and for a focused card, the computed `outline-width` is 2px or more when focused (`:focus-visible`), and the outline color reaches at least 3:1 against the adjacent composited background (§19.6.4). Width alone is insufficient evidence that an outline is painted. The M5-T05 dialog checks open each dialog by focusing its opener and pressing Enter, require `:focus-visible` and `outline-style: solid`, and count declared outline-color pixels in screenshots at `scale: 'css'` against a geometric minimum. Sample the entry's inset -3px outline and the body's and Leave buttons' outset +3px outlines (Close uses +2px), allowing one raster pixel at fractional edges. Negative controls disable each tested outline while retaining the original sampling geometry/color and must fall below the same threshold. Assert `window.scrollY === 0` before measuring because the probe combines viewport-relative bounds with document-relative screenshot clips. This amendment was authorized by the user on October 3, 2026; contrast checks remain required separately.
 
 ### Browser, device, and evidence assignments (requirements §12.5; nothing is removed)
 

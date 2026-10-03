@@ -51,7 +51,14 @@ for (const opener of [
     // A blocked Pass cannot be activated by force-focusing it and pressing Enter (done before any Tab, so
     // that Enter can never land on one of the dialog's own controls, e.g. "Yes, Leave Game").
     await page.getByRole('button', { name: 'Pass', exact: true }).evaluate((button) => (button as HTMLElement).focus());
+    expect(await page.getByRole('dialog', { name: opener.dialog }).evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
     await page.keyboard.press('Enter');
+    if (opener.dialog === 'Leave Game') {
+      // M5-T05 focuses Stay on entry: blocked background focus leaves Enter on that safe action.
+      await expect(page.getByRole('dialog', { name: opener.dialog })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: opener.button, exact: true })).toBeFocused();
+      await page.getByRole('button', { name: opener.button, exact: true }).click();
+    }
     await expect(page.getByRole('dialog', { name: opener.dialog })).toBeVisible();
     await expect(page.getByText('You passed.')).toHaveCount(0);
 

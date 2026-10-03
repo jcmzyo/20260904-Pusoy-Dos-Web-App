@@ -1,19 +1,10 @@
 .list {
   margin: 0;
-  padding: 0 10px 0 0;
+  padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 360px;
-  overflow-y: auto;
-  /* Reserves the scrollbar's own track as a permanent gutter (rather than having it overlap content only
-   * while actually scrollable), plus this own 10px of real padding on top of that gutter - the person's
-   * own follow-up report: "the edge of the event and the scroll bar... is still too close, add some small
-   * spacing" (a first pass here only widened `.entry`'s own inner padding, which the scrollbar's track
-   * still sat flush against). Falls back to ordinary overlap in the rare browser without `scrollbar-
-   * gutter` support; the padding here still helps there too. */
-  scrollbar-gutter: stable;
 }
 
 .entry {
@@ -26,6 +17,11 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 4px 8px;
+}
+
+.entry:focus-visible {
+  outline: 3px solid white;
+  outline-offset: -3px;
 }
 
 /* Just the human player's own NAME within an entry, not the whole entry (the person's own follow-up

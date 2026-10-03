@@ -663,13 +663,13 @@ export function SessionTable({
       {/* No latest-event preview line (M4-T10 follow-up; the person's own follow-up request): the
        *  center table's own current hand to beat already shows the latest Play, and a variable-length
        *  preview line was changing this button's own height as events came in. */}
-      <button type="button" className={styles.sideButton} onClick={() => setOverlay('eventLog')}>Event Log</button>
+      <button type="button" className={styles.sideButton} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setOverlay('eventLog'); }}>Event Log</button>
       {/* "Check Discard Pile" rather than bare "Discard Pile" (the person's own follow-up request): the
        *  noun phrase alone read as if clicking it would discard the player's own pile of cards, rather
        *  than opening the overlay to inspect it. The overlay's own title (below) stays "Discard Pile" -
        *  a heading naming what is inside it, with no action-verb ambiguity once it is already open. */}
-      <button type="button" className={styles.sideButton} onClick={() => setOverlay('discardPile')}>Check Discard Pile</button>
-      <button type="button" className={`${styles.sideButton} ${styles.leaveButton}`} onClick={() => setOverlay('leaveConfirm')}>Leave Game</button>
+      <button type="button" className={styles.sideButton} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setOverlay('discardPile'); }}>Check Discard Pile</button>
+      <button type="button" className={`${styles.sideButton} ${styles.leaveButton}`} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setOverlay('leaveConfirm'); }}>Leave Game</button>
     </div>,
     <HumanHand key="hand" cards={snapshot.humanHand} maxSelectable={maxSelectableCards(snapshot.center)} onSelectionChange={setSelectedCards} />,
     <PlayPassControls

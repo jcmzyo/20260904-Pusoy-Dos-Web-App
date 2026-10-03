@@ -218,7 +218,7 @@
  * (the grid reuses the same children, in the same order), so the whole Summary and its Play Again/Home
  * actions stay inside the viewport without an inner scrollbar. Width is never the constraint here: the
  * frozen minimum supported landscape width (667px) already fits two ~300px tables. */
-@media (max-height: 660px) {
+@media (orientation: landscape) and (max-height: 660px) {
   .backdrop {
     padding: 12px;
   }
@@ -269,5 +269,55 @@
   .primaryButton,
   .secondaryButton {
     padding: 8px 24px;
+  }
+}
+
+@media (orientation: portrait) {
+  .backdrop {
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .panel {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .rankingTable,
+  .roundsTable {
+    table-layout: fixed;
+  }
+
+  .tableCaption {
+    padding: 8px 4px;
+  }
+
+  .rankingTable th,
+  .rankingTable td,
+  .roundsTable th,
+  .roundsTable td {
+    padding: 4px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .roundsTable th:first-child {
+    width: 22%;
+  }
+
+  .roundsTable th:last-child {
+    width: 18%;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(560px, 100%);
+    gap: 8px;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    padding: 10px 4px;
+    font-size: 14px;
   }
 }
