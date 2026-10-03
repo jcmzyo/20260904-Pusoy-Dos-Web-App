@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/domain';
 import { HumanHand } from '../../../src/ui/primitives/HumanHand';
@@ -20,17 +20,149 @@ function slotOf(rank: string, suitLabel: string): HTMLElement {
 }
 
 function orderedKeys(): string[] {
-  return within(screen.getByRole('group', { name: 'Your hand' }))
+  return within(screen.getByRole('listbox', { name: 'Your hand' }))
     .getAllByRole('img')
     .map((img) => img.closest('[data-card-key]')!.getAttribute('data-card-key')!);
 }
 
 afterEach(cleanup);
 
+describe('M5-T04 keyboard, focus, and gesture safety', () => {
+  it.each([0, 1, 13])('exposes %i cards with one roving Tab stop when nonempty', (count) => {
+    const ranks: Card['rank'][] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+    render(<HumanHand cards={ranks.slice(0, count).map((rank) => c(rank, 'clubs'))} maxSelectable={5} />);
+    const list = screen.getByRole('listbox', { name: 'Your hand' });
+    expect(list.getAttribute('aria-multiselectable')).toBe('true');
+    expect(list.getAttribute('aria-orientation')).toBe('horizontal');
+    expect(within(list).queryAllByRole('option')).toHaveLength(count);
+    expect(list.querySelectorAll('[tabindex="0"]')).toHaveLength(count ? 1 : 0);
+    expect(document.getElementById(list.getAttribute('aria-describedby')!)?.textContent).toBe('← → choose · Space select · Shift+← → move');
+  });
+
+  it('navigates without wrapping and selects with Space/Enter without submitting or repeating', () => {
+    render(<HumanHand cards={hand} maxSelectable={1} />);
+    const first = slotOf('2', 'Hearts');
+    const last = slotOf('7', 'Clubs');
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'End' });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: ' ' });
+    fireEvent.keyDown(last, { key: ' ', repeat: true });
+    expect(last.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(last, { key: 'Home' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'Enter' });
+    expect(first.getAttribute('aria-selected')).toBe('false');
+    fireEvent.keyDown(last, { key: 'Enter' });
+    expect(last.getAttribute('aria-selected')).toBe('false');
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(slotOf('3', 'Diamonds'));
+  });
+
+  it.each([false, true])('reorders a selected=%s card at all keyboard boundaries, preserving identity and focus through both sorts', (selected) => {
+    render(<HumanHand cards={hand} maxSelectable={5} />);
+    const target = slotOf('3', 'Clubs');
+    act(() => target.focus());
+    if (selected) fireEvent.keyDown(target, { key: ' ' });
+    fireEvent.keyDown(target, { key: 'ArrowLeft', shiftKey: true });
+    expect(orderedKeys()[1]).toBe('3-clubs');
+    fireEvent.keyDown(target, { key: 'ArrowRight', shiftKey: true });
+    expect(orderedKeys()[2]).toBe('3-clubs');
+    for (const key of ['Home', 'ArrowLeft', 'Home']) fireEvent.keyDown(target, { key, shiftKey: true });
+    expect(orderedKeys()[0]).toBe('3-clubs');
+    for (const key of ['End', 'ArrowRight', 'End']) fireEvent.keyDown(target, { key, shiftKey: true });
+    expect(orderedKeys().at(-1)).toBe('3-clubs');
+    for (const name of ['Sort Rank', 'Sort Suit']) {
+      fireEvent.click(screen.getByRole('button', { name }));
+      expect(document.activeElement).toBe(target);
+      expect(target.getAttribute('aria-selected')).toBe(String(selected));
+      expect(new Set(orderedKeys()).size).toBe(hand.length);
+    }
+  });
+
+  it('recovers focus at the same index, clamps to the last card, then uses Sort Rank when empty', () => {
+    const report = vi.fn();
+    const { rerender } = render(<HumanHand cards={hand} maxSelectable={5} onSelectionChange={report} />);
+    const target = slotOf('3', 'Clubs');
+    act(() => target.focus());
+    fireEvent.keyDown(target, { key: ' ' });
+    rerender(<HumanHand cards={hand.filter((card) => card.rank !== '3')} maxSelectable={5} onSelectionChange={report} />);
+    expect(document.activeElement).toBe(slotOf('7', 'Clubs'));
+    expect(report.mock.calls.every(([cards]) => cards.every((card: Card | undefined) => card !== undefined))).toBe(true);
+    rerender(<HumanHand cards={[hand[0]!]} maxSelectable={5} />);
+    expect(document.activeElement).toBe(slotOf('2', 'Hearts'));
+    rerender(<HumanHand cards={[]} maxSelectable={5} />);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Sort Rank' }));
+  });
+
+  it('does not steal focus from another control when cards leave', () => {
+    const { rerender } = render(<HumanHand cards={hand} maxSelectable={5} />);
+    act(() => slotOf('2', 'Hearts').focus());
+    const sort = screen.getByRole('button', { name: 'Sort Suit' });
+    act(() => sort.focus());
+    rerender(<HumanHand cards={hand.slice(1)} maxSelectable={5} />);
+    expect(document.activeElement).toBe(sort);
+  });
+
+  it.each([6, 10, 12])('keeps a touch tap with %ipx jitter separate from drag', (delta) => {
+    render(<HumanHand cards={hand} maxSelectable={5} />);
+    const target = slotOf('3', 'Clubs');
+    const before = orderedKeys();
+    fireEvent.pointerDown(target, { pointerId: 1, pointerType: 'touch', button: 0, clientX: 100 });
+    fireEvent.pointerMove(target, { pointerId: 1, clientX: 100 + delta });
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: 100 + delta });
+    fireEvent.click(target);
+    expect(target.dataset.selected).toBe('true');
+    expect(orderedKeys()).toEqual(before);
+  });
+
+  it('cancels on capture loss and ignores a second pointer during drag', () => {
+    render(<HumanHand cards={hand} maxSelectable={5} />);
+    const target = slotOf('3', 'Clubs');
+    const before = orderedKeys();
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 100 });
+    fireEvent.pointerMove(target, { pointerId: 1, clientX: 300 });
+    fireEvent.pointerDown(slotOf('7', 'Clubs'), { pointerId: 2, button: 0, clientX: 100 });
+    fireEvent.lostPointerCapture(target, { pointerId: 1 });
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: 300 });
+    expect(orderedKeys()).toEqual(before);
+    expect(target.style.transform).toBe('');
+    fireEvent.click(target);
+    expect(target.dataset.selected).toBe('true');
+  });
+
+  it('does not drop a gesture against a changed authoritative card set', () => {
+    const { rerender } = render(<HumanHand cards={hand} maxSelectable={5} />);
+    const target = slotOf('3', 'Clubs');
+    fireEvent.pointerDown(target, { pointerId: 1, button: 0, clientX: 100 });
+    fireEvent.pointerMove(target, { pointerId: 1, clientX: 300 });
+    rerender(<HumanHand cards={hand.slice(1)} maxSelectable={5} />);
+    fireEvent.pointerUp(target, { pointerId: 1, clientX: 300 });
+    fireEvent.click(target);
+    expect(orderedKeys()).toEqual(['3-diamonds', '3-clubs', 'A-spades', '7-clubs']);
+    expect(target.dataset.selected).toBe('false');
+  });
+
+  it('blocks synthetic keyboard, sort and pointer input behind an inert surface', () => {
+    render(<div inert><HumanHand cards={hand} maxSelectable={5} /></div>);
+    const target = document.querySelector('[data-card-key]') as HTMLElement;
+    fireEvent.keyDown(target, { key: 'Enter' });
+    fireEvent.keyDown(target, { key: 'End', shiftKey: true });
+    fireEvent.click(target);
+    fireEvent.click(screen.getByText('Sort Rank'));
+    expect(target.dataset.selected).toBe('false');
+    expect(document.querySelector('[data-card-key]')).toBe(target);
+  });
+});
+
 describe('HumanHand rendering (M4-T07)', () => {
   it('renders every card face-up on one baseline plus the always-visible Sort controls', () => {
     render(<HumanHand cards={hand} maxSelectable={FREE_PLAY_CAP} />);
-    expect(screen.getByRole('group', { name: 'Your hand' })).toBeTruthy();
+    expect(screen.getByRole('listbox', { name: 'Your hand' })).toBeTruthy();
     for (const card of hand) {
       expect(cardOf(card.rank, card.suit[0]!.toUpperCase() + card.suit.slice(1))).toBeTruthy();
     }
@@ -59,7 +191,7 @@ describe('Selection (M4-T07)', () => {
     expect(target.dataset.selected).toBe('false');
 
     fireEvent.click(target);
-    fireEvent.click(screen.getByRole('group', { name: 'Your hand' }));
+    fireEvent.click(screen.getByRole('listbox', { name: 'Your hand' }));
     expect(target.dataset.selected).toBe('true');
   });
 
@@ -257,7 +389,7 @@ describe('Drag under a scaled play area (M4-T14)', () => {
     const dragged = slotOf('3', 'Clubs');
     Object.defineProperty(dragged, 'offsetWidth', { configurable: true, value: layoutWidth });
     dragged.getBoundingClientRect = () => ({ left: 100, right: 100 + renderedWidth, width: renderedWidth, top: 0, bottom: 40, height: 40, x: 100, y: 0, toJSON() {} });
-    screen.getByRole('group', { name: 'Your hand' }).getBoundingClientRect = () => ({ left: 0, right: 1000, width: 1000, top: 0, bottom: 40, height: 40, x: 0, y: 0, toJSON() {} });
+    screen.getByRole('listbox', { name: 'Your hand' }).getBoundingClientRect = () => ({ left: 0, right: 1000, width: 1000, top: 0, bottom: 40, height: 40, x: 0, y: 0, toJSON() {} });
     fireEvent.pointerDown(dragged, { pointerId: 10, clientX: 100, button: 0 });
     fireEvent.pointerMove(dragged, { pointerId: 10, clientX: 100 + pointerDelta });
     const transform = dragged.style.transform;

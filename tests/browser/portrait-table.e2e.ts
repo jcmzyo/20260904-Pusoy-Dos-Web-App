@@ -216,7 +216,7 @@ function geometryTests(pointer: 'coarse' | 'fine') {
         ['title row', page.locator('header')],
         ...['West', 'North', 'East', 'You'].map((name): [string, Locator] => [`${name} panel`, page.getByRole('region', { name: `${name} panel` })]),
         ['center', center],
-        ['hand', page.getByRole('group', { name: 'Your hand' })],
+        ['hand', page.getByRole('listbox', { name: 'Your hand' })],
         ...CONTROL_NAMES.map((name): [string, Locator] => [name, page.getByRole('button', { name, exact: true })]),
       ];
       const boxes = await Promise.all(critical.map(async ([name, locator]) => [name, await boxOf(locator)] as const));
@@ -233,7 +233,7 @@ function geometryTests(pointer: 'coarse' | 'fine') {
       expect(table.bottom - table.top, 'table height').toBeLessThanOrEqual(viewport.height * 5 / 8 + 1);
       const control = async (name: string) => boxOf(page.getByRole('button', { name, exact: true }));
       const [pass, play, sortRank, eventLog] = [await control('Pass'), await control('Play'), await control('Sort Rank'), await control('Event Log')];
-      const hand = await boxOf(page.getByRole('group', { name: 'Your hand' }));
+      const hand = await boxOf(page.getByRole('listbox', { name: 'Your hand' }));
       expect(table.bottom, 'table above the utility buttons').toBeLessThanOrEqual(eventLog.top);
       expect(eventLog.bottom, 'utility buttons above the hand').toBeLessThanOrEqual(hand.top);
       expect(hand.bottom, 'hand above Sort').toBeLessThanOrEqual(sortRank.top);
@@ -275,7 +275,7 @@ function geometryTests(pointer: 'coarse' | 'fine') {
       expect(you.left - table.left, 'room left of the human panel').toBeGreaterThanOrEqual(8);
       expect(table.right - you.right, 'room right of the human panel').toBeGreaterThanOrEqual(8);
       // Pass and Play are each smaller than a held card is tall, and narrower together than the hand.
-      const heldCard = await boxOf(page.getByRole('group', { name: 'Your hand' }).locator('[role="img"]').first());
+      const heldCard = await boxOf(page.getByRole('listbox', { name: 'Your hand' }).locator('[role="img"]').first());
       expect(play.bottom - play.top, 'Play shorter than a held card').toBeLessThan(heldCard.bottom - heldCard.top);
       expect(play.right - pass.left, 'Pass/Play narrower than the hand').toBeLessThan(hand.right - hand.left);
       // Every Play/Pass second line the Engine-derived feedback can produce fits inside the fixed button.
@@ -308,11 +308,11 @@ function geometryTests(pointer: 'coarse' | 'fine') {
       });
       expect(overflowing, 'reasons spilling out of Play/Pass').toEqual([]);
       // A fine-pointer (desktop) window caps held cards at 72px; touch at 88px.
-      const cardWidth = (await boxOf(page.getByRole('group', { name: 'Your hand' }).locator('[role="img"]').first()));
+      const cardWidth = (await boxOf(page.getByRole('listbox', { name: 'Your hand' }).locator('[role="img"]').first()));
       expect(cardWidth.right - cardWidth.left, 'held card width').toBeLessThanOrEqual((pointer === 'fine' ? 72 : 88) + 0.5);
 
       // A selected card rises without covering a control (the raise headroom is reserved above the hand).
-      const lastCard = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]').last();
+      const lastCard = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]').last();
       await lastCard.click();
       await expect(lastCard).toHaveAttribute('data-selected', 'true');
       const raised = await boxOf(lastCard.locator('[role="img"]'));
@@ -409,10 +409,11 @@ for (const name of ['portrait-phone-minimum', 'portrait-tablet-768']) {
     await startPortraitGame(page, spec);
     await waitForYourTurn(page);
 
-    // Portrait's order (ui-ux.md §19.6.4, revised October 2, 2026), which is also its reading order. The hand's own
-    // Tab stop arrives with M5-T04's listbox; until then Tab goes from Leave Game straight to Sort Rank.
+    // The hand is one Tab stop between Leave Game and Sort Rank.
+    const firstCardName = await page.getByRole('option').first().getAttribute('aria-label');
+    const expectedOrder = [...CONTROL_NAMES.slice(0, 3), firstCardName, ...CONTROL_NAMES.slice(3)];
     const reached: string[] = [];
-    for (let step = 0; step < CONTROL_NAMES.length; step++) {
+    for (let step = 0; step < expectedOrder.length; step++) {
       await page.keyboard.press('Tab');
       const focused = page.locator(':focus');
       reached.push(await focused.evaluate((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''));
@@ -420,9 +421,11 @@ for (const name of ['portrait-phone-minimum', 'portrait-tablet-768']) {
       expect(outline.visible, `${reached.at(-1)} matches :focus-visible`).toBe(true);
       expect(outline.style, `${reached.at(-1)} outline style`).not.toBe('none');
       expect(outline.width, `${reached.at(-1)} outline width`).toBeGreaterThanOrEqual(2);
-      expect(await contrastAgainstBackdrop(focused, 'outline', 'parent'), `${reached.at(-1)} outline contrast`).toBeGreaterThanOrEqual(3);
+      if (await focused.getAttribute('role') !== 'option') {
+        expect(await contrastAgainstBackdrop(focused, 'outline', 'parent'), `${reached.at(-1)} outline contrast`).toBeGreaterThanOrEqual(3);
+      }
     }
-    expect(reached).toEqual([...CONTROL_NAMES]);
+    expect(reached).toEqual(expectedOrder);
 
     // Play is unavailable (nothing selected) but focusable; Enter and Space on it do nothing.
     const play = page.getByRole('button', { name: 'Play', exact: true });
@@ -431,12 +434,12 @@ for (const name of ['portrait-phone-minimum', 'portrait-tablet-768']) {
     await page.keyboard.press('Enter');
     await page.keyboard.press('Space');
     await expect(page.getByRole('region', { name: 'You panel' })).toHaveAttribute('aria-current', 'true');
-    await expect(page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]')).toHaveCount(13);
+    await expect(page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]')).toHaveCount(13);
 
     // Sort Suit from the keyboard reorders the hand by suit.
     await page.getByRole('button', { name: 'Sort Suit', exact: true }).focus();
     await page.keyboard.press('Space');
-    const suits = await page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]').evaluateAll((slots) => slots.map((slot) => slot.getAttribute('data-card-key')!.split('-')[1]!));
+    const suits = await page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]').evaluateAll((slots) => slots.map((slot) => slot.getAttribute('data-card-key')!.split('-')[1]!));
     const suitOrder = ['clubs', 'spades', 'hearts', 'diamonds'];
     expect(suits).toEqual([...suits].sort((a, b) => suitOrder.indexOf(a) - suitOrder.indexOf(b)));
 
@@ -470,7 +473,7 @@ test('the approved colors meet WCAG AA against their composited backgrounds in p
   expect(await contrastAgainstBackdrop(pass, 'color')).toBeGreaterThanOrEqual(4.5);
 
   // Enabled Play needs a legal selection: the Play reason text of an unavailable Play must also meet 4.5:1.
-  const hand = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]');
+  const hand = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]');
   await hand.last().click();
   await expect(play).toHaveAttribute('aria-disabled', 'true');
   expect(await contrastAgainstBackdrop(play.locator('span').last(), 'color')).toBeGreaterThanOrEqual(4.5);

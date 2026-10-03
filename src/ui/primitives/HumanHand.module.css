@@ -49,6 +49,7 @@
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
+  transition: translate 120ms ease;
 }
 
 /* Each card after the first overlaps its neighbor so that only `--card-exposed` (`.handArea` above) of
@@ -63,12 +64,43 @@
   cursor: grabbing;
 }
 
-.lift {
-  transition: transform 120ms ease;
+.cardSlot:focus-visible {
+  z-index: 21;
+  outline: 3px solid #172b24;
+  outline-offset: -3px;
+  border-radius: 6px;
 }
 
-.lift.selected {
-  transform: translateY(-18px);
+/* The opaque face paints over an inset outline on its ancestor, so paint the ring on the face itself. */
+.cardSlot:focus-visible [role="img"] {
+  outline: 3px solid #172b24;
+  outline-offset: -3px;
+}
+
+.cardSlot.selected {
+  /* Move the hit target with its face. Independent translate preserves the drag's horizontal transform. */
+  translate: 0 -18px;
+}
+
+.keyboardHint {
+  display: none;
+  font-size: 14px;
+  line-height: 16px;
+  color: #f7f4e9;
+}
+
+.handArea:has(.cardSlot:focus-visible) .keyboardHint {
+  display: block;
+}
+
+.handArea:has(.cardSlot:focus-visible) {
+  gap: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardSlot {
+    transition: none;
+  }
 }
 
 /* Sort Rank/Sort Suit side by side, centered, below the hand within the same middle container

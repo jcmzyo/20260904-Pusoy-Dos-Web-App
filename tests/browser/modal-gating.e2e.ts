@@ -73,7 +73,7 @@ test('Escape closes an overlay opened from the keyboard and returns focus to the
 
 test('an unsupported-layout interruption keeps the hand arrangement, selection, open Event Log and started Round', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const slots = hand.locator('[data-card-key]');
   await expect(slots).toHaveCount(13);
 
@@ -120,7 +120,7 @@ test('the current Turn glow is the documented cyan, not the earlier sky blue or 
 
 test('a cancelled real drag leaves the hand order untouched and does not swallow the next card click', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const slots = hand.locator('[data-card-key]');
   await expect(slots).toHaveCount(13);
   const keys = () => slots.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-card-key')));

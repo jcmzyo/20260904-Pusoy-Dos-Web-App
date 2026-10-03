@@ -108,7 +108,7 @@ test.describe('touch device (coarse pointer) rotation and undersizing', () => {
     await expectComposition(page, 'portrait-phone');
     await waitForYourTurn(page);
 
-    const slots = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]');
+    const slots = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]');
     await slots.last().click();
     const before = await handState(page);
     expect(before.selected).toHaveLength(1);
@@ -217,7 +217,7 @@ test.describe('touch device (coarse pointer) rotation and undersizing', () => {
 
 test('a resize during an active drag cancels it: nothing is dropped, the order is unchanged, and no card is selected', async ({ page }) => {
   await startGameAt(page, findViewport('laptop'));
-  const slots = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]');
+  const slots = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]');
   await expect(slots).toHaveCount(13);
   const before = await handState(page);
 

@@ -657,6 +657,13 @@
   padding: 12px 4px 8px;
 }
 
+/* Reclaim spacing for the keyboard hint at 360×560 while keeping the card/control sizes and the
+ * 12px table-to-utility gap. */
+.portrait .bottomBar:has([role="option"]:focus-visible) {
+  gap: 0;
+  padding-bottom: 0;
+}
+
 /* Three equal-width buttons, centered as a group, so Check Discard Pile sits exactly under the middle of Sort
  * Rank/Sort Suit and the hand. Each is at most 130px wide; a label that does not fit wraps onto a second line
  * within the 44px height. */

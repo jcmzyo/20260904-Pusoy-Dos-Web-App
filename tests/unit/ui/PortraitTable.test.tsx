@@ -60,7 +60,7 @@ async function respondingHumanTable(composition: SupportedLayout) {
 
 function slotFor(card: Card): HTMLElement {
   const suitLabel = card.suit[0]!.toUpperCase() + card.suit.slice(1);
-  return within(screen.getByRole('group', { name: 'Your hand' }))
+  return within(screen.getByRole('listbox', { name: 'Your hand' }))
     .getByRole('img', { name: `${card.rank} of ${suitLabel}` })
     .closest('[data-card-key]') as HTMLElement;
 }
@@ -251,7 +251,7 @@ describe('Portrait controls and composition switches (ui-ux.md §19.6.2-§19.6.4
     expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent))
       .toEqual(['Event Log', 'Check Discard Pile', 'Leave Game', 'Sort Rank', 'Sort Suit', 'Pass', 'Play']);
     // The hand sits between Leave Game and Sort Rank in document order.
-    const hand = screen.getByRole('group', { name: 'Your hand' });
+    const hand = screen.getByRole('listbox', { name: 'Your hand' });
     expect(screen.getByRole('button', { name: 'Leave Game' }).compareDocumentPosition(hand) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(hand.compareDocumentPosition(screen.getByRole('button', { name: 'Sort Rank' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     for (const name of ['Play', 'Pass']) {
@@ -274,14 +274,14 @@ describe('Portrait controls and composition switches (ui-ux.md §19.6.2-§19.6.4
     const selected = () => Array.from(document.querySelectorAll('[data-card-key][data-selected="true"]')).map((slot) => slot.getAttribute('data-card-key'));
     const arranged = order();
     const selection = selected();
-    const hand = screen.getByRole('group', { name: 'Your hand' });
+    const hand = screen.getByRole('listbox', { name: 'Your hand' });
 
     for (const composition of ['portrait-phone', 'portrait-tablet', 'landscape', 'portrait-phone'] as const) {
       rerender(<SessionTable presentation={presentation} composition={composition} />);
       expect(screen.getByRole('region', { name: 'Game Table' })).toBe(table);
       expect(table.closest('[data-play-area-scale]')).toBe(area);
       // The hand is the same element in every composition, not remounted.
-      expect(screen.getByRole('group', { name: 'Your hand' })).toBe(hand);
+      expect(screen.getByRole('listbox', { name: 'Your hand' })).toBe(hand);
       if (composition === 'landscape') {
         expect(area.style.transform).toMatch(/^scale\(/);
       } else {
