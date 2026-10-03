@@ -71,6 +71,12 @@
   border-radius: 6px;
 }
 
+/* The opaque face paints over an inset outline on its ancestor, so paint the ring on the face itself. */
+.cardSlot:focus-visible [role="img"] {
+  outline: 3px solid #172b24;
+  outline-offset: -3px;
+}
+
 .cardSlot.selected {
   /* Move the hit target with its face. Independent translate preserves the drag's horizontal transform. */
   translate: 0 -18px;

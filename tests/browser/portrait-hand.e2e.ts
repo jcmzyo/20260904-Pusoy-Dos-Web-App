@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { findViewport, SUPPORTED_PORTRAIT_VIEWPORTS } from './viewportMatrix';
 import { waitForYourTurn } from './turnHelpers';
 
@@ -12,6 +12,77 @@ async function start(page: Page) {
 
 async function keys(page: Page) {
   return page.getByRole('option').evaluateAll((cards) => cards.map((card) => card.getAttribute('data-card-key')));
+}
+
+async function paintedFocusRing(page: Page, target: Locator) {
+  await target.evaluate(async (element) => { await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)); });
+  const face = target.getByRole('img');
+  const rect = (await face.boundingBox())!;
+  const clip = { x: Math.max(0, Math.floor(rect.x) - 4), y: Math.max(0, Math.floor(rect.y) - 4), width: Math.ceil(rect.width) + 8, height: Math.ceil(rect.height) + 8 };
+  const screenshot = await page.screenshot({ clip, scale: 'css' });
+  const style = await face.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return { width: parseFloat(computed.outlineWidth), scale: element.getBoundingClientRect().width / (element as HTMLElement).offsetWidth };
+  });
+  const pixels = await page.evaluate(async ({ png, rect, clip, style }) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${png}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    const data = context.getImageData(0, 0, image.width, image.height).data;
+    const ring = [23, 43, 36];
+    const left = rect.x - clip.x, top = rect.y - clip.y;
+    const right = left + rect.width, bottom = top + rect.height;
+    const thickness = style.width * style.scale;
+    const solidThickness = Math.max(1, Math.floor(thickness));
+    const sides: boolean[][] = [[], [], [], []];
+    let count = 0;
+    for (let y = 0; y < image.height; y++) {
+      for (let x = 0; x < image.width; x++) {
+        const edge = [Math.abs(x + 0.5 - left) <= thickness + 1, Math.abs(x + 0.5 - right) <= thickness + 1,
+          Math.abs(y + 0.5 - top) <= thickness + 1, Math.abs(y + 0.5 - bottom) <= thickness + 1];
+        if (x + 0.5 < left - 1 || x + 0.5 > right + 1 || y + 0.5 < top - 1 || y + 0.5 > bottom + 1 || !edge.some(Boolean)) continue;
+        const offset = (y * image.width + x) * 4;
+        if (!ring.every((channel, index) => Math.abs(data[offset + index]! - channel) <= 8)) continue;
+        count++;
+        edge.forEach((matches, side) => { if (matches) sides[side]![side < 2 ? y : x] = true; });
+      }
+    }
+    const runs = sides.map((side) => {
+      let longest = 0, current = 0;
+      for (let index = 0; index < side.length; index++) {
+        current = side[index] ? current + 1 : 0;
+        longest = Math.max(longest, current);
+      }
+      return longest;
+    });
+    const luminance = (color: number[]) => color.map((n) => n / 255).map((n) => n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4).reduce((sum, n, i) => sum + n * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const adjacent = [[left + thickness + 1, (top + bottom) / 2], [right - thickness - 1, (top + bottom) / 2],
+      [(left + right) / 2, top + thickness + 1], [(left + right) / 2, bottom - thickness - 1]];
+    const contrasts = adjacent.map(([x, y]) => {
+      const offset = (Math.floor(y!) * image.width + Math.floor(x!)) * 4;
+      const a = luminance(ring), b = luminance([data[offset]!, data[offset + 1]!, data[offset + 2]!]);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+    return { count, runs, minimum: Math.floor(0.75 * (2 * solidThickness * (rect.width + rect.height) - 4 * solidThickness ** 2)),
+      contrast: Math.min(...contrasts) };
+  }, { png: screenshot.toString('base64'), rect, clip, style });
+  return { ...pixels, screenshot, rect, width: style.width };
+}
+
+async function expectPaintedFocusRing(page: Page, target: Locator) {
+  const ring = await paintedFocusRing(page, target);
+  expect(ring.width).toBeGreaterThanOrEqual(2);
+  expect(ring.count, 'painted focus-ring pixels').toBeGreaterThanOrEqual(ring.minimum);
+  for (const [side, run] of ring.runs.entries()) {
+    expect(run, `contiguous focus band on side ${side}`).toBeGreaterThanOrEqual((side < 2 ? ring.rect.height : ring.rect.width) * 0.65);
+  }
+  expect(ring.contrast).toBeGreaterThanOrEqual(3);
+  return ring;
 }
 
 for (const spec of [...SUPPORTED_PORTRAIT_VIEWPORTS, findViewport('large-phone-landscape')]) {
@@ -94,15 +165,7 @@ for (const name of [...SUPPORTED_PORTRAIT_VIEWPORTS.map((spec) => spec.name), 'l
       expect(box.x + box.width).toBeLessThanOrEqual(spec.width);
       expect(box.y + box.height).toBeLessThanOrEqual(spec.height);
     }
-    const contrast = await target.evaluate((element) => {
-      const style = getComputedStyle(element);
-      const background = getComputedStyle(element.querySelector('[role="img"]')!).backgroundColor;
-      const luminance = (rgb: string) => rgb.match(/[\d.]+/g)!.slice(0, 3).map(Number).map((n) => n / 255).map((n) => n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4).reduce((sum, n, i) => sum + n * [0.2126, 0.7152, 0.0722][i]!, 0);
-      const a = luminance(style.outlineColor), b = luminance(background);
-      return { width: parseFloat(style.outlineWidth), ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) };
-    });
-    expect(contrast.width).toBeGreaterThanOrEqual(2);
-    expect(contrast.ratio).toBeGreaterThanOrEqual(3);
+    await expectPaintedFocusRing(page, target);
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Sort Rank' })).toBeFocused();
     await page.keyboard.press('Enter');
@@ -120,6 +183,31 @@ for (const name of [...SUPPORTED_PORTRAIT_VIEWPORTS.map((spec) => spec.name), 'l
     await expect(target).toHaveAttribute('aria-selected', 'true');
   });
 }
+
+test('focus pixel probe distinguishes the shipped face ring from the occluded ancestor ring', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 560 });
+  await start(page);
+  await page.getByRole('button', { name: 'Leave Game', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  const target = page.getByRole('option').first();
+  const shipped = await expectPaintedFocusRing(page, target);
+  await target.getByRole('img').evaluate((face) => {
+    (face as HTMLElement).style.outline = '3px solid #172b24';
+    (face as HTMLElement).style.outlineOffset = '-3px';
+  });
+  const control = await expectPaintedFocusRing(page, target);
+  await target.evaluate((element) => {
+    const slot = element as HTMLElement;
+    slot.style.outline = '3px solid #172b24';
+    slot.style.outlineOffset = '-3px';
+    (slot.querySelector('[role="img"]') as HTMLElement).style.outlineColor = 'transparent';
+  });
+  const occluded = await paintedFocusRing(page, target);
+  expect(occluded.count).toBeLessThan(shipped.minimum);
+  await testInfo.attach('shipped-focus-ring', { body: shipped.screenshot, contentType: 'image/png' });
+  await testInfo.attach('control-face-ring', { body: control.screenshot, contentType: 'image/png' });
+  console.log(`Focus pixels: shipped=${shipped.count}, face control=${control.count}, occluded ancestor=${occluded.count}; minimum=${shipped.minimum}; contrast=${shipped.contrast.toFixed(2)}:1`);
+});
 
 for (const pointer of ['mouse', 'touch'] as const) {
   test.describe(`${pointer} bounded portrait drag`, () => {
