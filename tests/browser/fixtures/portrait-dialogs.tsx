@@ -11,7 +11,10 @@ import '../../../src/ui/App.module.css';
 
 // Genuine public history from a reproducible production Round, including physically unique discards.
 let seed = 8;
-const presentation = new SessionPresentation(startSession<PlayerController>(createSessionConfiguration(), {
+const configuration = new URLSearchParams(location.search).has('longNames')
+  ? createSessionConfiguration(() => ['Alexandria-Cassandra', 'Maximilian Christopher', 'Charlotte Montgomery'])
+  : createSessionConfiguration();
+const presentation = new SessionPresentation(startSession<PlayerController>(configuration, {
   engineRng: { next: () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; } },
   humanController: { playerId: 'south', chooseMove: async (request) => request.legalMoves.find((move) => move.kind === 'play') ?? request.legalMoves[0]! },
 }));

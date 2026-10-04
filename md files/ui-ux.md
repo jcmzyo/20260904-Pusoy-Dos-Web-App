@@ -473,7 +473,7 @@ This is the state of the code at M5-T01 (`27abb0d`):
 - **When the preference is set:**
   - A selected card appears raised instantly, with no transition; its raised position is kept.
   - Table dimming and other opacity or filter transitions are instant.
-  - The bot "deciding" spinner becomes static "deciding" text.
+  - The bot "deciding" spinner becomes a static three-dot indicator. It does not cycle or animate, and its accessible name remains "<seat> is deciding", so the seat is still announced as deciding.
   - The Round Result opens **already settled**, with final ordering, Round points, and totals all visible.
   - With the Round Result already settled, a skip input does nothing. Next Round is still required for Rounds 1–4. Round 5 still moves to the Session Summary on its existing timer.
   - The Round-start transition screen and the 4th-place reveal keep their durations and their skip rules, without any movement.

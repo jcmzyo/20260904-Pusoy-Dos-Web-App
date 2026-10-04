@@ -99,7 +99,7 @@ export function PlayerPanel(props: PlayerPanelProps) {
       style={paused ? { animationPlayState: 'paused' } : undefined}
       role="status"
       aria-label={`${name} is deciding`}
-    >{reducedMotion ? 'deciding' : null}</span>
+    >{reducedMotion ? '...' : null}</span>
   );
   const cards = `${cardCount} card${cardCount === 1 ? '' : 's'}`;
   if (variant !== 'full') {
