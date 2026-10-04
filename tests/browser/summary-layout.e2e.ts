@@ -26,6 +26,13 @@ for (const spec of VIEWPORT_MATRIX.filter((entry) => entry.category === 'support
         captionOffset: Math.abs(caption.x + caption.width / 2 - card.x - card.width / 2),
         roundWidths: columns.slice(1, 6).map((box) => box.width),
         totalVisible: columns[6]!.right <= card.right,
+        scoreOffsets: Array.from(table.querySelectorAll('tbody td:not(:first-child)')).map((cell) => {
+          const box = cell.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(cell);
+          const text = range.getBoundingClientRect();
+          return Math.abs(text.x + text.width / 2 - box.x - box.width / 2);
+        }),
         buttons,
         panelCenter: panel.x + panel.width / 2,
       };
@@ -34,6 +41,7 @@ for (const spec of VIEWPORT_MATRIX.filter((entry) => entry.category === 'support
     expect(geometry.overflow).toEqual([]);
     expect(geometry.captionOffset).toBeLessThan(1);
     expect(geometry.totalVisible).toBe(true);
+    expect(Math.max(...geometry.scoreOffsets)).toBeLessThan(1);
     for (const button of geometry.buttons) {
       expect(button.width).toBeGreaterThanOrEqual(44);
       expect(button.height).toBeGreaterThanOrEqual(44);

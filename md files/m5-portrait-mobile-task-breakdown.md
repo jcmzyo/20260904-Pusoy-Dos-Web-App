@@ -433,11 +433,19 @@ Integrated M5 is ready for complete-Session acceptance with documented evidence 
 
 ### Definition of Done
 
-- [ ] All supported matrix cases checked; failures fixed or explicitly blocking acceptance.
-- [ ] No unnoticed landscape or input regression.
-- [ ] Documentation reflects delivered support without invented manual passes.
-- [ ] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete.
-- [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+- [x] All supported matrix cases checked; failures fixed or explicitly blocking acceptance. Accepted with the T07-only evidence waiver below.
+- [x] No unnoticed landscape or input regression. Automated sweep passed; no remaining defect reported.
+- [x] Documentation reflects delivered support without invented manual passes.
+- [x] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete. Accepted with the T07-only evidence waiver below.
+- [x] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Completion and User Acceptance — October 4, 2026
+
+**M5-T07: COMPLETE, with a user-approved manual-evidence waiver.** The user reported working desktop Chrome portrait/landscape, mobile Chrome, Safari, and portrait tablet, then explicitly instructed: "i vouch the other browsers for now so please pass the requirements". This accepts the remaining browser/device coverage and reporting gaps for T07; it does not claim those checks were executed. Unavailable targets remain NOT VERIFIED in README. M5-T08 and milestone acceptance gates are unchanged.
+
+Delivered: centered Round Result scores; measured Round-by-Round Summary centering; scrollable long-content portrait Summary with fixed heading/actions and keyboard/wheel access; responsive/input regressions; README matrix/evidence update; user-requested static `...` for reduced-motion thinking while retaining the accessible deciding label.
+
+Evidence: full 335-test browser sweep passed before the label-only follow-up; 35 focused result/layout checks passed. After the follow-up, `npm test` passed 1,135 tests across 88 files, `npm run typecheck` and `npm run build` passed, and both focused portrait/landscape static-dots browser checks passed. Exact commands and evidence limitations are recorded in README. No rules, dependencies, public contracts, or deferred features changed. Git commit/push and M5-T08 remain the user's next workflow steps.
 
 # M5-T08 — M5 Five-Round Acceptance and Regression Gate
 

@@ -77,12 +77,12 @@ it('keeps the Round 5 timer and pause gate under reduced motion; a skip does not
   expect(onContinue).toHaveBeenCalledTimes(1);
 });
 
-it('replaces the deciding ring with text on live reduced-motion changes', () => {
+it.each(['full', 'compact'] as const)('replaces the %s deciding ring with static dots on live reduced-motion changes', (variant) => {
   const preference = motion(false);
-  render(<PlayerPanel name="West" cardCount={13} score={0} isCurrentTurn thinking passed={false} done={false} placement={null} />);
+  render(<PlayerPanel name="West" cardCount={13} score={0} isCurrentTurn thinking passed={false} done={false} placement={null} variant={variant} />);
   expect(screen.getByRole('status').textContent).toBe('');
   preference.change(true);
-  expect(screen.getByRole('status').textContent).toBe('deciding');
+  expect(screen.getByRole('status', { name: 'West is deciding' }).textContent).toBe('...');
   preference.change(false);
   expect(screen.getByRole('status').textContent).toBe('');
 });

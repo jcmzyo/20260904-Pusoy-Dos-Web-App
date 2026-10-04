@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { GameEvent } from '../../engine';
 import type { PlayerId } from '../../domain';
 import type { BasicRoundResult } from '../../engine/rounds/resolveBasicRound';
@@ -86,6 +86,7 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
   useBodyScrollLock();
 
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const { panelRef, headingRef, containFocus } = useResultFocus();
   const nameOf = (playerId: PlayerId): string => seats.find((seat) => seat.playerId === playerId)?.name ?? playerId;
   const standingOf = (playerId: PlayerId) => {
@@ -102,12 +103,25 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
     <div className={styles.backdrop}>
       {/* Inert while its own Event Log popup is open on top of it, so Home/Play Again/Event Log cannot be
        *  reached from the keyboard underneath that modal. */}
-      <section ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen} onKeyDown={containFocus}>
+      <section ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen} onKeyDown={(event) => {
+        containFocus(event);
+        const body = bodyRef.current;
+        if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || !body || body.scrollHeight <= body.clientHeight) return;
+        // Keep the approved action-only Tab order while allowing keyboard reading of overflowing results.
+        const distance = event.key === 'ArrowDown' ? 40 : event.key === 'ArrowUp' ? -40
+          : event.key === 'PageDown' ? body.clientHeight : event.key === 'PageUp' ? -body.clientHeight
+          : event.key === 'End' ? body.scrollHeight : event.key === 'Home' ? -body.scrollHeight : 0;
+        if (distance !== 0) {
+          event.preventDefault();
+          body.scrollTop += distance;
+        }
+      }}>
         <header className={styles.header}>
           <p className={styles.eyebrow}>SESSION COMPLETE</p>
           <h2 ref={headingRef} tabIndex={-1}>Session Summary</h2>
         </header>
 
+        <div ref={bodyRef} className={styles.body} role="region" aria-label="Session results">
         {tiebreakExplanation !== null && <p className={styles.tiebreak}>{tiebreakExplanation}</p>}
 
         <div className={styles.tableCard}>
@@ -164,6 +178,8 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
               ))}
             </tbody>
           </table>
+        </div>
+
         </div>
 
         {/* Event Log, Home, Play Again, in that order (the person's own follow-up request) - Play Again
