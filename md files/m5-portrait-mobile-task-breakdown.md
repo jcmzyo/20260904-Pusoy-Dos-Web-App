@@ -177,7 +177,7 @@ An approved measurable contract that implementation agents can follow without in
 - Resolved in M5-T04 (PR #101; originally found during M5-T03 tablet-portrait manual testing on October 2, 2026): neighboring held-card taps now target the visible card correctly.
   - The raised card's hit target moves with its face, so tapping the exposed strip beneath it reaches the visible neighboring card.
   - Touch taps tolerate up to 12px of horizontal movement before starting a drag; the 4px mouse threshold is unchanged. Automated coverage includes 6px, 10px, and 12px touch movement.
-- Resolved in M5-T06 (PR #103): the reduced-motion bot ‘deciding’ indicator now renders static `deciding` text in `PlayerPanel.tsx`, replacing the frozen spinner ring and satisfying ui-ux.md §19.6.6. Component tests cover live preference changes.
+- Resolved in M5-T06 (PR #103): the reduced-motion bot ‘deciding’ indicator now renders static `deciding` text in `PlayerPanel.tsx`, replacing the frozen spinner ring and satisfying ui-ux.md §19.6.6. Component tests cover live preference changes. Superseded in M5-T07 (PR #104) by user-approved refinement: the visible label is now a static '...' indicator, with the accessible deciding label retained.
 
 **Baseline observations:** recorded in ui-ux.md §19.6.1. They describe the code before M5 and are not portrait acceptance evidence.
 
