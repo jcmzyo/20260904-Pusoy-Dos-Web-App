@@ -148,9 +148,30 @@ Automated results before the static-dots follow-up: `npm test` passed 1,134 test
 
 For each available target, check that every card can be selected/rearranged, selection stays raised after sorting, controls and feedback are understandable, dialogs scroll with visible actions, keyboard focus remains visible/contained, rotation preserves play, and reduced-motion results continue deliberately. Record tester/date, build, browser version, device, available viewport, input, actions, expected/observed results, and pass/fail. Unavailable targets remain NOT VERIFIED.
 
+### M5-T08 milestone gate evidence and acceptance
+
+Automated environment: October 5, 2026, Node 24.21.0, Playwright 1.63.0, `npm ci` from the existing lockfile, task branch based on `fd4ca91`. The commands ran in a Linux mirror of the branch because no shell on the development machine was available. Playwright's pinned Chromium was not installed there, so the browser suite ran on the pre-installed Chromium 141.0.7390.37 through a temporary out-of-repository config that overrides only the browser executable and output paths.
+
+New deterministic browser acceptance: `tests/browser/m5-session-acceptance.e2e.ts` drives one complete five-Round Basic Session through the production dev entry (`?e2eSeed=8`) on portrait phone 390 x 844 (touch), portrait tablet 768 x 1024 (touch), and the landscape regression path 1440 x 900 (fine pointer). Each Session plays Round 3 in the other orientation and rotates back while Round 3's Result is open. It checks the Round 1–4 Results and explicit Next Round, Round 5's automatic Session Summary, and the consistency of the rendered Summary tables. It then leaves through Play Again (fresh Round 1, all scores 0) or Home. The fake-clock Session driver now lives in `tests/browser/turnHelpers.ts`, shared with `responsive-hardening.e2e.ts`. When forced to lead, it targets each card's always-exposed left strip, because a card's center can sit under its neighbor in the portrait overlap.
+
+Automated results: `npm test` passed 1,135 tests in 88 files; `npm run typecheck` and `npm run build` passed; the full `npm run test:browser` passed 340 of 340 checks; `npm run test:browser -- m5-session-acceptance --repeat-each=3` passed 9 of 9; and `npm run test:acceptance:m3` passed 4 of 4: 32 of 32 Sessions and 160 Rounds completed, with all 8,388 actions accepted and zero invariant, controller, rejected-Move, or exception failures. No lint script exists.
+
+**Human report — October 5, 2026:** the user tested Safari, a tablet, mobile Chrome, and desktop, and reported that all worked properly with nothing blocked or not working. Exact browser versions, viewport dimensions, OS/platform, and individual checklist results were not supplied.
+
+**M5-T08 COMPLETE — user acceptance, October 5, 2026:** the user waived the remaining assigned scenarios because of limited device access and accepted the milestone gate. The targets below that were not tested remain NOT VERIFIED; this is a record of tests not performed, not of passes. Chromium mobile emulation and automated runs are not real-device evidence.
+
+| Human target | M5-T08 status |
+|---|---|
+| Desktop Chrome | Reported working; checklist details not supplied |
+| Desktop Edge | NOT VERIFIED — waived (no device access) |
+| Desktop Firefox | NOT VERIFIED — waived (no device access) |
+| Safari | Reported working; platform unspecified, so macOS- and iPhone-specific coverage NOT VERIFIED |
+| Real Android Chrome phone | Mobile Chrome reported working; device and five-Round details not supplied |
+| Real portrait tablet | Reported working; device/browser and five-Round details not supplied |
+
 ## Status
 
-The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 deterministic simulation and developer trace tooling, and the M4 playable UI (Home, a five-Round Basic Session against three Baseline bots, and the Session Summary). Phase 1 is the completed baseline. M5 portrait gameplay, keyboard/focus, and reduced-motion presentation are implemented; T07 is accepted with the recorded manual-evidence waiver. M5-T08 milestone acceptance and M6–M8 tutorial/reference and later acceptance work remain pending.
+The repository contains the M1 Basic Engine, M2 Orchestrator/Baseline AI, M3 deterministic simulation and developer trace tooling, and the M4 playable UI (Home, a five-Round Basic Session against three Baseline bots, and the Session Summary). Phase 1 is the completed baseline. M5 portrait gameplay, keyboard/focus, and reduced-motion presentation are implemented; T07 and the M5-T08 milestone gate are accepted with their recorded manual-evidence waivers, so M5 is complete. M6–M8 tutorial/reference and later acceptance work remain pending.
 
 ## Phase 2 planning
 

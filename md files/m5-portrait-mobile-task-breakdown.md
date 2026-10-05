@@ -54,12 +54,14 @@ M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and 
 
 # 8. Milestone Definition of Done
 
-- [ ] The approved portrait/landscape matrix and keyboard/reduced-motion contracts are frozen and reused by tests.
-- [ ] A human can complete all five Basic Rounds on supported portrait phone and tablet classes; supported landscape remains functional.
-- [ ] Every gameplay-critical action/status, all overlapped human cards, history overlays, and result actions are usable with required inputs.
-- [ ] Supported orientation/resize preserves state and below-minimum pause/recovery is coherent.
-- [ ] M5 keyboard/focus, sizing/contrast/non-color, and reduced-motion criteria have automated and required human evidence.
-- [ ] Required regression, browser, typecheck, build, and headless acceptance checks pass; required human checks are executed with no blocking defect.
+- [x] The approved portrait/landscape matrix and keyboard/reduced-motion contracts are frozen and reused by tests.
+- [x] A human can complete all five Basic Rounds on supported portrait phone and tablet classes; supported landscape remains functional.
+- [x] Every gameplay-critical action/status, all overlapped human cards, history overlays, and result actions are usable with required inputs.
+- [x] Supported orientation/resize preserves state and below-minimum pause/recovery is coherent.
+- [x] M5 keyboard/focus, sizing/contrast/non-color, and reduced-motion criteria have automated and required human evidence.
+- [x] Required regression, browser, typecheck, build, and headless acceptance checks pass; required human checks are executed with no blocking defect.
+
+Accepted at M5-T08 (October 5, 2026), with the user-approved manual-evidence waiver recorded there.
 
 # 9. Task Planning Principles
 
@@ -482,11 +484,19 @@ An accepted portrait/mobile checkpoint suitable for tutorial integration.
 
 ### Definition of Done
 
-- [ ] Every M5 milestone DoD item has passing evidence.
-- [ ] Required human acceptance executed with no blocking defect.
-- [ ] Full automated gates pass; no deferred feature required.
-- [ ] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete.
-- [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+- [x] Every M5 milestone DoD item has passing evidence. Automated evidence for every item; human evidence accepted with the waiver below.
+- [x] Required human acceptance executed with no blocking defect. Accepted with the waiver below.
+- [x] Full automated gates pass; no deferred feature required.
+- [x] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete. Accepted with the waiver below.
+- [x] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Completion and User Acceptance — October 5, 2026
+
+**M5-T08: COMPLETE, with a user-approved manual-evidence waiver.** The user tested Safari, a tablet, mobile Chrome, and desktop, and reported: "all are working properly ... nothing is blocked or not working". The user waived the remaining scenarios because of limited device access and instructed that the task be marked done. This accepts the remaining assigned browser/device coverage gaps; it does not claim those checks were executed. Untested targets remain NOT VERIFIED in README.
+
+Delivered: `tests/browser/m5-session-acceptance.e2e.ts`, which runs deterministic full five-Round Sessions on portrait phone (touch), portrait tablet (touch), and the landscape regression path, with a mid-Session orientation change, Round 5's automatic Summary, and Play Again/Home. The fake-clock Session driver moved into the shared `turnHelpers.ts` and now targets each card's exposed strip in the portrait overlap. Test-only changes.
+
+Evidence: `npm test` passed 1,135 tests in 88 files; `npm run typecheck` and `npm run build` passed; the full `npm run test:browser` passed 340 of 340 checks; `npm run test:acceptance:m3` passed, with 32 of 32 Sessions, 160 Rounds, and 0 failures. The environment and its limits are recorded in README. No rules, dependencies, public contracts, or deferred features changed. M5 is accepted; M6 is next, subject to the user's Git workflow.
 
 # 11. Dependency Order and Completion Evidence
 
