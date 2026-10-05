@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Card, PlayerId } from '../../domain';
 import type { GameEvent } from '../../engine';
 import { CardIndex } from './Card';
@@ -133,19 +133,21 @@ export interface EventLogOverlayProps {
  * first - scrolling up from there reaches progressively earlier entries, exactly as specified.
  */
 export function EventLogOverlay({ events, names, onClose }: EventLogOverlayProps) {
-  const listRef = useRef<HTMLOListElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const newestRef = useRef<HTMLLIElement>(null);
   const entries = describeEvents(events, names);
+  const [focusedKey, setFocusedKey] = useState(entries.at(-1)?.key);
 
   useEffect(() => {
-    const list = listRef.current;
+    const list = bodyRef.current;
     if (list) list.scrollTop = list.scrollHeight;
   }, []);
 
   return (
-    <Overlay title="Event Log" onClose={onClose}>
-      <ol ref={listRef} className={styles.list} aria-label="Session event history">
+    <Overlay title="Event Log" onClose={onClose} bodyRef={bodyRef} {...(entries.length > 0 ? { initialFocusRef: newestRef } : {})}>
+      <ol className={styles.list} aria-label="Session event history">
         {entries.length === 0 && <li className={styles.empty}>No events yet this Session.</li>}
-        {entries.map((entry) => {
+        {entries.map((entry, index) => {
           // ROUND_STARTED is the only entry with no actor of its own (`playerId: null`, describeEvent
           // above) - a Round-boundary marker rather than an ordinary event, so it gets its own more
           // prominent, centered treatment (the person's own follow-up request: "i think its better if
@@ -153,7 +155,20 @@ export function EventLogOverlay({ events, names, onClose }: EventLogOverlayProps
           // human's own `.you` name highlight.
           const isRoundMarker = entry.playerId === null;
           return (
-            <li key={entry.key} className={isRoundMarker ? `${styles.entry} ${styles.roundMarker}` : styles.entry}>
+            <li key={entry.key} className={isRoundMarker ? `${styles.entry} ${styles.roundMarker}` : styles.entry}
+              ref={index === entries.length - 1 ? newestRef : undefined}
+              tabIndex={entry.key === focusedKey ? 0 : -1}
+              onFocus={() => setFocusedKey(entry.key)}
+              onKeyDown={(event) => {
+                let next: number;
+                if (event.key === 'ArrowUp') next = Math.max(0, index - 1);
+                else if (event.key === 'ArrowDown') next = Math.min(entries.length - 1, index + 1);
+                else if (event.key === 'Home') next = 0;
+                else if (event.key === 'End') next = entries.length - 1;
+                else return;
+                event.preventDefault();
+                (event.currentTarget.parentElement!.children[next] as HTMLElement).focus();
+              }}>
               <span className={styles.entryText}>{renderEntryText(entry, names)}</span>
               {entry.cards !== null && (
                 <span className={styles.entryCards}>

@@ -30,8 +30,9 @@
   color: #dc2626;
 }
 
+/* #c2410c keeps Diamonds orange at 4.83:1 on the #faf7ee face (ui-ux.md §19.6.5; the earlier #ea580c was 3.32:1). */
 .diamonds {
-  color: #ea580c;
+  color: #c2410c;
 }
 
 .corner {
@@ -43,7 +44,9 @@
   align-items: center;
   line-height: 1;
   font-weight: 700;
-  font-size: 25cqw;
+  /* 25% of the card's content box; `--card-index-min-font-size` lets a composition set a floor (portrait's
+   * 14px, ui-ux.md §19.6.3), since a 56px card's content box is only 54px wide. Unset in landscape. */
+  font-size: max(25cqw, var(--card-index-min-font-size, 0px));
 }
 
 .cornerBottom {

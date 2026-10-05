@@ -1,9 +1,9 @@
 # Pusoy Dos --- M5 Portrait & Mobile Experience
 
-## Milestone Design + Task Breakdown (v1.0)
+## Milestone Design + Task Breakdown (v1.1)
 
 **Status:** Phase 2 implementation plan based on approved scope; detailed decisions gated by the named contract tasks  
-**Last Modified:** September 29, 2026  
+**Last Modified:** October 3, 2026\
 **Milestone:** M5 --- Portrait & Mobile Experience  
 **Phase:** Phase 2 --- Mobile Accessibility, Onboarding, and Player Experience Expansion  
 **Parent requirements:** requirements.md v1.17  
@@ -12,9 +12,9 @@
 **Engine design:** engine.md v1.8  
 **Orchestrator design:** orchestrator.md v1.7  
 **AI design:** ai.md v1.7  
-**UI/UX design:** ui-ux.md v1.12  
+**UI/UX design:** ui-ux.md v1.15  
 **Tutorial design:** tutorial.md v1.0  
-**Testing strategy:** testing-simulation.md v1.9
+**Testing strategy:** testing-simulation.md v1.10
 
 ---
 
@@ -40,7 +40,7 @@ Overlays and unsupported layouts coordinate pause without dropping other pause r
 
 # 6. Responsive and Accessibility Contract
 
-M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and input/accessibility criteria. Retain all existing supported landscape matrix cases, 844×390 minimum, full-scale constraints, and the approved landscape-phone text/target exemption. Portrait cannot inherit that exemption silently. Do not claim support by removing rotate guidance alone.
+M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and input/accessibility criteria. Retain all existing supported landscape matrix cases, 844×390 minimum, full-scale constraints, and the approved landscape-phone text/target exemption. Portrait cannot inherit that exemption silently. Do not claim support by removing rotate guidance alone. The approved contract is frozen in [ui-ux.md](ui-ux.md) §19.6 and the testing-simulation.md frozen M5 matrix (see the M5-T01 Approval Record).
 
 # 7. Testing Contract
 
@@ -54,12 +54,14 @@ M5-T01 approves/freezes portrait dimensions, minima, sizing, card exposure, and 
 
 # 8. Milestone Definition of Done
 
-- [ ] The approved portrait/landscape matrix and keyboard/reduced-motion contracts are frozen and reused by tests.
-- [ ] A human can complete all five Basic Rounds on supported portrait phone and tablet classes; supported landscape remains functional.
-- [ ] Every gameplay-critical action/status, all overlapped human cards, history overlays, and result actions are usable with required inputs.
-- [ ] Supported orientation/resize preserves state and below-minimum pause/recovery is coherent.
-- [ ] M5 keyboard/focus, sizing/contrast/non-color, and reduced-motion criteria have automated and required human evidence.
-- [ ] Required regression, browser, typecheck, build, and headless acceptance checks pass; required human checks are executed with no blocking defect.
+- [x] The approved portrait/landscape matrix and keyboard/reduced-motion contracts are frozen and reused by tests.
+- [x] A human can complete all five Basic Rounds on supported portrait phone and tablet classes; supported landscape remains functional.
+- [x] Every gameplay-critical action/status, all overlapped human cards, history overlays, and result actions are usable with required inputs.
+- [x] Supported orientation/resize preserves state and below-minimum pause/recovery is coherent.
+- [x] M5 keyboard/focus, sizing/contrast/non-color, and reduced-motion criteria have automated and required human evidence.
+- [x] Required regression, browser, typecheck, build, and headless acceptance checks pass; required human checks are executed with no blocking defect.
+
+Accepted at M5-T08 (October 5, 2026), with the user-approved manual-evidence waiver recorded there.
 
 # 9. Task Planning Principles
 
@@ -127,6 +129,65 @@ An approved measurable contract that implementation agents can follow without in
 - [ ] All blocking product choices resolved before T02.
 - [ ] Required document approvals and consistency/link checks recorded.
 - [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Approval Record (M5-T01)
+
+**Approved:** by the user, September 29, 2026, in the M5-T01 session, on branch `dev/M5/T1-Freeze_Portrait_Input_and_Accessibility_Contracts` at base `27abb0d`. The decisions below were selected explicitly; the remaining proposal was approved as written. The full contract is in [ui-ux.md](ui-ux.md) §19.6, and the matrix and evidence assignments are in [testing-simulation.md](testing-simulation.md) under "Frozen M5 acceptance matrix and evidence assignments".
+
+**Decisions:**
+
+- **Portrait minimum:** 360×560 CSS px, for any pointer type.
+  - Landscape is when width > height; a square viewport counts as portrait.
+  - Phone portrait is 360–599px wide; tablet portrait is 600px or wider.
+- **Portrait hand geometry:**
+  - card ratio 5:7, card width 56–96px;
+  - all 13 cards in one row on one baseline;
+  - at least 24px exposed per overlapped card;
+  - a selected card rises at least 16px;
+  - 14px text and 44×44px controls apply literally in portrait. Portrait does not inherit the landscape phone-tier exemption.
+  - Excluded by this decision: an iPhone SE-class screen in Safari with its toolbars shown (about 375×550) is below the minimum. With Safari's toolbars shown, an SE-class viewport (375×553) is below the portrait minimum and its 553×375 landscape is also unsupported, so that state gets 'This screen is too small to play'. With the toolbars collapsed the device is supported (375×667, or 667×375 which rotates to it). The frozen matrix row `portrait-phone-se-toolbar` (375×553) asserts this.
+- **Keyboard:**
+  - the hand is a listbox with a roving `tabindex`;
+  - ←/→ and Home/End move focus;
+  - Space/Enter select;
+  - Shift+←/→ and Shift+Home/End reorder the focused card;
+  - a visible hint is shown while the hand has focus;
+  - Play and Pass use `aria-disabled` so their disabled reason can be reached.
+- **Dialog focus:**
+  - focus moves in on open, stays inside, and returns on close; Escape closes only the dismissible dialogs (for Leave, Escape means Stay);
+  - Round Result never focuses Next Round automatically.
+- **Contrast:**
+  - WCAG 2.2 AA everywhere, including card suits;
+  - Diamonds `#c2410c`, enabled Play `#1f7a43`, Pass `#1d5fc4`.
+- **Reduced motion:** Round Result opens already settled, and every explicit continuation is kept.
+- **Phone portrait opponents:** compact panels without the card fan or the per-seat Play trail. Tablet portrait keeps the trail.
+- **Browsers:**
+  - Playwright Chromium, plus mobile emulation, is the automated gate. Firefox and WebKit are not added to Playwright in M5.
+  - Edge, Firefox, and macOS Safari are covered by human checks.
+  - Real Android Chrome, iOS Safari, and portrait-tablet sessions are required human evidence for M5-T08.
+- **Landscape:** unchanged. The 844×390 minimum, the 896×656 full-scale threshold, the phone-tier 14px/44×44px exemption, and the 28px exposure rule all stand.
+
+**Revisions (approved by the user on October 2, 2026, during M5-T03 review):** recorded in ui-ux.md §§19.6.3–19.6.4.
+
+- Phone portrait opponents show the face-down fan again, in the tall height tier (from 662px tall for phones and 690px for tablets). Below that tier there is no fan, so 360×560 still fits. This supersedes the phone-fan part of the **Phone portrait opponents** decision above; phones still have no per-seat Play trail.
+- The table takes spare height first, up to 5/8 of the viewport height, replacing the September 30, 2026 spare-height rule.
+- Portrait controls run Event Log / Discard Pile / Leave Game, the hand, Sort, then Pass | Play (Play on the right). Portrait Tab order follows: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play. This revises the portrait Tab order in ui-ux.md §19.6.4; landscape is unchanged.
+- The compact panel shows the "deciding" indicator on its own row below the status. In the tall tier the human's own panel is stacked like the others rather than a one-row strip.
+- In a fine-pointer (desktop browser) portrait window held cards are capped at 72px wide. Portrait cards are otherwise slightly smaller (at most 14.5% of the viewport width and 88px). The utility buttons sit 12px below the table and share one width so Discard Pile is exactly centered. Sort Rank/Sort Suit share one width (their gap lines up with Pass/Play's) and are drawn 32px tall inside their 44px target. The human's own panel keeps room inside the table border for its glow. Pass/Play are each centered in their own half of the row at up to 160×62px, smaller than a held card.
+- Resolved in M5-T05 (PR #102; user-requested refinement, documented October 3, 2026): portrait Session Summary now has equal R1–R5 column spacing, room for Total, a centered Round-by-Round caption, and aligned Event Log/Home/Play Again actions. `summary-layout.e2e.ts` covers the supported viewport matrix. This layout work is no longer deferred to M5-T06; remaining result lifecycle, focus, and reduced-motion work stays in T06.
+- Resolved in M5-T05 (PR #102; originally found in M5-T03 desktop keyboard testing, October 2, 2026): Leave confirmation's **Stay** and **Yes, Leave Game** actions now sit outside the scrolling body in the fixed footer, so their 3px outlines with 3px offsets remain visible. `portrait-dialogs.e2e.ts` verifies painted rings and includes outline-disabled negative controls. Nested scroll locking and pause/cancellation semantics remain intact.
+- Resolved in M5-T04 (PR #101; originally found during M5-T03 tablet-portrait manual testing on October 2, 2026): neighboring held-card taps now target the visible card correctly.
+  - The raised card's hit target moves with its face, so tapping the exposed strip beneath it reaches the visible neighboring card.
+  - Touch taps tolerate up to 12px of horizontal movement before starting a drag; the 4px mouse threshold is unchanged. Automated coverage includes 6px, 10px, and 12px touch movement.
+- Resolved in M5-T06 (PR #103): the reduced-motion bot ‘deciding’ indicator now renders static `deciding` text in `PlayerPanel.tsx`, replacing the frozen spinner ring and satisfying ui-ux.md §19.6.6. Component tests cover live preference changes. Superseded in M5-T07 (PR #104) by user-approved refinement: the visible label is now a static '...' indicator, with the accessible deciding label retained.
+
+**Baseline observations:** recorded in ui-ux.md §19.6.1. They describe the code before M5 and are not portrait acceptance evidence.
+
+**Remaining limitations:**
+
+- No runtime behavior has changed.
+- The vertical budget at 360×560 is an estimate that M5-T03 must confirm. If it does not fit, M5-T03 reports a contract conflict rather than relaxing a minimum.
+- Real-device availability for iOS, macOS Safari, and tablets is not yet confirmed.
 
 # M5-T02 — Responsive Layout Classification and Safe Orientation Transitions
 
@@ -284,6 +345,12 @@ Open each dialog using touch and keyboard, scroll long content, close/cancel, an
 
 Portrait overlays retain safe lifecycle behavior and usable focus.
 
+### Amendment and Evidence Record (October 3, 2026)
+
+The user approved keeping Event Log entry focus instead of restoring body focus and explicitly authorized applying the documentation corrections on October 3, 2026. The agent updated ui-ux.md §19.6.4, testing-simulation.md's frozen M5 automated assertions, the two resolved records above, and T06's remaining Summary scope. These edits record implemented behavior; they do not declare the task accepted solely because tests pass.
+
+The user reports that the tester confirmed all M5-T05 manual checks at the first patch and reconfirmed that the gameplay changes are good on October 3, 2026. This includes opening dialogs, scrolling long content, closing/cancelling, confirming Leave in a separate run, and the expected reachable controls, focus return, paused gameplay, and preserved progress after cancellation. Tester identity, actual execution date, browser/version, device/OS, viewport sizes, and input methods were not recorded. Manual-result confirmation is recorded, but the requested evidence provenance remains NOT VERIFIED; DoD item 4 remains incomplete until that record is supplied.
+
 ### Definition of Done
 
 - [ ] History/leave surfaces fit and remain usable across matrix.
@@ -306,7 +373,7 @@ AGENTS.md; this milestone §§1–10 and this task; [requirements.md](requiremen
 
 ### Work
 
-- Adapt fourth-place reveal, Round Result, and Session Summary to portrait, including official ordering/points, five-Round rows, Event Log, Home, and Play Again.
+- Adapt fourth-place reveal and Round Result to portrait. Retain and regression-check the Session Summary layout completed in M5-T05 (official ordering/points, five-Round rows, Event Log, Home, and Play Again); do not redo its column spacing, caption centering, or action alignment. Complete the remaining result lifecycle, keyboard-focus, and reduced-motion work below.
 - Preserve explicit Next Round for Rounds 1–4 and automatic Round 5 Summary; tutorial work must not be introduced here.
 - Apply reduced-motion preference across existing meaningful card/result motion and selection emphasis without removing required feedback or awaiting absent animation events.
 - Ensure skip input is consumed once, keyboard focus lands sensibly through result transitions, and restart/leave cleanup remains intact.
@@ -368,11 +435,19 @@ Integrated M5 is ready for complete-Session acceptance with documented evidence 
 
 ### Definition of Done
 
-- [ ] All supported matrix cases checked; failures fixed or explicitly blocking acceptance.
-- [ ] No unnoticed landscape or input regression.
-- [ ] Documentation reflects delivered support without invented manual passes.
-- [ ] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete.
-- [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+- [x] All supported matrix cases checked; failures fixed or explicitly blocking acceptance. Accepted with the T07-only evidence waiver below.
+- [x] No unnoticed landscape or input regression. Automated sweep passed; no remaining defect reported.
+- [x] Documentation reflects delivered support without invented manual passes.
+- [x] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete. Accepted with the T07-only evidence waiver below.
+- [x] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Completion and User Acceptance — October 4, 2026
+
+**M5-T07: COMPLETE, with a user-approved manual-evidence waiver.** The user reported working desktop Chrome portrait/landscape, mobile Chrome, Safari, and portrait tablet, then explicitly instructed: "i vouch the other browsers for now so please pass the requirements". This accepts the remaining browser/device coverage and reporting gaps for T07; it does not claim those checks were executed. Unavailable targets remain NOT VERIFIED in README. M5-T08 and milestone acceptance gates are unchanged.
+
+Delivered: centered Round Result scores; measured Round-by-Round Summary centering; scrollable long-content portrait Summary with fixed heading/actions and keyboard/wheel access; responsive/input regressions; README matrix/evidence update; user-requested static `...` for reduced-motion thinking while retaining the accessible deciding label.
+
+Evidence: full 335-test browser sweep passed before the label-only follow-up; 35 focused result/layout checks passed. After the follow-up, `npm test` passed 1,135 tests across 88 files, `npm run typecheck` and `npm run build` passed, and both focused portrait/landscape static-dots browser checks passed. Exact commands and evidence limitations are recorded in README. No rules, dependencies, public contracts, or deferred features changed. Git commit/push and M5-T08 remain the user's next workflow steps.
 
 # M5-T08 — M5 Five-Round Acceptance and Regression Gate
 
@@ -409,11 +484,19 @@ An accepted portrait/mobile checkpoint suitable for tutorial integration.
 
 ### Definition of Done
 
-- [ ] Every M5 milestone DoD item has passing evidence.
-- [ ] Required human acceptance executed with no blocking defect.
-- [ ] Full automated gates pass; no deferred feature required.
-- [ ] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete.
-- [ ] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+- [x] Every M5 milestone DoD item has passing evidence. Automated evidence for every item; human evidence accepted with the waiver below.
+- [x] Required human acceptance executed with no blocking defect. Accepted with the waiver below.
+- [x] Full automated gates pass; no deferred feature required.
+- [x] Shared §7 verification completed; required manual evidence recorded, or task remains incomplete. Accepted with the waiver below.
+- [x] No unrelated/deferred work; completion report lists changes, evidence, remaining limitations, and stops.
+
+### Completion and User Acceptance — October 5, 2026
+
+**M5-T08: COMPLETE, with a user-approved manual-evidence waiver.** The user tested Safari, a tablet, mobile Chrome, and desktop, and reported: "all are working properly ... nothing is blocked or not working". The user waived the remaining scenarios because of limited device access and instructed that the task be marked done. This accepts the remaining assigned browser/device coverage gaps; it does not claim those checks were executed. Untested targets remain NOT VERIFIED in README.
+
+Delivered: `tests/browser/m5-session-acceptance.e2e.ts`, which runs deterministic full five-Round Sessions on portrait phone (touch), portrait tablet (touch), and the landscape regression path, with a mid-Session orientation change, Round 5's automatic Summary, and Play Again/Home. The fake-clock Session driver moved into the shared `turnHelpers.ts` and now targets each card's exposed strip in the portrait overlap. Test-only changes.
+
+Evidence: `npm test` passed 1,135 tests in 88 files; `npm run typecheck` and `npm run build` passed; the full `npm run test:browser` passed 340 of 340 checks; `npm run test:acceptance:m3` passed, with 32 of 32 Sessions, 160 Rounds, and 0 failures. The environment and its limits are recorded in README. No rules, dependencies, public contracts, or deferred features changed. M5 is accepted; M6 is next, subject to the user's Git workflow.
 
 # 11. Dependency Order and Completion Evidence
 

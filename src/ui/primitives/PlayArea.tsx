@@ -13,9 +13,26 @@ import styles from './PlayArea.module.css';
  * Full-viewport overlays must not be rendered inside this component: a `transform` makes its element the
  * containing block for `position: fixed` descendants, which would pin them to the scaled area instead of
  * the viewport.
+ *
+ * `scaled={false}` is the supported-portrait composition (ui-ux.md §19.6.3): authored in real CSS px with
+ * no scale transform, filling the viewport. It renders the same two elements rather than a different
+ * tree, so switching orientation never remounts the table's own presentation state (§19.6.2).
  */
-export function PlayArea({ children }: { readonly children: ReactNode }) {
+export function PlayArea({ children, scaled = true }: { readonly children: ReactNode; readonly scaled?: boolean }) {
   const { scale, width, height } = usePlayAreaLayout();
+  if (!scaled) {
+    return (
+      <div className={styles.frame} style={{ width: '100%', height: '100%' }}>
+        <div
+          className={styles.playArea}
+          data-play-area-scale={1}
+          style={{ width: '100%', height: '100%', '--play-area-scale': 1 } as CSSProperties}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className={styles.frame}

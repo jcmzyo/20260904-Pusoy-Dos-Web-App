@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Move, Suit } from '../../../src/domain';
 import { SessionPresentation } from '../../../src/application/SessionPresentation';
@@ -63,7 +63,7 @@ async function fixtureWithBotFourthPlace(): Promise<SessionPresentation> {
   throw new Error('No seed within range produced a bot 4th-place finish - fixture drive logic likely broken.');
 }
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§12)', () => {
   it('reveals the 4th-place bot hand face-up sorted by Rank, skippable by click, before the Round Result overlay appears', async () => {
@@ -377,7 +377,8 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
   // `yieldToMacrotask` cost `session-summary.test.tsx`'s full-Session tests actually
   // cross (those go through the production autoplay path; this test does not). Same justification for the
   // bound (measured worst case under CPU contention, generous headroom, no masked hang), different cause.
-  it('shows no continuation button once the Basic Session\'s own official result exists, and automatically replaces itself with Session Summary rather than continuing (ui-ux.md §12/§13 follow-up: M4-T13 UI refinement)', async () => {
+  it.each([false, true])('shows no continuation button once the Basic Session\'s own official result exists, and automatically replaces itself with Session Summary rather than continuing (reduced motion: %s)', async (reducedMotion) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: reducedMotion && query === '(prefers-reduced-motion: reduce)', addEventListener: () => {}, removeEventListener: () => {} }));
     const presentation = fixture(5);
     for (let round = 1; round <= 5; round++) {
       await driveToRoundEnd(presentation);
@@ -402,7 +403,9 @@ describe('End-of-Round reveal and Round Result overlay (M4-T12; ui-ux.md §11-§
     expect(screen.queryByRole('button', { name: 'Next Round' })).toBeNull();
 
     // No click required - the settled overlay replaces itself with Session Summary on its own.
-    expect(await screen.findByRole('dialog', { name: 'Session Summary' })).toBeTruthy();
+    const summary = await screen.findByRole('dialog', { name: 'Session Summary' });
+    expect(document.activeElement).toBe(within(summary).getByRole('heading'));
+    expect(document.activeElement?.getAttribute('role')).not.toBe('option');
     expect(screen.queryByRole('dialog', { name: 'Round 5 Result' })).toBeNull();
     expect(continueToNextRoundSpy).not.toHaveBeenCalled();
   }, 45000);
@@ -496,5 +499,39 @@ describe('Reveal and result isolation, and presentation timers under blocked lay
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe.each([false, true])('result-close focus recovery (reduced motion: %s)', (reducedMotion) => {
+  function setMotion() {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: reducedMotion && query === '(prefers-reduced-motion: reduce)', addEventListener: () => {}, removeEventListener: () => {} }));
+  }
+
+  it('leaves opening-round focus on body', async () => {
+    setMotion();
+    const presentation = fixture(3);
+    render(<SessionTable presentation={presentation} showInitialTransition roundTransitionDurationMs={0} />);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Starting Round 1' })).toBeNull());
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it.each([false, true])('recovers after Next Round only when a hand card exists (empty rendered hand: %s)', async (emptyHand) => {
+    setMotion();
+    const presentation = fixture(3);
+    await driveToRoundEnd(presentation);
+    render(<SessionTable presentation={presentation} revealDurationMs={0} resultStageDelayMs={0} roundTransitionDurationMs={60000} />);
+    const next = await screen.findByRole('button', { name: 'Next Round' });
+    next.focus();
+    fireEvent.click(next);
+    expect(document.activeElement).toBe(document.body);
+    const hand = screen.getByRole('listbox', { name: 'Your hand' });
+    // Exercise absence of rendered cards without fabricating or changing authoritative game state.
+    if (emptyHand) hand.replaceChildren();
+    const card = hand.querySelector<HTMLElement>('[tabindex="0"]');
+    const focus = card ? vi.spyOn(card, 'focus') : null;
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Starting Round 2' }))).not.toThrow();
+    expect(document.activeElement).toBe(card ?? document.body);
+    if (focus) expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });

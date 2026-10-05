@@ -1,6 +1,6 @@
 # Pusoy Dos --- September 11, 2026 Milestone Documentation Update
 
-**Last Modified:** September 29, 2026
+**Last Modified:** October 2, 2026
 **Purpose:** Record the documentation changes made after approval of the M2 Baseline AI algorithm and M3/M4 milestone planning decisions.
 
 ## New milestone documents
@@ -90,3 +90,47 @@ No canonical Pusoy Dos house rule was changed.
 - Clarified that tutorial deal tables define order-insensitive 13-card assignments per seat, not a unique raw shuffle output or RNG sequence. Preserved the explicit Round 5 seed recipe.
 - Distinguished author-reported external probe evidence from the reviewer's independently corroborated results. M6-T01 now requires a repository-contained fixture test and reproducible command using existing APIs, with an explicit test-only exception to its planning-task verification exemption.
 - Retained cosmetic link encoding, intentional Markdown hard breaks, and historical M1 scope wording; no rules or production code changed.
+
+## September 29, 2026 — M5-T01 frozen portrait, input, and accessibility contract
+
+- User approved the M5-T01 proposal: a 360×560 portrait minimum; portrait cards 56–96px wide, all 13 in one row with at least 24px exposed and a selected-card rise of at least 16px; literal 14px/44×44px minimums in portrait; Shift+Arrow card reordering; WCAG 2.2 AA contrast with Diamonds `#c2410c`, Play `#1f7a43`, and Pass `#1d5fc4`; and the rest of the proposal as written.
+- UI/UX v1.13, from v1.12, adds §19.6 "Frozen M5 portrait, input, and accessibility contract":
+  - the pre-M5 baseline;
+  - classification and guidance;
+  - portrait geometry and overflow;
+  - keyboard, focus, and disabled-feedback rules;
+  - contrast and non-color cues;
+  - reduced motion;
+  - task allocation.
+
+  §19.1, §19.3, and §19.4 now point to it.
+- Testing v1.10, from v1.9, adds "Frozen M5 acceptance matrix and evidence assignments": portrait, landscape, and transition cases with the expected guidance per pointer type; automated assertions; and browser/device evidence assignments that keep every requirements §12.5 target.
+- The M5 breakdown moves to v1.1 with an M5-T01 Approval Record. The M6, M7, M8, and tutorial.md headers now cite UI/UX v1.13 and Testing v1.10.
+- Review follow-up (M5-T01):
+  - added the coarse 844×389 "Rotate your device" boundary row;
+  - added the `portrait-phone-se-toolbar` (375×553) exclusion row;
+  - added an explicit focus-indicator assertion (outline at least 2px, contrast at least 3:1);
+  - added this log entry.
+- The landscape contract, requirements, rules, dependencies, and runtime code are unchanged. No portrait behavior is implemented yet.
+
+## September 30 – October 1, 2026 — M5-T02 portrait spare-height rule and review follow-up
+
+- User approved (September 30, M5-T02 review) a portrait layout rule for M5-T03: the table and opponent area stays at its natural height and is never stretched; spare height goes to the bottom controls section, not the table center.
+- UI/UX v1.14, from v1.13 (September 30, 2026):
+  - §19.6.3 adds the "Spare vertical height" bullet;
+  - §19.6.7 records that M5-T02 also delivered the unsupported-layout notice's focus entry and return (§19.6.4).
+- The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.14 (October 1, 2026).
+- README notes that its `portrait-unsupported` row is superseded since M5-T02 and that the table itself is updated in M5-T07.
+- No other contract, requirement, rule, or dependency changed.
+
+## October 2, 2026 — M5-T03 portrait layout revisions
+
+- User approved (October 2, M5-T03 review) these portrait contract revisions, recorded in the M5 breakdown's M5-T01 Approval Record under "Revisions":
+  - **Table height:** the table takes spare height first, up to 5/8 of the viewport height, and the controls get the rest. This supersedes the September 30 spare-height rule.
+  - **Height tiers:** a tall tier from 662px for phones and 690px for tablets (`PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX`, `PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX`). In it, opponents show their face-down fan again (restored on phones; M5-T01 had removed it) and the human's own panel is stacked. Below it there is no fan and the human's panel is a one-row strip, so 360×560 still fits. Phones still have no per-seat Play trail.
+  - **Controls and Tab order:** portrait reads Event Log / Discard Pile / Leave Game, the hand, Sort Rank / Sort Suit, then Pass | Play (Play on the right), and its Tab order follows: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play. Landscape is unchanged.
+  - **Card width:** held and center cards keep the 56px floor, take at most 14.5vw, and are capped at 88px on touch devices and 72px in a fine-pointer (desktop) window.
+- UI/UX v1.15, from v1.14 (October 2, 2026): §19.6.3 records the above, plus the compact panel's separate "deciding" row, the fixed Pass/Play, Sort, and utility-button sizes, and room for the human panel's glow; §19.6.4 records the portrait Tab order.
+- The M5, M6, M7, M8, and tutorial.md headers now cite UI/UX v1.15.
+- Deferred findings recorded in the M5 breakdown: the portrait Session Summary's Round-by-Round table (M5-T06), the clipped focus outline in the Leave Game confirmation (M5-T05), wrong-card and ignored taps on neighboring held cards (M5-T04), and the frozen "deciding" spinner under reduced motion (M5-T06).
+- No requirement, rule, Engine/Orchestrator contract, or dependency changed.

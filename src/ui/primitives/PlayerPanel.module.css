@@ -87,6 +87,12 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
+  /* A long name shortens with an ellipsis rather than wrapping into the fixed-height rows below it; the
+   * panel's accessible name keeps the full name (M5-T03). */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .meta {
@@ -137,6 +143,11 @@
   animation: spin 0.8s linear infinite;
 }
 
+.deciding {
+  font-size: 14px;
+  line-height: 1;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -147,4 +158,88 @@
   .spinner {
     animation: none;
   }
+}
+
+/* Phone-portrait opponent (ui-ux.md §19.6.3): name, count, and score on their own lines, the status, and the
+ * "deciding" indicator on its own row below the status (as in the full panel), with no Play trail. It fills
+ * its column of the portrait opponents row rather than the landscape panel's fixed 168x122 box, and holds one
+ * fixed height across every status so the row never shifts. Rendered in real CSS px (no play-area scale), so
+ * every text stays at 14px or more. */
+.compact {
+  width: 100%;
+  height: 94px;
+  gap: 0;
+  padding: 1px 4px;
+}
+
+/* A long name shortens with an ellipsis (`.name` above); the panel's accessible name keeps the full name. */
+.compact .name,
+.self .name,
+.strip .name {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.compact .meta,
+.self .meta,
+.strip .meta {
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.compact .statusSlot,
+.self .statusSlot,
+.strip .statusSlot {
+  height: 20px;
+}
+
+.compact .status,
+.self .status,
+.strip .status {
+  padding: 1px 6px;
+  line-height: 18px;
+}
+
+/* Always rendered in the compact panel, so a seat's rows never move when its "deciding" indicator comes and
+ * goes. */
+.spinnerSlot {
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinnerSlot .spinner {
+  margin-top: 0;
+}
+
+/* The human's own seat in tall portrait (ui-ux.md §19.6.3): stacked like the other panels. */
+.self {
+  width: 100%;
+  height: 64px;
+  gap: 1px;
+  padding: 2px 8px;
+}
+
+/* The human's own seat in short portrait: one row - name, count and score, then the status - so it costs one
+ * line of height. */
+.strip {
+  flex-direction: row;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  padding: 2px 10px;
+}
+
+.strip .name {
+  flex: 0 1 auto;
+}
+
+.strip .meta {
+  flex: 0 0 auto;
+}
+
+.strip .statusSlot {
+  flex: 0 0 auto;
+  min-width: 0;
 }

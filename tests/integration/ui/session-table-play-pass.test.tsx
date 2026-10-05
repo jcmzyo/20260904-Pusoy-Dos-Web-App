@@ -41,7 +41,7 @@ function fixture() {
 
 function slotFor(card: Card): HTMLElement {
   const suitLabel = card.suit[0]!.toUpperCase() + card.suit.slice(1);
-  return within(screen.getByRole('group', { name: 'Your hand' }))
+  return within(screen.getByRole('listbox', { name: 'Your hand' }))
     .getByRole('img', { name: `${card.rank} of ${suitLabel}` })
     .closest('[data-card-key]') as HTMLElement;
 }
@@ -78,7 +78,7 @@ describe('Play/Pass submission reaches the production Engine (M4-T08)', () => {
     if (playMove && playMove.kind === 'play') {
       for (const card of playMove.cards) fireEvent.click(slotFor(card));
       const playButton = screen.getByRole('button', { name: 'Play' });
-      await waitFor(() => expect((playButton as HTMLButtonElement).disabled).toBe(false));
+      await waitFor(() => expect(playButton.getAttribute('aria-disabled')).toBe('false'));
       fireEvent.click(playButton);
       expect(human.getPendingRequest()).toBeNull();
       expect(await turnResult).toEqual({ accepted: true });
@@ -89,7 +89,7 @@ describe('Play/Pass submission reaches the production Engine (M4-T08)', () => {
       expect(snapshot.center.kind === 'hand' && snapshot.center.playerId === 'south').toBe(true);
     } else {
       const passButton = screen.getByRole('button', { name: 'Pass' });
-      expect((passButton as HTMLButtonElement).disabled).toBe(false);
+      expect(passButton.getAttribute('aria-disabled')).toBe('false');
       fireEvent.click(passButton);
       expect(human.getPendingRequest()).toBeNull();
       expect(await turnResult).toEqual({ accepted: true });

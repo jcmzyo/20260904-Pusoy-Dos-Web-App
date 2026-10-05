@@ -59,7 +59,7 @@ async function waitForTurnDecision(page: import('@playwright/test').Page): Promi
       const panel = document.querySelector('[aria-label="You panel"]');
       if (panel?.getAttribute('aria-current') !== 'true') return null;
       const passButton = document.querySelector('button[aria-label="Pass"]') as HTMLButtonElement | null;
-      if (passButton !== null && !passButton.disabled) return { kind: 'pass' };
+      if (passButton !== null && passButton.getAttribute('aria-disabled') !== 'true') return { kind: 'pass' };
       const opening = document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false;
       return { kind: 'lead', opening };
     },
@@ -98,7 +98,7 @@ async function driveRoundToResult(page: import('@playwright/test').Page): Promis
   const playButton = page.getByRole('button', { name: 'Play', exact: true });
   const dialog = page.getByRole('dialog');
   const skipReveal = page.getByRole('button', { name: 'Skip reveal', exact: true });
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
 
   for (let turn = 0; turn < TURN_BUDGET; turn++) {
     const decision = await waitForTurnDecision(page);

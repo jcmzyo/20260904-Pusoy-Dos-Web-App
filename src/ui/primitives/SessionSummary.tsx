@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { GameEvent } from '../../engine';
 import type { PlayerId } from '../../domain';
 import type { BasicRoundResult } from '../../engine/rounds/resolveBasicRound';
@@ -6,6 +6,7 @@ import type { BasicSessionResult } from '../../engine/sessions/basicSessionResul
 import { EventLogOverlay } from './EventLogOverlay';
 import { HUMAN_PLAYER_ID } from './humanPlayer';
 import { useBodyScrollLock } from './useBodyScrollLock';
+import { useResultFocus } from './useResultFocus';
 import styles from './SessionSummary.module.css';
 
 const PLACEMENT_LABELS: Record<1 | 2 | 3 | 4, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
@@ -85,6 +86,8 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
   useBodyScrollLock();
 
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const { panelRef, headingRef, containFocus } = useResultFocus();
   const nameOf = (playerId: PlayerId): string => seats.find((seat) => seat.playerId === playerId)?.name ?? playerId;
   const standingOf = (playerId: PlayerId) => {
     const standing = result.standings.find((entry) => entry.playerId === playerId);
@@ -100,74 +103,89 @@ export function SessionSummary({ seats, result, completedRounds, events, names, 
     <div className={styles.backdrop}>
       {/* Inert while its own Event Log popup is open on top of it, so Home/Play Again/Event Log cannot be
        *  reached from the keyboard underneath that modal. */}
-      <section className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen}>
+      <section ref={panelRef} className={styles.panel} role="dialog" aria-modal="true" aria-label="Session Summary" inert={isLogOpen} onKeyDown={(event) => {
+        containFocus(event);
+        const body = bodyRef.current;
+        if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || !body || body.scrollHeight <= body.clientHeight) return;
+        // Keep the approved action-only Tab order while allowing keyboard reading of overflowing results.
+        const distance = event.key === 'ArrowDown' ? 40 : event.key === 'ArrowUp' ? -40
+          : event.key === 'PageDown' ? body.clientHeight : event.key === 'PageUp' ? -body.clientHeight
+          : event.key === 'End' ? body.scrollHeight : event.key === 'Home' ? -body.scrollHeight : 0;
+        if (distance !== 0) {
+          event.preventDefault();
+          body.scrollTop += distance;
+        }
+      }}>
         <header className={styles.header}>
           <p className={styles.eyebrow}>SESSION COMPLETE</p>
-          <h2>Session Summary</h2>
+          <h2 ref={headingRef} tabIndex={-1}>Session Summary</h2>
         </header>
 
-        {tiebreakExplanation !== null && <p className={styles.tiebreak}>{tiebreakExplanation}</p>}
+        <div ref={bodyRef} className={styles.body} role="region" aria-label="Session results">
+          {tiebreakExplanation !== null && <p className={styles.tiebreak}>{tiebreakExplanation}</p>}
 
-        <div className={styles.tableCard}>
-          <table className={styles.rankingTable}>
-            <caption className={styles.tableCaption}>Final Ranking</caption>
-            <thead>
-              <tr>
-                <th scope="col">Place</th>
-                <th scope="col">Player</th>
-                <th scope="col">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.placements.map((entry) => {
-                const tied = (placementCounts.get(entry.placement) ?? 0) > 1;
-                return (
-                  <tr key={entry.playerId} className={[medalClass(entry.placement), entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined].filter(Boolean).join(' ') || undefined}>
-                    <td>
-                      <span className={styles.placementLabel}>{PLACEMENT_LABELS[entry.placement]}</span>
-                      {tied && <span className={styles.tiedNote}> (tied)</span>}
-                    </td>
+          <div className={styles.tableCard}>
+            <table className={styles.rankingTable}>
+              <caption className={styles.tableCaption}>Final Ranking</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Place</th>
+                  <th scope="col">Player</th>
+                  <th scope="col">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.placements.map((entry) => {
+                  const tied = (placementCounts.get(entry.placement) ?? 0) > 1;
+                  return (
+                    <tr key={entry.playerId} className={[medalClass(entry.placement), entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined].filter(Boolean).join(' ') || undefined}>
+                      <td>
+                        <span className={styles.placementLabel}>{PLACEMENT_LABELS[entry.placement]}</span>
+                        {tied && <span className={styles.tiedNote}> (tied)</span>}
+                      </td>
+                      <td>{nameOf(entry.playerId)}</td>
+                      <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className={styles.tableCard}>
+            <table className={styles.roundsTable}>
+              <caption className={styles.tableCaption}>Round-by-Round Summary</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  {completedRounds.map((_, index) => <th scope="col" key={index}>R{index + 1}</th>)}
+                  <th scope="col">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.placements.map((entry) => (
+                  <tr key={entry.playerId} className={entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
                     <td>{nameOf(entry.playerId)}</td>
+                    {completedRounds.map((round, index) => {
+                      const points = round.placements.find((placement) => placement.playerId === entry.playerId)?.points;
+                      if (points === undefined) throw new Error(`Round ${index + 1} is missing a result for ${entry.playerId}.`);
+                      // Plain point value, no +/- prefix - Basic Mode has no loser deductions to distinguish
+                      // a gain from (ui-ux.md §13 follow-up, M4-T13 UI refinement).
+                      return <td className={styles.numeric} key={index}>{points}</td>;
+                    })}
                     <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <div className={styles.tableCard}>
-          <table className={styles.roundsTable}>
-            <caption className={styles.tableCaption}>Round-by-Round Summary</caption>
-            <thead>
-              <tr>
-                <th scope="col">Player</th>
-                {completedRounds.map((_, index) => <th scope="col" key={index}>R{index + 1}</th>)}
-                <th scope="col">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.placements.map((entry) => (
-                <tr key={entry.playerId} className={entry.playerId === HUMAN_PLAYER_ID ? styles.you : undefined}>
-                  <td>{nameOf(entry.playerId)}</td>
-                  {completedRounds.map((round, index) => {
-                    const points = round.placements.find((placement) => placement.playerId === entry.playerId)?.points;
-                    if (points === undefined) throw new Error(`Round ${index + 1} is missing a result for ${entry.playerId}.`);
-                    // Plain point value, no +/- prefix - Basic Mode has no loser deductions to distinguish
-                    // a gain from (ui-ux.md §13 follow-up, M4-T13 UI refinement).
-                    return <td className={styles.numeric} key={index}>{points}</td>;
-                  })}
-                  <td className={styles.numeric}>{standingOf(entry.playerId).totalScore}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
 
         {/* Event Log, Home, Play Again, in that order (the person's own follow-up request) - Play Again
          *  last/rightmost as the primary/default action. */}
         <div className={styles.actions}>
-          <button type="button" className={styles.secondaryButton} onClick={() => setIsLogOpen(true)}>Event Log</button>
+          <button type="button" className={styles.secondaryButton} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setIsLogOpen(true); }}>Event Log</button>
           <button type="button" className={styles.secondaryButton} onClick={onHome}>Home</button>
           <button type="button" className={styles.primaryButton} onClick={onPlayAgain}>Play Again</button>
         </div>
