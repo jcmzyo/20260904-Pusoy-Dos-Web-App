@@ -6,6 +6,7 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
 }
@@ -34,13 +35,13 @@
  * color rather than the shared gold/cream treatment every other button in the app uses — the person
  * should never confuse it with a routine action. */
 .leave {
-  background: #c94f4f;
-  border-color: #c94f4f;
+  background: #a93636;
+  border-color: #ead8a7;
   color: #f7f4e9;
 }
 
 .leave:hover {
-  background: #d96363;
+  background: #b43b3b;
 }
 
 .stay:focus-visible,

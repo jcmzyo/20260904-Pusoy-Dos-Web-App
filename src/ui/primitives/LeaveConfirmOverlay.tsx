@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Overlay } from './Overlay';
 import styles from './LeaveConfirmOverlay.module.css';
 
@@ -17,13 +18,15 @@ export interface LeaveConfirmOverlayProps {
  * different, not-yet-built contract).
  */
 export function LeaveConfirmOverlay({ onStay, onLeave }: LeaveConfirmOverlayProps) {
+  const stayRef = useRef<HTMLButtonElement>(null);
   return (
-    <Overlay title="Leave Game" onClose={onStay}>
-      <p className={styles.warning}>Your Session progress is not saved. Leaving now ends this Session for good.</p>
+    <Overlay title="Leave Game" onClose={onStay} initialFocusRef={stayRef} footer={
       <div className={styles.actions}>
-        <button type="button" className={styles.stay} onClick={onStay}>Stay</button>
+        <button ref={stayRef} type="button" className={styles.stay} onClick={onStay}>Stay</button>
         <button type="button" className={styles.leave} onClick={onLeave}>Yes, Leave Game</button>
       </div>
+    }>
+      <p className={styles.warning}>Your Session progress is not saved. Leaving now ends this Session for good.</p>
     </Overlay>
   );
 }

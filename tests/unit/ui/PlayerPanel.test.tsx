@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PlayerPanel } from '../../../src/ui/primitives/PlayerPanel';
 
@@ -105,5 +105,53 @@ describe('PlayerPanel status variants', () => {
     expect(new Set([idle, turn, gold, silver, bronze]).size).toBe(5);
     // ...and an unplaced/4th finish gets no special glow (same look as idle).
     expect(fourth).toBe(idle);
+  });
+});
+
+describe('PlayerPanel portrait variants (M5-T03; ui-ux.md §19.6.3)', () => {
+  const longName = 'Maximiliana Montgomery-Featherstonehaugh';
+
+  it('compact: name, count, and score on their own lines, with Turn, the "deciding" indicator on its own row, and no Play trail', () => {
+    render(
+      <PlayerPanel variant="compact" name={longName} cardCount={13} score={25} isCurrentTurn passed={false} done={false} placement={null}
+        thinking playTrail={<span>trail</span>} />,
+    );
+    const panel = screen.getByRole('region', { name: `${longName} panel` });
+    expect(panel.getAttribute('aria-current')).toBe('true');
+    expect(screen.getByText(longName)).toBeTruthy();
+    expect(screen.getByText('13 cards')).toBeTruthy();
+    expect(screen.getByText('25 pts')).toBeTruthy();
+    expect(screen.getByText('Turn')).toBeTruthy();
+    expect(screen.getByRole('status', { name: `${longName} is deciding` })).toBeTruthy();
+    expect(screen.getByRole('status').parentElement).not.toBe(screen.getByText('Turn').parentElement);
+    expect(screen.queryByText('trail')).toBeNull();
+  });
+
+  it.each([
+    [{ passed: true, done: false, placement: null, isCurrentTurn: false }, 'PASS'],
+    [{ passed: false, done: true, placement: 2 as const, isCurrentTurn: false }, 'DONE · 2nd'],
+    [{ passed: true, done: true, placement: 4 as const, isCurrentTurn: true }, 'DONE · 4th'],
+  ])('compact, self, and strip keep the text status %j -> %s', (state, text) => {
+    for (const variant of ['compact', 'self', 'strip'] as const) {
+      render(<PlayerPanel variant={variant} name="West" cardCount={1} score={0} {...state} />);
+      expect(screen.getByText(text)).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it('compact keeps the singular "card", and paused freezes its "deciding" indicator', () => {
+    render(<PlayerPanel variant="compact" name="West" cardCount={1} score={0} isCurrentTurn passed={false} done={false} placement={null} thinking paused />);
+    expect(screen.getByText('1 card')).toBeTruthy();
+    expect((screen.getByRole('status', { name: 'West is deciding' }) as HTMLElement).style.animationPlayState).toBe('paused');
+  });
+
+  it.each(['self', 'strip'] as const)('%s: the human seat shows name, "count · score", and status, with no "deciding" slot', (variant) => {
+    render(<PlayerPanel variant={variant} name="You" cardCount={13} score={7} isCurrentTurn passed={false} done={false} placement={null} />);
+    const panel = screen.getByRole('region', { name: 'You panel' });
+    expect(panel.getAttribute('aria-current')).toBe('true');
+    expect(within(panel).getByText('You')).toBeTruthy();
+    expect(within(panel).getByText('13 cards · 7 pts')).toBeTruthy();
+    expect(within(panel).getByText('Turn')).toBeTruthy();
+    expect(panel.querySelectorAll(':scope > div')).toHaveLength(1);
   });
 });

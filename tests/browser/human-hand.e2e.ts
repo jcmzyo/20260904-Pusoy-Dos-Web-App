@@ -51,7 +51,7 @@ async function waitForSelectableTurn(page: import('@playwright/test').Page, minC
 
 test('every dealt card is selectable independently, and selection survives Sort Rank/Sort Suit', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const cards = hand.getByRole('img');
   const slots = hand.locator('[data-card-key]');
   await expect(cards).toHaveCount(13);
@@ -82,7 +82,7 @@ test('every dealt card is selectable independently, and selection survives Sort 
 
 test('dragging a card reorders the hand without changing what is selected', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const slots = hand.locator('[data-card-key]');
   await expect(slots).toHaveCount(13);
 
@@ -124,7 +124,7 @@ test('dragging a card reorders the hand without changing what is selected', asyn
 
 test('a drag is bounded to the hand region and cannot be pulled outside it', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const handRowBox = (await hand.boundingBox())!;
   const dragged = hand.locator('[data-card-key]').first();
   const draggedBox = (await dragged.boundingBox())!;
@@ -140,7 +140,7 @@ test('a drag is bounded to the hand region and cannot be pulled outside it', asy
 
 test('the hand row holding Sort Rank/Sort Suit is sized purely from the viewport, never from held card count (person\'s own follow-up report: they visibly shifted once the hand emptied)', async ({ page }) => {
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   await expect(hand.locator('[data-card-key]')).toHaveCount(13);
 
   // `.handRow`'s own height is a fixed CSS expression derived only from the play area's shared
@@ -180,7 +180,7 @@ test(`overlapped cards stay independently targetable at the minimum supported la
   if (!spec) throw new Error('Viewport matrix is missing its large-phone-landscape entry.');
   await page.setViewportSize({ width: spec.width, height: spec.height });
   await startGame(page);
-  const hand = page.getByRole('group', { name: 'Your hand' });
+  const hand = page.getByRole('listbox', { name: 'Your hand' });
   const cards = hand.getByRole('img');
   const slots = hand.locator('[data-card-key]');
   await expect(cards).toHaveCount(13);

@@ -1,13 +1,15 @@
 # Pusoy Dos --- UI / UX Design
 
-## UI / UX Document (v1.11)
+## UI / UX Document (v1.15)
 
-**Status:** Phase 1 design baseline with deferred approved ideas  
-**Last Modified:** September 19, 2026  
-**Parent document:** `requirements.md` v1.16  
-**Committed scope:** Phase 1 — Minimal Playable Basic Game UI
+**Status:** Phase 1 baseline plus committed Phase 2 design contracts  
+**Last Modified:** October 3, 2026\
+**Parent document:** `requirements.md` v1.17  
+**Committed scope:** Phase 2 M5–M8, preserving the completed Phase 1 UI
 
 ---
+
+> §§1–18 record the Phase 1 baseline. §19 defines the approved Phase 2 changes; portrait rejection and uniform landscape composition do not apply to supported Phase 2 portrait. Features described in §19 are planned until their tasks pass acceptance.
 
 # 1. Product Experience Goal
 
@@ -272,8 +274,220 @@ Human checks should include whether the tester can understand whose turn it is, 
 
 # 17. Deferred Approved UI Ideas
 
-Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; additional accessibility controls; an adaptive playable-portrait layout (Phase 2 idea — §14's landscape-first contract, including rotate guidance for portrait, remains Phase 1 behavior; a portrait-specific reflowed layout is not Phase 1 scope). Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
+Deferred: persistence/Resume UI; Stats; Settings; auto-pass; suit-color preference toggle; difficulty/personality configuration; Surprise Me; Mystery Bots; Competitive-specific result details; richer animation/audio/branding/progression; accessibility/preferences beyond §19. Adaptive playable portrait and scoped keyboard/focus/reduced-motion support are now committed Phase 2 work (§19). Manual hand rearrangement is **not deferred**; it is Phase 1 scope.
 
 # 18. Phase 1 UI Acceptance
 
 M4/Phase 1 is complete when a human can start a Basic Session immediately from Home, play a complete five-Round Session against three Baseline bots through production Engine/Orchestrator boundaries, use selection/sorting/manual arrangement and Play/Pass correctly, inspect public Discard/Event history without hidden-information leakage, understand Round/Session results, and use the same coherent landscape-first UI across the documented supported viewport matrix.
+
+# 19. Phase 2 Presentation and Accessibility Contract
+
+## 19.1 Responsive foundation (M5)
+
+Supported portrait phone/tablet layouts use an intentional narrow-screen composition, reusing production presentation state and intent rather than a parallel game loop. §14's uniform-scale geometry remains the landscape baseline only. Reorganizing opponent/status panels is allowed; all critical information/actions listed in requirements §3.6 must remain accessible. No portrait support is claimed merely because a rotate overlay was removed.
+
+M5-T01 freezes representative CSS viewport sizes, portrait minima, real-device/browser targets, card ratio, exposed-card targeting, core text/control minima, safe inset/browser-chrome behavior, overlay overflow, and measurable contrast criteria. The approved values are frozen in §19.6 (M5-T01). Existing landscape minimum 844×390, full-scale threshold 896×656, and landscape phone-tier 14px/44×44px exemption remain unchanged. The 28px exposed-card rule remains applicable to the existing landscape hand. Portrait must define its own usable exposure/target contract and cannot silently inherit the phone exemption.
+
+Human cards share a horizontal baseline; selected cards rise without changing display order. Selection, sorting, bounded manual rearrangement, and Engine-derived Play/Pass feedback remain independent of layout. If a 13-card portrait hand cannot satisfy the approved geometry, resolve that design in M5-T01 before implementation rather than silently changing the baseline/selection requirements.
+
+Supported portrait/landscape transitions preserve the active execution, pending Turn, selection, display order, overlay, and result checkpoint where applicable. Below-minimum states pause/prevent gameplay; restoring supported dimensions resumes coherently. Guidance must match device capability: never instruct a fine-pointer desktop window to physically rotate. An overlay or other remaining pause reason must not be cleared by a viewport recovery.
+
+## 19.2 Navigation and tutorial presentation (M7)
+
+The main menu (Home) provides **Play** and **How to Play**. **Play → choice window → Tutorial or Basic Game** is the approved M7 entry flow. Opening the window must not create a Session or tutorial run. Selecting **Tutorial** starts the scripted game with step-by-step guidance; selecting **Basic Game** starts the existing five-Round game against three Baseline bots. Closing/cancelling the window returns to the main menu without starting gameplay. Repeated activation must not start duplicate runs. Apply modal keyboard/focus entry, containment, and return to this choice window. It is an application flow selector, not a new Engine GameMode or a difficulty/settings screen.
+
+**How to Play** is available directly on the main menu without opening Play or starting a game. It opens a comprehensive, organized reference covering all current Basic house rules, combination comparisons and examples, Round/Session scoring and tiebreaks, and app controls. Include clear section navigation and a return to the main menu; a compact summary may supplement, but cannot replace, the full explanation. Retain reference access from gameplay/tutorial context without losing the current run; when shown over active gameplay it uses the existing pause/modal boundary. M7-T01 finalizes remaining content, retry/replay, completion, and return navigation details within this approved entry flow. No persistence is introduced.
+
+Tutorial guidance uses concise contextual text and visible cues, with less guidance in the final portion. It must not obscure cards or required controls, and focus must not jump on every bot event. Distinguish a legal action that does not satisfy the current lesson from an illegal Move. Feedback explains the relevant reason and allows retry. Do not add general move suggestions to normal Basic gameplay.
+
+Normal result presentation still follows §§12–13, including explicit Next Round for Rounds 1–4 and automatic Round 5 transition to Summary. Tutorial completion is a separate application checkpoint; it must not pretend an unfinished Engine Session is complete.
+
+## 19.3 Mandatory keyboard and focus behavior
+
+- Applicable controls are reachable in a sensible keyboard order with visible focus and meaningful accessible names; activation uses the expected button interaction.
+- Card selection, bounded rearrangement, Sort Rank/Suit, Play/Pass, navigation, tutorial actions, and results have keyboard-operable equivalents. The exact card navigation/reorder bindings and their visible instructions are frozen in §19.6.4 (M5-T01).
+- Modal focus enters the dialog, remains within its active interaction surface, and returns appropriately on close. Background controls cannot consume keyboard input. Non-dismissible result checkpoints retain their lifecycle rather than acquiring an Escape-to-skip rule.
+- Disabled-action reasons, validation feedback, selection, current Turn, PASS/DONE, and completion remain understandable without color alone. Provide text/semantic cues as appropriate to the component.
+
+## 19.4 Mandatory reduced-motion behavior
+
+Respect the system/browser reduced-motion preference without requiring a Settings screen. Simplify/remove meaningful movement in cards, score/results, and guidance while preserving selection emphasis, final scores/placements, instructional content, and progression. Do not make lifecycle completion depend on an animation event that no longer fires. A skip/continue input must not accidentally trigger the next action. Instant scoring presentation does not auto-start Rounds 2–5 or alter bot strategy. The frozen M5 specifics are in §19.6.6.
+
+## 19.5 Delivery and acceptance
+
+Implement these behaviors with the relevant M5 and M7 components; M8 verifies and fixes integration gaps. This is scoped accessibility support, not a claim of full standard conformance. Automated browser/component evidence and actual human keyboard, touch/mouse, readability, and tutorial-comprehension checks are required. Use the frozen matrix and record MANUAL VERIFICATION PENDING until humans report results. Do not widen scope into an unrestricted visual redesign.
+
+## 19.6 Frozen M5 portrait, input, and accessibility contract (M5-T01)
+
+**Approved by the user on September 29, 2026 (M5-T01).** This section is the measurable contract that §§19.1, 19.3, and 19.4 refer to. The later M5 tasks (T02–T08) and the M6–M8 matrix reuse it. It records approved *criteria*; it does not claim that any portrait behavior is implemented yet. Where it differs from §14, §14 still governs landscape and this section governs portrait.
+
+### 19.6.1 Baseline recorded before approval
+
+This is the state of the code at M5-T01 (`27abb0d`):
+
+- **Classification** (`useLayoutSupport.ts`, `layoutThresholds.ts`):
+  - Any taller-than-wide viewport is unsupported. Coarse-pointer devices get "Rotate your device to continue"; fine-pointer devices get "Resize your window to continue".
+  - Landscape is supported from 844×390. Full scale (scale 1) starts at 896×656.
+  - Between those two sizes (the landscape phone tier) the 14px text and 44×44px target minimums are exempt. The 28px exposed-card minimum applies to every landscape size.
+- **Hand** (`HumanHand`):
+  - Cards are a 60-design-unit width at a 5:7 ratio. Each card shows `max(70% of the card width, 28px / scale)` beyond the card before it. Selected cards rise 18 design units.
+  - Pointer drag reorder works. There is no keyboard operation of cards.
+- **Focus** (`Overlay`, `PlayPassControls`):
+  - Dismissible overlays return focus to the element that opened them, but they do not move focus into the dialog and they do not contain it.
+  - Play/Pass use native `disabled`, so the disabled reason cannot be reached with the keyboard.
+- **Reduced motion:** only the bot "deciding" spinner honors `prefers-reduced-motion`. The card lift transition, the table dim transition, and the Round Result stage sequence do not. The result lifecycles already advance on timers, not on animation events.
+- **Contrast (WCAG relative-luminance formula):**
+  - Failures: the Diamonds index `#ea580c` on the `#faf7ee` card face is 3.32:1; the enabled Play sub-label (`#f7f4e9` on `#2f9e58`) is 3.1:1; the Pass sub-label (`#f7f4e9` on `#2f6fd6`) is 4.37:1.
+  - All other measured text/background pairs pass.
+- **Safe areas:** `index.html` does not opt into `viewport-fit=cover`.
+
+### 19.6.2 Classification and supported portrait
+
+- **Orientation:** a viewport is *landscape* when `innerWidth > innerHeight`; otherwise it is *portrait*, and a square viewport counts as portrait. §14 governs landscape unchanged: minimum 844×390, full scale at 896×656, and the phone-tier exemption.
+- **Supported portrait:** `innerWidth ≥ 360` **and** `innerHeight ≥ 560` CSS px, whatever the pointer type. A portrait-shaped desktop window is therefore also supported portrait.
+- **Portrait classes:** *phone portrait* is 360–599px wide; *tablet portrait* is 600px wide or more. Only the composition rules in §19.6.3 differ between the two classes.
+- **Below-minimum guidance** depends on what the device can actually do:
+  - A fine-pointer device always gets **Resize your window to continue**. It is never told to rotate.
+  - A coarse-pointer device gets **Rotate your device to continue** only when swapping the two dimensions would produce a supported layout in the other orientation. Otherwise it gets **This screen is too small to play**.
+  - Example: a coarse landscape 667×375 swaps to a supported 375×667, so it is told to rotate. A coarse portrait 320×568 is told the screen is too small.
+- **Measurement:** use `window.innerWidth`/`innerHeight` (the layout viewport), as §14 already does. Re-evaluate on `resize` and `orientationchange`. Do not classify from `screen.*` or `visualViewport`, so pinch-zoom never reclassifies. A mobile browser toolbar collapsing or expanding is an ordinary resize.
+- **Safe areas:** M5 does not opt into `viewport-fit=cover`. The browser keeps content out of notch and home-indicator areas. Any later opt-in must pad critical content with `env(safe-area-inset-*)`.
+- **Transitions:**
+  - Supported portrait ↔ supported landscape switches composition without remounting the session table or replacing controllers. The active run, pending Turn, selection, manual display order, open overlay, reveal, and result checkpoint are all preserved.
+  - A resize or orientation change during an active drag cancels the drag exactly like `pointercancel`: nothing is dropped and the order is unchanged.
+  - Supported → unsupported keeps gameplay paused and inert behind the notice. Recovering the size never closes an overlay and never releases a pause held for another reason.
+
+### 19.6.3 Portrait composition, geometry, and sizing
+
+- **No scale transform in portrait:** the portrait composition is authored in real CSS px, without §14's uniform scale transform. So the **14px minimum text size** and the **44×44px minimum control target** apply literally to everything rendered in portrait, including the table, controls, card indices, trail badges, and every dialog. **The landscape phone-tier exemption does not apply to portrait.**
+- **Card ratio:** 5:7 everywhere. Cards are never distorted to fit.
+- **Held cards:** the rendered width `W` is 56px ≤ `W` ≤ 96px. `W` and the exposed width are determined only by the viewport, never by how many cards are held, so the hand stays the same size from 13 cards to 0. **Revision (approved by the user on October 2, 2026, during M5-T03 review):** in a fine-pointer (desktop browser) window `W` is capped at 72px instead of 96px; the pointer type sets only that cap. A further revision the same day lowered the touch cap to 88px and the width share to 14.5% of the viewport width, making cards slightly smaller.
+- **One row, one baseline:**
+  - All 13 cards sit in a single row on a common baseline for unselected cards, with no horizontal scroll and no clipping.
+  - The hand region keeps a side gutter of at least 4px.
+  - Every card except the last keeps an exposed (non-overlapped) width of **at least 24 CSS px**; the last card is fully visible.
+  - Worked check at the 360px minimum: 56 + 12 × 24 = 344 ≤ 352.
+  - The 28px landscape exposure rule is unchanged for landscape.
+- **Card hit area:** each card's target is its whole visible area, which is at least 24px wide and the full card height.
+- **Selection:** a selected card rises **at least 16 CSS px** without changing display order. Headroom for the rise is reserved, so a raised card is never clipped and never covers a control.
+- **Hand to beat:** its cards obey the same 56px minimum width, so their index text stays at 14px or larger.
+- **Arrangement:** all three opponents (West, North, East) sit across the top of the table and the human's own panel at its bottom, with the current hand to beat between them.
+- **Height tiers (approved by the user on October 2, 2026, during M5-T03 review):** each portrait class has a *tall* tier from `PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX` (662px) for phones and `PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX` (690px) for tablets (`layoutThresholds.ts`). Each threshold is the smallest height at which that class's tall layout fits with 56px cards and the literal 14px/44px minimums.
+  - In both tiers the human's own panel keeps at least 8px of room inside the table border, so its Turn/placement glow does not run into the border.
+  - Tall tier: every opponent shows its face-down card fan, held upright above its panel, and a revealed 4th-place hand takes the fan's place. The human's own panel is stacked like the other panels: name, then count and score, then status.
+  - Below the tall tier: there is no fan, so everything still fits down to the 360×560 minimum. The human's own panel is a one-row strip. A revealed 4th-place hand is laid over the table just below its panel; its final portrait presentation is M5-T06's.
+- **Phone portrait opponents:** each opponent is a compact panel showing:
+  - the name,
+  - the remaining card count as a number,
+  - the score,
+  - a Turn / PASS / DONE-plus-placement status as text,
+  - the current-Turn cue, and the "deciding" indicator on its own row below the status, as in the full panel.
+
+  In phone portrait:
+  - There is no per-seat Play trail. The center shows the current combination (or FREE LEAD) and the player who made it, and the Event Log keeps the history. The face-down fan follows the height tiers above. (Revision, October 2, 2026: M5-T01 had removed the phone fan entirely.)
+  - §§5.3, 5.4, and 5.7 seat-layout rules do not apply.
+  - The human's own name, score, and status stay visible.
+- **Tablet portrait opponents:** the full panel with the per-seat Play trail is kept. The remaining card count is always shown as a number. The face-down fan follows the height tiers above.
+- **Controls order (approved by the user on October 2, 2026, during M5-T03 review; revised the same day):** below the table, top to bottom: Event Log, Discard Pile, and Leave Game (12px below the table), the hand, Sort Rank and Sort Suit, then Pass and Play side by side (Play on the right). Event Log, Discard Pile, and Leave Game share one width (at most 130px) so Discard Pile sits exactly under the middle of Sort and the hand. Sort Rank/Sort Suit share one width, so the gap between them lines up with the gap between Pass and Play, and are drawn 32px tall inside their full 44px target. Pass and Play are each centered in their own half of the row at a fixed size of up to 160×62px (smaller than a held card), still fitting two lines of 14px reason text. Every control keeps a 44px minimum target. Landscape is unchanged.
+- **Must stay reachable in every supported portrait layout without clipping:** Event Log, Discard Pile, Leave Game, Sort Rank, Sort Suit, Play, and Pass.
+- **Vertical budget at 360×560:** a rough estimate for T03, not a frozen layout. M5-T03 confirmed it fits (no page scroll at 360×560 with 56px cards):
+  - title/Round row about 28px,
+  - opponents about 84px,
+  - center about 104px,
+  - hand about 98px,
+  - Play/Pass about 64px,
+  - Sort about 44px,
+  - utility row about 44px,
+  - plus gaps: about 520px in total.
+- **Spare vertical height (approved by the user on October 2, 2026, during M5-T03 review; replaces the September 30, 2026 rule that kept the table at its natural height and gave all spare height to the controls):** in every supported portrait layout the table takes spare height first, up to **5/8 of the viewport height**, and its extra height goes to the center area. Any height beyond that goes to the controls section below the table. When there is no spare height, the table keeps its natural height and the controls keep their sizes; only gaps compress.
+- **Overflow:**
+  - The gameplay screen has no page scroll, vertical or horizontal, at any supported portrait or landscape size.
+  - A dialog panel is at most the viewport height minus 16px. Only the dialog body scrolls; the title, the close button, and action buttons such as Next Round, Home, Play Again, Stay, and Leave stay visible. Body scroll stays locked.
+  - Nothing scrolls horizontally.
+  - In phone portrait the Round Result and Session Summary tables may scroll vertically inside the dialog body. This relaxes the landscape "no inner scrollbar" rule of §13 for portrait only.
+
+### 19.6.4 Keyboard, focus, and disabled-feedback contract
+
+- **Tab order** matches visual reading order in both orientations. There are no global single-key shortcuts.
+  - Landscape: Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Play → Pass.
+  - Portrait (approved by the user on October 2, 2026, during M5-T03 review, following the portrait controls order in §19.6.3): Event Log → Discard Pile → Leave Game → hand → Sort Rank → Sort Suit → Pass → Play.
+- **The hand** is a single Tab stop using a roving `tabindex`. It is exposed as `role="listbox"` with `aria-multiselectable="true"`, a horizontal orientation, and the accessible name "Your hand". Each card is an `option` whose accessible name is its rank and suit, with `aria-selected` reflecting selection. Bindings:
+  - **← / →** move focus to the previous or next card. **Home / End** move focus to the first or last card. Focus does not wrap.
+  - **Space / Enter** toggle the focused card's selection. The existing selection cap applies: selecting beyond the cap does nothing, as with a pointer. Enter never submits a Play.
+  - **Shift+← / Shift+→** move the focused card one position left or right in display order. **Shift+Home / Shift+End** move it to the first or last position. At the boundary the move does nothing. Selection never changes, and focus stays on the moved card.
+  - The keyboard allows exactly what the pointer allows at that moment. It never bypasses the Turn, pause, or inert gates.
+- **Focus stability:**
+  - After Sort Rank or Sort Suit, focus stays on the same card identity.
+  - When the focused card leaves the hand, focus moves to the remaining card at the same index, clamped to the last card. If the hand is empty, focus moves to Sort Rank.
+  - Focus that was on another control stays there.
+- **Visible instructions:** while the hand has keyboard focus (`:focus-visible` inside the hand), a hint is shown next to it: "← → choose · Space select · Shift+← → move". The hint must not cover cards or controls. The same text is the listbox's accessible description. Touch-only use never shows it.
+- **Focus indicator:** every focusable element shows a visible indicator: an outline at least 2px thick with at least 3:1 contrast against the adjacent colors. A focused card is raised in stacking order, not moved in position, so its whole outline is visible. Rising in position remains reserved for selection.
+- **Disabled feedback:** Play and Pass use `aria-disabled="true"` instead of native `disabled`, so they stay focusable. Activating either while it is aria-disabled does nothing. The Engine-derived reason text stays visible and is connected through `aria-describedby`.
+- **Dismissible dialogs** (Event Log, Discard Pile, Leave confirmation):
+  - Opening a dialog moves focus into it. Discard Pile focuses its scrollable body so the arrow keys scroll it. The Leave dialog focuses **Stay**.
+  - Event Log (approved by the user during M5-T05 review; documented October 3, 2026): opening a nonempty log focuses and highlights the newest entry. Entries retain list/listitem semantics (`<ol>`/`<li>`), not listbox/option or selection semantics. Exactly one entry has `tabindex="0"`; other entries and the scrollable body have `tabindex="-1"`. Arrow Up/Down move to the previous/next entry, Home/End move to the first/last entry, and navigation does not wrap. The focused entry scrolls into view. Tab reaches Close; Shift+Tab from Close returns to the focused entry. An empty log focuses its scrollable body instead. This replaces the earlier Event Log body-focus contract; public chronology and information visibility are unchanged.
+  - Tab and Shift+Tab cycle only within the dialog, and background controls are inert.
+  - Escape closes the dialog; for Leave, Escape means Stay.
+  - On close, focus returns to the opener. If the opener is gone, focus goes to the hand.
+- **Round Result:**
+  - On open, focus moves to the dialog heading.
+  - **Next Round is never focused automatically**; it is the first Tab stop. Enter or Space on the dialog surface only skips to the settled state, and each skip input is used once.
+  - There is no Escape handling; the lifecycle in §12 is unchanged.
+  - When Round 5 is replaced by the Session Summary, focus moves to the Summary heading. The Summary's Tab order is Event Log → Home → Play Again.
+  - After Next Round closes a Round Result overlay for Rounds 1–4, completion of the Round-start transition moves focus to the hand’s current tabbable card with `preventScroll: true` only if focus is on `document.body`. If no tabbable hand card exists, recovery does nothing. The opening Round after Start Game does not perform this recovery: focus remains on `document.body`, so the first Tab reaches Event Log. Round 5 → Session Summary keeps focus on the Summary heading. Reduced motion does not change these focus rules.
+- **Unsupported-layout notice:** when the notice appears it takes focus. When the size recovers, the previously focused element gets focus back if it still exists.
+- **Screen readers:** M5 adds no screen-reader live-region announcements. Names, roles, and states are required.
+
+### 19.6.5 Contrast and non-color criteria
+
+**Thresholds (WCAG 2.2 AA):**
+
+- Text needs **4.5:1**. Large text (24px or larger, or 18.66px or larger in bold) needs **3:1**.
+- Focus indicators and UI-component boundaries that identify a control need **3:1**.
+- Measure against the actual composited background, blending any translucent layers over the table.
+- The criteria apply in both orientations, to all gameplay and dialog surfaces, and to hover and active states as well as the resting state.
+- A disabled control is exempt, but any reason text it displays must still meet 4.5:1.
+
+**Approved color changes (same hue families):**
+
+| Element | Now | Approved | Contrast |
+|---|---|---|---|
+| Diamonds on the card face (`#faf7ee`) | `#ea580c` | `#c2410c` | 4.83:1 |
+| Enabled Play background (with `#f7f4e9` text) | `#2f9e58` | `#1f7a43` | 4.86:1 |
+| Pass background (with `#f7f4e9` text) | `#2f6fd6` | `#1d5fc4` | 5.47:1 |
+
+- Hover and active variants must also meet the thresholds.
+- §15's palette direction is otherwise unchanged: Diamonds stays orange, and suits stay distinguishable by symbol shape as well as color.
+
+**Non-color cues:** every state that color signals also has a text, shape, or position cue:
+
+- selection: the card rises and has `aria-selected`;
+- Turn, PASS, DONE, and placement: text;
+- Play validity, invalid reasons, and No valid plays: text;
+- medal rows: ordinal text;
+- the human player's own highlight: the "You" name text.
+
+### 19.6.6 Reduced-motion behavior
+
+- Follow the live `(prefers-reduced-motion: reduce)` media query, including changes made during a Session. No Settings screen is involved.
+- **When the preference is set:**
+  - A selected card appears raised instantly, with no transition; its raised position is kept.
+  - Table dimming and other opacity or filter transitions are instant.
+  - The bot "deciding" spinner becomes a static three-dot indicator. It does not cycle or animate, and its accessible name remains "<seat> is deciding", so the seat is still announced as deciding.
+  - The Round Result opens **already settled**, with final ordering, Round points, and totals all visible.
+  - With the Round Result already settled, a skip input does nothing. Next Round is still required for Rounds 1–4. Round 5 still moves to the Session Summary on its existing timer.
+  - The Round-start transition screen and the 4th-place reveal keep their durations and their skip rules, without any movement.
+  - Pointer drag still follows the pointer.
+  - Bot pacing delays are unchanged.
+- **Always:** no lifecycle step waits on `animationend` or `transitionend`, and reduced motion never auto-starts Rounds 2–5 or changes gameplay.
+
+### 19.6.7 Task allocation
+
+- **M5-T02:** classification and guidance (§19.6.2), including the unsupported-layout notice's focus entry and return (§19.6.4).
+- **M5-T03:** table, opponents, controls, the Play/Pass `aria-disabled` change, and the approved colors (§§19.6.3–19.6.5).
+- **M5-T04:** hand geometry and keyboard bindings.
+- **M5-T05:** dialogs.
+- **M5-T06:** results and reduced motion.
+- **M5-T07 and M5-T08:** verification.
+
+The verification matrix and evidence assignments are in `testing-simulation.md` (Phase 2 Verification Contract, "Frozen M5 acceptance matrix").

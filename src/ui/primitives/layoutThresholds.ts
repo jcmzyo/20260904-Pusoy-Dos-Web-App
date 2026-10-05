@@ -14,6 +14,15 @@ export const MINIMUM_SUPPORTED_LANDSCAPE_WIDTH_PX = 844;
  *  from 375 with the width above (M4-T14 decision). */
 export const MINIMUM_SUPPORTED_LANDSCAPE_HEIGHT_PX = 390;
 
+/** Supported portrait minimum (M5-T01; ui-ux.md §19.6.2): a portrait viewport (width <= height, so a
+ *  square counts as portrait) is supported at or above both of these, whatever the pointer type. */
+export const MINIMUM_SUPPORTED_PORTRAIT_WIDTH_PX = 360;
+export const MINIMUM_SUPPORTED_PORTRAIT_HEIGHT_PX = 560;
+
+/** Supported portrait at or above this width is the tablet class; below it, the phone class (ui-ux.md
+ *  §19.6.2). Only the portrait composition differs between the two classes (§19.6.3). */
+export const MINIMUM_TABLET_PORTRAIT_WIDTH_PX = 600;
+
 /** The smallest viewport at which the play area renders at scale 1 or larger (its own design size,
  *  `playAreaScale.ts`; a Vitest check pins the two together). From here up (M4-T14 "two tiers"),
  *  `MINIMUM_READABLE_TEXT_SIZE_PX` and `MINIMUM_TOUCH_TARGET_SIZE_PX` below hold literally for everything
@@ -30,3 +39,11 @@ export const MINIMUM_TOUCH_TARGET_SIZE_PX = 44;
 
 /** Smallest exposed (non-overlapped) width an overlapping hand card must keep to stay targetable. */
 export const MINIMUM_EXPOSED_CARD_WIDTH_PX = 28;
+
+/** Supported portrait at or above these heights is the "tall" tier (ui-ux.md §19.6.3, revised October 2,
+ *  2026): opponents show their face-down fan and the human's panel stacks like the others. Below them the
+ *  compact arrangement (no fan, a one-row human strip) keeps everything at the 14px/44px minimums within the
+ *  height. Each is the smallest height at which that class's tall layout fits with 56px cards
+ *  (tests/browser/portrait-table.e2e.ts checks it). */
+export const PORTRAIT_PHONE_TALL_MIN_HEIGHT_PX = 662;
+export const PORTRAIT_TABLET_TALL_MIN_HEIGHT_PX = 690;

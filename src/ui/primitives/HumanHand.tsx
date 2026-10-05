@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { Card } from '../../domain';
 import { PlayingCard } from './Card';
 import { cardKey, moveKey, reconcileOrder, sortKeysByRank, sortKeysBySuit } from './handOrdering';
@@ -25,11 +25,15 @@ export interface HumanHandProps {
 /** Pointer movement (px) beyond which a gesture counts as a drag rather than a tap (ui-ux.md §6:
  *  "Reordering changes only display order; it does not select/deselect cards"). */
 const DRAG_THRESHOLD_PX = 4;
+// Finger taps can drift 6–10 screen pixels without intending to rearrange a card.
+const TOUCH_DRAG_THRESHOLD_PX = 12;
+const KEYBOARD_HINT = '← → choose · Space select · Shift+← → move';
 
 interface DragState {
   readonly key: string;
   readonly pointerId: number;
   readonly startClientX: number;
+  readonly threshold: number;
   readonly cardRect: DOMRect;
   readonly containerRect: DOMRect;
   /** On-screen size of the card relative to its own layout size (`PlayArea`'s uniform scale, M4-T14):
@@ -49,7 +53,7 @@ function clamp(value: number, min: number, max: number): number {
  * click/tap selection, always-visible Sort Rank/Sort Suit, and a bounded
  * mouse/touch drag reorder (M4-T07; ui-ux.md §6).
  *
- * Selection only ever changes from a per-card click handler — there is no
+ * Selection changes through per-card pointer or keyboard activation — there is no
  * container-level click-away handler — so clicking empty table space never
  * clears selection (ui-ux.md §6).
  */
@@ -58,11 +62,56 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   const [order, setOrder] = useState<readonly string[]>(() => cards.map(cardKey));
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const [focusKey, setFocusKey] = useState<string | null>(() => cards[0] ? cardKey(cards[0]) : null);
+  const focusInsideRef = useRef(false);
+  const sortRankRef = useRef<HTMLButtonElement | null>(null);
+  const hintId = useId();
+  const cardSetKey = [...cardsByKey.keys()].sort().join('|');
 
   const handRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const dragStateRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
+  /** A drag cancelled by a resize (below) while its pointer is still down; see `handlePointerUp`. */
+  const layoutCancelledDragRef = useRef<{ readonly key: string; readonly pointerId: number; readonly dragged: boolean } | null>(null);
+
+  useLayoutEffect(() => {
+    if (focusKey !== null && cardsByKey.has(focusKey)) return;
+    const remaining = reconcileOrder(order, new Set(cardsByKey.keys()));
+    const next = remaining[clamp(order.indexOf(focusKey ?? ''), 0, remaining.length - 1)] ?? null;
+    setFocusKey(next);
+    // Removing a focused DOM node can leave focus on body without a blur event. Recover only if
+    // focus belonged to the hand; a dialog or another control must keep its own focus.
+    if (focusInsideRef.current && (document.activeElement === document.body || handRef.current?.contains(document.activeElement))) {
+      if (next) cardRefs.current.get(next)?.focus(); else sortRankRef.current?.focus();
+    }
+  }, [cardsByKey, focusKey, order]);
+
+  function inputBlocked() {
+    return handRef.current?.closest('[inert], [hidden]') !== null;
+  }
+
+  function handleKeyDown(key: string, event: KeyboardEvent<HTMLDivElement>) {
+    if (inputBlocked() || event.altKey || event.ctrlKey || event.metaKey) return;
+    suppressClickRef.current = false;
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      if (!event.repeat) toggleSelected(key);
+      return;
+    }
+    const index = order.indexOf(key);
+    const target = event.key === 'ArrowLeft' ? index - 1 : event.key === 'ArrowRight' ? index + 1
+      : event.key === 'Home' ? 0 : event.key === 'End' ? order.length - 1 : null;
+    if (target === null) return;
+    event.preventDefault();
+    const bounded = clamp(target, 0, order.length - 1);
+    if (event.shiftKey) {
+      cancelPendingDrag();
+      setOrder((prev) => moveKey(prev, key, bounded));
+    } else {
+      cardRefs.current.get(order[bounded]!)?.focus();
+    }
+  }
 
   // Reconciles display order/selection against the authoritative card set. `cards` is a fresh array
   // every SessionPresentation snapshot even when its contents are unchanged (bot Turns re-render the
@@ -78,6 +127,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   }, [cardsByKey]);
 
   function toggleSelected(key: string) {
+    if (inputBlocked()) return;
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
@@ -109,7 +159,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   // Reports the current selection, as authoritative Card values in display order, to the caller (T08's
   // Play/Pass control) whenever selection or the authoritative card set itself changes.
   useEffect(() => {
-    onSelectionChange?.(order.filter((key) => selected.has(key)).map((key) => cardsByKey.get(key)!));
+    onSelectionChange?.(order.filter((key) => selected.has(key) && cardsByKey.has(key)).map((key) => cardsByKey.get(key)!));
   }, [order, selected, cardsByKey, onSelectionChange]);
 
   function computeDropIndex(draggedKey: string, clientX: number): number {
@@ -124,7 +174,9 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   }
 
   function handlePointerDown(key: string, event: ReactPointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || dragStateRef.current || inputBlocked()) return;
+    suppressClickRef.current = false;
+    layoutCancelledDragRef.current = null;
     const cardEl = cardRefs.current.get(key);
     const containerEl = handRef.current;
     if (!cardEl || !containerEl) return;
@@ -134,18 +186,22 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     const cardRect = cardEl.getBoundingClientRect();
     dragStateRef.current = {
       key, pointerId: event.pointerId, startClientX: event.clientX,
+      threshold: event.pointerType === 'touch' ? TOUCH_DRAG_THRESHOLD_PX : DRAG_THRESHOLD_PX,
       cardRect, containerRect: containerEl.getBoundingClientRect(),
       scale: cardEl.offsetWidth > 0 ? cardRect.width / cardEl.offsetWidth : 1,
       dragged: false,
     };
-    setDragKey(key);
+    cardEl.focus({ preventScroll: true });
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
     if (!state || event.pointerId !== state.pointerId) return;
     const deltaX = event.clientX - state.startClientX;
-    if (Math.abs(deltaX) > DRAG_THRESHOLD_PX) state.dragged = true;
+    if (Math.abs(deltaX) > state.threshold) {
+      state.dragged = true;
+      setDragKey(state.key);
+    }
     const cardEl = cardRefs.current.get(state.key);
     if (!cardEl) return;
     if (!state.dragged) return;
@@ -159,6 +215,7 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
   /** Tears down an in-progress drag: visual offset, pointer capture, and drag state. Shared by a completed
    *  drop (`endDrag`) and a cancelled gesture (`cancelDrag`), neither of which may leave any of it behind. */
   function releaseDrag(state: DragState, pointerId: number) {
+    dragStateRef.current = null;
     const cardEl = cardRefs.current.get(state.key);
     if (cardEl) {
       cardEl.style.transform = '';
@@ -166,7 +223,6 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
         cardEl.releasePointerCapture(pointerId);
       }
     }
-    dragStateRef.current = null;
     setDragKey(null);
   }
 
@@ -180,10 +236,50 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
     releaseDrag(state, event.pointerId);
   }
 
+  function cancelPendingDrag() {
+    const state = dragStateRef.current;
+    if (!state) return;
+    layoutCancelledDragRef.current = { key: state.key, pointerId: state.pointerId, dragged: state.dragged };
+    releaseDrag(state, state.pointerId);
+  }
+
+  useLayoutEffect(() => {
+    cancelPendingDrag();
+  }, [cardSetKey]);
+
+  // A resize or orientation change during an active drag cancels it exactly like `pointercancel`: nothing
+  // is dropped and the order is unchanged (ui-ux.md §19.6.2). The rects captured at pointerdown no longer
+  // describe the re-laid-out hand, so continuing the drag would drop against stale geometry.
+  useEffect(() => {
+    function cancelForLayoutChange() {
+      cancelPendingDrag();
+    }
+    window.addEventListener('resize', cancelForLayoutChange);
+    window.addEventListener('orientationchange', cancelForLayoutChange);
+    return () => {
+      window.removeEventListener('resize', cancelForLayoutChange);
+      window.removeEventListener('orientationchange', cancelForLayoutChange);
+    };
+  }, []);
+
+  /** Unlike a real `pointercancel`, a layout-cancelled gesture still has its pointer down, so its release
+   *  can produce a click. When that gesture had already become a drag and is released on its own card (the
+   *  only case where the click lands on that card), the click is swallowed so the cancelled drag does not
+   *  turn into a selection toggle. */
+  function handlePointerUp(key: string, event: ReactPointerEvent<HTMLDivElement>) {
+    const cancelled = layoutCancelledDragRef.current;
+    if (cancelled && cancelled.pointerId === event.pointerId) {
+      layoutCancelledDragRef.current = null;
+      if (cancelled.dragged && cancelled.key === key) suppressClickRef.current = true;
+      return;
+    }
+    endDrag(event);
+  }
+
   function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
     if (!state || event.pointerId !== state.pointerId) return;
-    const dropIndex = state.dragged ? computeDropIndex(state.key, event.clientX) : null;
+    const dropIndex = state.dragged && !inputBlocked() && cardsByKey.has(state.key) ? computeDropIndex(state.key, event.clientX) : null;
     releaseDrag(state, event.pointerId);
     if (dropIndex !== null) {
       setOrder((prev) => moveKey(prev, state.key, dropIndex));
@@ -193,7 +289,9 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
 
   return (
     <div className={styles.handArea}>
-      <div className={styles.handRow} ref={handRef} role="group" aria-label="Your hand">
+      <div className={styles.handRow} ref={handRef} role="listbox" aria-label="Your hand" aria-multiselectable="true" aria-orientation="horizontal" aria-describedby={hintId}
+        onFocus={() => { focusInsideRef.current = true; }}
+        onBlur={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) focusInsideRef.current = false; }}>
         {order.map((key) => {
           const card = cardsByKey.get(key);
           if (!card) return null;
@@ -204,16 +302,23 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
               ref={(el) => {
                 if (el) cardRefs.current.set(key, el); else cardRefs.current.delete(key);
               }}
-              className={`${styles.cardSlot} ${dragKey === key ? styles.dragging : ''}`}
+              className={`${styles.cardSlot} ${isSelected ? styles.selected : ''} ${dragKey === key ? styles.dragging : ''}`}
+              role="option"
+              aria-label={`${card.rank} of ${card.suit[0]!.toUpperCase() + card.suit.slice(1)}`}
+              aria-selected={isSelected}
+              tabIndex={focusKey === key ? 0 : -1}
+              onFocus={() => setFocusKey(key)}
+              onKeyDown={(event) => handleKeyDown(key, event)}
               data-card-key={key}
               data-selected={isSelected}
               onPointerDown={(event) => handlePointerDown(key, event)}
               onPointerMove={handlePointerMove}
-              onPointerUp={endDrag}
+              onPointerUp={(event) => handlePointerUp(key, event)}
               onPointerCancel={cancelDrag}
+              onLostPointerCapture={cancelDrag}
               onClick={() => toggleSelected(key)}
             >
-              <div className={`${styles.lift} ${isSelected ? styles.selected : ''}`}>
+              <div>
                 {/* The player's own held cards draw the center suit pip too (round-4 follow-up: without
                  *  it, larger/less-crowded held cards read as visually "barren"), unlike the smaller,
                  *  more-crowded center hand-to-beat which stays corner-only (Card.tsx). */}
@@ -223,11 +328,12 @@ export function HumanHand({ cards, maxSelectable, onSelectionChange }: HumanHand
           );
         })}
       </div>
+      <div id={hintId} className={styles.keyboardHint}>{KEYBOARD_HINT}</div>
       <div className={styles.sortControls}>
-        <button type="button" className={styles.sortButton} onClick={() => setOrder(sortKeysByRank([...cardsByKey.values()]))}>
+        <button ref={sortRankRef} type="button" className={styles.sortButton} onClick={() => { if (!inputBlocked()) { cancelPendingDrag(); setOrder(sortKeysByRank([...cardsByKey.values()])); } }}>
           Sort Rank
         </button>
-        <button type="button" className={styles.sortButton} onClick={() => setOrder(sortKeysBySuit([...cardsByKey.values()]))}>
+        <button type="button" className={styles.sortButton} onClick={() => { if (!inputBlocked()) { cancelPendingDrag(); setOrder(sortKeysBySuit([...cardsByKey.values()])); } }}>
           Sort Suit
         </button>
       </div>

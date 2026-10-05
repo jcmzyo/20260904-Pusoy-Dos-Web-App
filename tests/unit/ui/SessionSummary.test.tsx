@@ -197,4 +197,23 @@ describe('SessionSummary (M4-T13; ui-ux.md §13)', () => {
     const buttons = screen.getAllByRole('button');
     expect(buttons.map((button) => button.textContent)).toEqual(['Event Log', 'Home', 'Play Again']);
   });
+
+  it('scrolls overflowing results with reading keys without activating an action or changing the Tab order', () => {
+    const onPlayAgain = vi.fn();
+    const onHome = vi.fn();
+    renderSummary(resolveBasicSessionResult(ids, clearRounds), clearRounds, { onPlayAgain, onHome });
+    const body = screen.getByRole('region', { name: 'Session results' });
+    Object.defineProperties(body, { clientHeight: { value: 200 }, scrollHeight: { value: 600 } });
+    const heading = screen.getByRole('heading', { name: 'Session Summary' });
+    fireEvent.keyDown(heading, { key: 'PageDown' });
+    expect(body.scrollTop).toBe(200);
+    fireEvent.keyDown(heading, { key: 'ArrowUp' });
+    expect(body.scrollTop).toBe(160);
+    fireEvent.keyDown(heading, { key: 'PageDown', ctrlKey: true });
+    expect(body.scrollTop).toBe(160);
+    fireEvent.keyDown(heading, { key: 'Tab' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Event Log' }));
+    expect(onPlayAgain).not.toHaveBeenCalled();
+    expect(onHome).not.toHaveBeenCalled();
+  });
 });

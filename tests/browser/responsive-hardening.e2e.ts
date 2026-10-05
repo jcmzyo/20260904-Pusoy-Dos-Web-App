@@ -6,9 +6,12 @@ import {
   MINIMUM_EXPOSED_CARD_WIDTH_PX,
   MINIMUM_READABLE_TEXT_SIZE_PX,
   MINIMUM_TOUCH_TARGET_SIZE_PX,
+  SUPPORTED_LANDSCAPE_VIEWPORTS,
   VIEWPORT_MATRIX,
+  guidanceCases,
 } from './viewportMatrix';
-import { currentSelectionCap, waitForSelectableTurn, waitForYourTurn } from './turnHelpers';
+import type { GuidanceCase } from './viewportMatrix';
+import { currentSelectionCap, driveUnderFakeClock, waitForSelectableTurn, waitForYourTurn } from './turnHelpers';
 
 /**
  * Real-browser coverage for M4-T14 (Full Responsive Hardening; ui-ux.md §14): the frozen T04 viewport
@@ -33,8 +36,9 @@ interface Size {
   readonly height: number;
 }
 
-const SUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category === 'supported');
-const UNSUPPORTED_VIEWPORTS: readonly Size[] = VIEWPORT_MATRIX.filter((entry) => entry.category !== 'supported');
+// Landscape only: these suites assert §14's scaled landscape geometry. Supported portrait has its own
+// composition and geometry contract (ui-ux.md §19.6.3), asserted by the later M5 portrait tasks.
+const SUPPORTED_VIEWPORTS: readonly Size[] = SUPPORTED_LANDSCAPE_VIEWPORTS;
 
 // Reproducible deal (M4-P1 review finding: the required deterministic browser acceptance suite was
 // missing) for the one test below that must reliably drive a full five-Round Session to Session Summary -
@@ -213,7 +217,7 @@ async function waitForCardsOnCenterTable(page: Page) {
     .poll(async () => (await centerCard.count()) > 0 || (await youPanel.getAttribute('aria-current')) === 'true', { timeout: 20_000 })
     .toBe(true);
   if ((await centerCard.count()) > 0) return;
-  await page.getByRole('group', { name: 'Your hand' }).getByRole('img', { name: '3 of Clubs', exact: true }).click();
+  await page.getByRole('listbox', { name: 'Your hand' }).getByRole('img', { name: '3 of Clubs', exact: true }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(centerCard.first()).toBeVisible();
 }
@@ -247,7 +251,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
       ['Check Discard Pile', page.getByRole('button', { name: 'Check Discard Pile', exact: true })],
       ['Event Log', page.getByRole('button', { name: 'Event Log', exact: true })],
       ['Leave Game', page.getByRole('button', { name: 'Leave Game', exact: true })],
-      ['Your hand', page.getByRole('group', { name: 'Your hand' })],
+      ['Your hand', page.getByRole('listbox', { name: 'Your hand' })],
       ['You panel', page.getByRole('region', { name: 'You panel' })],
       ['West panel', page.getByRole('region', { name: 'West panel' })],
       ['North panel', page.getByRole('region', { name: 'North panel' })],
@@ -476,7 +480,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`held cards share one baseline and only selected cards rise at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const hand = page.getByRole('group', { name: 'Your hand' });
+    const hand = page.getByRole('listbox', { name: 'Your hand' });
     const cards = hand.getByRole('img');
     const slots = hand.locator('[data-card-key]');
     await expect(cards).toHaveCount(13);
@@ -506,7 +510,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`all 13 overlapped cards are independently targetable, each with >= ${MINIMUM_EXPOSED_CARD_WIDTH_PX}px exposed, at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const hand = page.getByRole('group', { name: 'Your hand' });
+    const hand = page.getByRole('listbox', { name: 'Your hand' });
     const cards = hand.getByRole('img');
     const slots = hand.locator('[data-card-key]');
     await expect(cards).toHaveCount(13);
@@ -532,7 +536,7 @@ for (const viewport of SUPPORTED_VIEWPORTS) {
 for (const viewport of SUPPORTED_VIEWPORTS) {
   test(`dragging a held card follows the pointer 1:1 under the scaled play area at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
     await startGameAt(page, viewport);
-    const slots = page.getByRole('group', { name: 'Your hand' }).locator('[data-card-key]');
+    const slots = page.getByRole('listbox', { name: 'Your hand' }).locator('[data-card-key]');
     await expect(slots).toHaveCount(13);
     const slot = slots.nth(6);
     const start = (await slot.boundingBox())!;
@@ -592,93 +596,6 @@ for (const viewport of FULL_SCALE_VIEWPORTS) {
       await expect(dialog).not.toBeVisible();
     }
   });
-}
-
-/**
- * Drives the human seat through Rounds with the same minimal legal strategy round-result.e2e.ts uses
- * (always Pass while responding; lead the first card only when forced to), but under Playwright's fake
- * clock so the bots' 800ms presentation pauses, the reveal, and the scoring stages are fast-forwarded
- * instead of waited out in real time - this is what makes reaching Round Result *and* a five-Round
- * Session Summary affordable across the whole matrix. Stops at Round 1's settled Result
- * (`'roundResult'`), or after clicking through every "Next Round" until Session Summary is showing
- * (`'sessionSummary'`).
- */
-/**
- * Blocks until this seat's own just-submitted Move has actually left it - the Round ending or another
- * Turn genuinely starting elsewhere. A `click()` resolving is only the browser dispatching the click
- * event; the resulting Engine commit runs on the far side of `GameRunner.commitWhenSubmissionAllowed`'s
- * own deliberate macrotask boundary (M4-P1 review finding, escalated - a real `MessageChannel` round-trip,
- * not gated by this test's own fake clock), so without this wait the loop's very next atomic `evaluate()`
- * below could run before that commit lands and re-observe this exact same, already-acted-on Turn - the
- * Engine never lets this same seat's own Turn immediately recur, so waiting for the "no longer my Turn"
- * edge is always safe here.
- */
-async function waitForTurnToRelease(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => {
-      const panel = document.querySelector('[aria-label="You panel"]');
-      const isYourTurn = panel?.getAttribute('aria-current') === 'true';
-      const dialogOpen = document.querySelector('[role="dialog"]') !== null;
-      return !isYourTurn || dialogOpen;
-    },
-    { timeout: 20_000 },
-  );
-}
-
-async function driveUnderFakeClock(page: Page, until: 'roundResult' | 'sessionSummary') {
-  const passButton = page.getByRole('button', { name: 'Pass', exact: true });
-  const playButton = page.getByRole('button', { name: 'Play', exact: true });
-  const nextRound = page.getByRole('button', { name: 'Next Round', exact: true });
-  const hand = page.getByRole('group', { name: 'Your hand' });
-
-  for (let step = 0; step < 4000; step++) {
-    // Every fact this loop decides on, including whether Pass is enabled and whether this is an
-    // Opening lead, is read together in this one atomic evaluate (M4-P1 review finding, escalated) -
-    // `GameRunner.commitWhenSubmissionAllowed` now deliberately crosses a macrotask boundary on every
-    // Turn, so a `yourTurn` read and a separate, later `passButton.isEnabled()` read could otherwise
-    // straddle two different Turns instead of describing the same live one.
-    const state = await page.evaluate(() => {
-      const passButtonEl = document.querySelector('button[aria-label="Pass"]') as HTMLButtonElement | null;
-      return {
-        yourTurn: document.querySelector('[aria-label="You panel"]')?.getAttribute('aria-current') === 'true',
-        summary: document.querySelector('[aria-label="Session Summary"]') !== null,
-        dialog: document.querySelector('[role="dialog"]') !== null,
-        nextRound: [...document.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Next Round'),
-        skipReveal: document.querySelector('[aria-label="Skip reveal"]') !== null,
-        transition: document.querySelector('[aria-label^="Starting Round"]') !== null,
-        passEnabled: passButtonEl !== null && !passButtonEl.disabled,
-        opening: document.querySelector('[aria-label="Current hand to beat"] p')?.textContent?.includes('OPENING') ?? false,
-      };
-    });
-
-    if (state.summary) {
-      // Let the settling Round 5 -> Summary hand-off and the Summary's own layout finish.
-      await page.clock.runFor(1000);
-      return;
-    }
-    if (state.nextRound) {
-      if (until === 'roundResult') return;
-      await nextRound.click();
-      continue;
-    }
-    if (state.skipReveal) {
-      await page.getByRole('button', { name: 'Skip reveal', exact: true }).click();
-      continue;
-    }
-    if (state.dialog || state.transition || !state.yourTurn) {
-      await page.clock.runFor(state.dialog || state.transition ? 700 : 800);
-      continue;
-    }
-    if (state.passEnabled) {
-      await passButton.click();
-    } else {
-      if (state.opening) await hand.getByRole('img', { name: '3 of Clubs', exact: true }).click();
-      else await hand.getByRole('img').first().click();
-      await playButton.click();
-    }
-    await waitForTurnToRelease(page);
-  }
-  throw new Error(`Session did not reach ${until} within the step budget.`);
 }
 
 test('Round Result and Session Summary stay inside the viewport with their actions targetable at every supported size', async ({ page }) => {
@@ -744,11 +661,11 @@ test('Round Result and Session Summary stay inside the viewport with their actio
   }
 });
 
-for (const viewport of UNSUPPORTED_VIEWPORTS) {
-  test(`the unsupported-layout guidance fits its viewport without scrolling at ${viewport.name} (${viewport.width}x${viewport.height})`, async ({ page }) => {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+function guidanceFitTest({ spec, pointer, heading }: GuidanceCase) {
+  test(`the unsupported-layout guidance fits its viewport without scrolling at ${spec.name} (${spec.width}x${spec.height}, ${pointer} pointer)`, async ({ page }) => {
+    await page.setViewportSize({ width: spec.width, height: spec.height });
     await page.goto('/');
-    await expectTargetable(page.getByRole('heading', { name: 'Resize your window to continue', exact: true }), 'guidance heading');
+    await expectTargetable(page.getByRole('heading', { name: heading, exact: true }), 'guidance heading');
     const scrolls = await page.evaluate(() => {
       const root = document.documentElement;
       return root.scrollWidth > root.clientWidth || root.scrollHeight > root.clientHeight;
@@ -756,3 +673,10 @@ for (const viewport of UNSUPPORTED_VIEWPORTS) {
     expect(scrolls, 'guidance page scrolls').toBe(false);
   });
 }
+
+for (const guidanceCase of guidanceCases('fine')) guidanceFitTest(guidanceCase);
+
+test.describe('coarse-pointer (touch) context', () => {
+  test.use({ hasTouch: true });
+  for (const guidanceCase of guidanceCases('coarse')) guidanceFitTest(guidanceCase);
+});

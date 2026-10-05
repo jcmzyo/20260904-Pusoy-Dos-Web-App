@@ -1,19 +1,21 @@
 # Pusoy Dos --- Testing & Simulation Strategy
 
-## Testing & Simulation Document (v1.8)
+## Testing & Simulation Document (v1.10)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 15, 2026
-**Parent document:** `requirements.md` v1.14  
-**Shared model:** `domain-model.md` v1.3  
-**Engine design:** `engine.md` v1.7  
-**Orchestrator design:** `orchestrator.md` v1.6  
-**AI design:** `ai.md` v1.5  
+**Last Modified:** October 3, 2026
+**Parent document:** `requirements.md` v1.17  
+**Shared model:** `domain-model.md` v1.4  
+**Engine design:** `engine.md` v1.8  
+**Orchestrator design:** `orchestrator.md` v1.7  
+**AI design:** `ai.md` v1.7  
 **Module:** Testing & Simulation  
 **Primary POC target:** Fully headless five-Round game/session execution  
 **Language/tooling:** TypeScript + Vitest + React Testing Library + Playwright + headless Node.js execution
 
 ---
+
+> Earlier Phase 1/POC sections are the preserved baseline and historical sequencing. The Phase 2 Verification Contract below extends them for M5–M8; supported portrait replaces the old portrait-rejection expectation only after the approved M5 contract is implemented.
 
 # 1. Purpose
 
@@ -2034,3 +2036,137 @@ A valid deal must not be silently skipped as "unplayable." A failure either term
 Confirmed simulation defects should create focused regression coverage and/or a retained deterministic failing-seed fixture. The original seed must be replayed after the fix, followed by the broader deterministic regression batch.
 
 Normal successful batch logs should remain compact; detailed traces may be captured on failure/replay to avoid unnecessary log volume.
+
+# Phase 2 Verification Contract
+
+## Test layers and execution
+
+Use existing Vitest/RTL for responsive classification, selection/reordering, focus, reduced motion, objective progression, scenario validation, and production integration. Use focused Playwright coverage for geometry/targetability, orientation/resize, drag, overlays and pause, keyboard flows, tutorial progression/completion, and responsive results. Test rules authoritatively in Engine tests; do not duplicate their algorithms in UI/tutorial assertions.
+
+For each code task run focused tests, npm test, and npm run typecheck. Run npm run build for UI/integration changes and at milestone gates. Run npm run test:browser for affected browser contracts and the full suite at each milestone gate. Run npm run test:acceptance:m3 at milestone gates and when Engine/runner/deterministic setup changes can affect reliability. Use Node >=24 and npm ci only if installation is necessary. There is no lint script in the current package; do not invent a passing lint result or add tooling solely for this plan.
+
+Contract-only planning tasks verify documentation links, consistency, approval records, and scope; they do not claim runtime tests. Existing tests that expect all portrait to be rejected must be updated narrowly for the approved M5 support classification, while below-minimum and landscape regressions remain meaningful.
+
+## Frozen acceptance matrix
+
+M5-T01 freezes portrait CSS viewport/minimums, orientation boundary cases, fine/coarse input, real mobile browser-chrome/inset behavior, and keyboard/reduced-motion/contrast criteria. Preserve existing supported landscape cases and their approved sizing exception. Include immediately below-minimum and threshold sizes; distinguish emulator evidence from actual touch-device usability. The same matrix is reused by M6–M8. Requirements §12.5 lists Chrome, Edge, Firefox, Safari, Android Chrome, and iOS Safari; M5-T01 assigns reproducible versions/devices and automated versus human coverage. Current Playwright configuration is Chromium-only; Safari/iOS evidence must not be claimed from that suite. Browser availability limitations remain NOT VERIFIED until covered, not silently removed from the matrix. The approved M5-T01 values are recorded in the next section.
+
+## Frozen M5 acceptance matrix and evidence assignments (M5-T01)
+
+**Approved by the user on September 29, 2026 (M5-T01).** The criteria are defined in `ui-ux.md` §19.6. This section freezes the cases and the evidence each case needs. Sizes are CSS px (`innerWidth×innerHeight`). M5-T02 carries these cases into `tests/browser/viewportMatrix.ts`, which already holds the landscape cases. The README's implemented matrix is updated only when the behavior is delivered (M5-T07). None of these cases has passed yet.
+
+### Portrait cases
+
+**Supported portrait:**
+
+| Name | Size | Class | Pointer to exercise |
+|---|---|---|---|
+| portrait-phone-minimum | 360×560 | phone (boundary) | coarse + fine |
+| portrait-phone-360 | 360×640 | phone | coarse |
+| portrait-phone-375 | 375×667 | phone | coarse |
+| portrait-phone-ios-toolbar | 390×664 | phone (iPhone with Safari toolbars) | coarse |
+| portrait-phone-390 | 390×844 | phone (was `portrait-unsupported`) | coarse + fine |
+| portrait-phone-412 | 412×915 | phone | coarse |
+| portrait-phone-class-max | 599×960 | phone (class boundary) | coarse |
+| portrait-tablet-minimum | 600×960 | tablet (class boundary) | coarse |
+| portrait-tablet-768 | 768×1024 | tablet | coarse + fine |
+| portrait-tablet-820 | 820×1180 | tablet | coarse |
+| portrait-tablet-1024 | 1024×1366 | tablet | coarse |
+| portrait-square | 700×700 | tablet (square counts as portrait) | fine |
+
+**Unsupported portrait, with the expected guidance:**
+
+| Name | Size | Pointer | Expected guidance |
+|---|---|---|---|
+| portrait-below-min-width | 359×560 | fine | "Resize your window to continue" |
+| portrait-below-min-width | 359×560 | coarse | "This screen is too small to play" |
+| portrait-below-min-height | 360×559 | coarse | "This screen is too small to play" |
+| portrait-small-phone | 320×568 | coarse | "This screen is too small to play" |
+| portrait-phone-se-toolbar | 375×553 | coarse | "This screen is too small to play" (iPhone SE-class Safari with toolbars shown; excluded by the approved 560px minimum, and its 553×375 landscape is also unsupported) |
+
+### Landscape cases
+
+- **Supported, unchanged:** large-desktop 1920×1080, laptop 1440×900, windowed-desktop 1280×800, tablet-landscape 1024×768, and large-phone-landscape 844×390, which is the minimum.
+- **Unchanged landscape rules:** the 896×656 full-scale threshold, the phone-tier exemption from 14px text and 44×44px targets, and the 28px exposed-card rule stay exactly as in §14.
+- **Unsupported landscape, with the expected guidance:**
+
+| Name | Size | Pointer | Expected guidance |
+|---|---|---|---|
+| landscape-below-min-width | 843×390 | coarse | "Rotate your device to continue" (390×843 would be supported portrait) |
+| landscape-below-min-width | 843×390 | fine | "Resize your window to continue" |
+| landscape-below-min-height | 844×389 | fine | "Resize your window to continue" |
+| landscape-below-min-height | 844×389 | coarse | "Rotate your device to continue" (389×844 would be supported portrait) |
+| small-phone-landscape | 667×375 | coarse | "Rotate your device to continue" |
+| undersized-landscape | 560×320 | coarse | "This screen is too small to play" |
+
+### Transition cases
+
+For each transition below, assert the same run, pending Turn, selection, display order, and open overlay, with no duplicated commits and no Session reset:
+
+- portrait-phone-390 ↔ large-phone-landscape;
+- portrait-tablet-768 ↔ tablet-landscape;
+- supported → unsupported → supported, while it is a human Turn, while a bot Turn is pending, and while an overlay is open;
+- a resize during an active drag, which must cancel the drag with the order unchanged.
+
+### Automated assertions
+
+Automated checks assert geometry and behavior. They never assert animation durations.
+
+- **Every supported portrait case:**
+  - no page scroll in either direction;
+  - rendered text is 14px or larger, and controls are 44×44px or larger;
+  - with 13 cards, each card has 24px or more exposed, the card ratio is 5:7, unselected cards share one baseline, and selected cards rise 16px or more;
+  - each of the 13 cards can be hit at its exposed-area center;
+  - the listed controls can be reached;
+  - dialogs keep their title and actions visible while their body scrolls.
+- **Keyboard:**
+  - the listbox bindings and their boundaries;
+  - card identity is preserved after sorting and reordering;
+  - focus lands in the right place after a Play;
+  - focus enters, is contained in, and returns from each dialog;
+  - Event Log opens on its newest entry, keeps only the focused entry in the Tab order, navigates with Arrow Up/Down and Home/End without wrapping, and scrolls the focused entry into view; Tab from a middle entry reaches Close directly and Shift+Tab returns to that entry. An empty log and Discard Pile focus their scrollable body; Leave focuses Stay (user-approved M5-T05 amendment, October 3, 2026);
+  - no background element responds to keyboard input;
+  - Next Round is never focused automatically, and a skip never continues.
+- **Reduced motion** (`page.emulateMedia({ reducedMotion: 'reduce' })` plus RTL `matchMedia` stubs):
+  - the Round Result is settled when it opens;
+  - Next Round is still required for Rounds 1–4;
+  - Round 5 still reaches the Summary;
+  - the preference can change during a Session.
+- **Contrast:** computed colors of the listed elements checked against the §19.6.5 thresholds. Color states always have text or shape equivalents.
+- **Focus indicator:** for each focusable control type, and for a focused card, the computed `outline-width` is 2px or more when focused (`:focus-visible`), and the outline color reaches at least 3:1 against the adjacent composited background (§19.6.4). Width alone is insufficient evidence that an outline is painted. The M5-T05 dialog checks open each dialog by focusing its opener and pressing Enter, require `:focus-visible` and `outline-style: solid`, and count declared outline-color pixels in screenshots at `scale: 'css'` against a geometric minimum. Sample the entry's inset -3px outline and the body's and Leave buttons' outset +3px outlines (Close uses +2px), allowing one raster pixel at fractional edges. Negative controls disable each tested outline while retaining the original sampling geometry/color and must fall below the same threshold. Assert `window.scrollY === 0` before measuring because the probe combines viewport-relative bounds with document-relative screenshot clips. This amendment was authorized by the user on October 3, 2026; contrast checks remain required separately.
+
+### Browser, device, and evidence assignments (requirements §12.5; nothing is removed)
+
+| Target | Automated evidence | Human evidence |
+|---|---|---|
+| Chrome, desktop (current stable; record the version) | Playwright Chromium, full matrix, plus Chromium mobile-emulation projects (`hasTouch`/`isMobile`, coarse pointer) for the portrait and guidance cases | Portrait-shaped window and landscape smoke; keyboard-only Round |
+| Edge, desktop (current stable) | None separately. Chromium results count as **engine-level only**. | Smoke: start, play a Round, dialogs, keyboard |
+| Firefox, desktop (current stable) | None in M5 | Smoke: start, play a Round, dialogs, keyboard, reduced motion |
+| Safari, macOS (current stable) | None. Playwright WebKit is not Safari evidence. | Smoke. **NOT VERIFIED** if no Mac is available. |
+| Android Chrome, real phone 360–412px wide | Chromium emulation is **not** device evidence | **Required (M5-T08):** a full five-Round portrait Session; rotation both ways; toolbar collapse/expand; touch drag and selection of every card |
+| iOS Safari, real iPhone | None | **Required (M5-T08):** a portrait Session smoke; rotation; toolbar behavior; touch drag and selection |
+| Tablet portrait, real device (iPad Safari or an Android tablet in Chrome) | Tablet emulation is not device evidence | **Required (M5-T08):** a full five-Round portrait Session |
+
+- An unavailable browser or device is recorded as **NOT VERIFIED** with the reason. It is never dropped from the matrix.
+- Human records use the fields listed under "Human evidence and completion" above.
+- Emulator, automated, and prototype observations never count as human or device evidence.
+
+## Scenario falsification and reproducibility
+
+Record scenario/revision, deterministic setup inputs, checkpoint, and action sequence in test diagnostics. Check 52-card uniqueness and setup invariants; reject malformed/missing card references, impossible states, and invalid scripts. Verify accepted transitions/events against production Engine outputs, not mirrored rules. Cover rejection with unchanged state/events, multiple satisfying solutions and their scripted continuations, exact-action objectives, duplicate activation, repeated/reordered observation, cancellation, stale responses, restart, and final completion. Require bounded execution so defective scripts cannot loop indefinitely. Keep private scenario/deal data out of normal views/logs and Baseline requests.
+
+Re-run representative scenarios with identical setup/action sequences and assert equivalent authoritative outcomes/objective progression. Reordering or sorting the displayed hand must not change recognition of the same card set. No reliance on unseeded random data or exact animation duration.
+
+## Human evidence and completion
+
+Each applicable task lists concrete actions and expected visible results. A real person verifies card readability/targetability, bounded dragging, keyboard navigation/focus, understandable feedback, Rules discovery, and tutorial comprehension. Ask a new player to complete the tutorial without developer explanation, then play normal Basic gameplay; record confusion separately from functional failures. Human checks never require timing in milliseconds or hidden/internal state inspection.
+
+Record tester/date, build or commit, browser/device/viewport/input, actions, expected/observed result, pass/fail, and issue references. Use MANUAL VERIFICATION PENDING until reported. Task code completion cannot be called COMPLETE while a required task DoD manual check is unverified; milestone acceptance requires the designated human checks and no unresolved blocker. M8 maps every requirements §3.6 / expansion-plan §11 item to concrete evidence, including full five-Round portrait phone/tablet and landscape Sessions, keyboard/focus, reduced motion, tutorial, reference, and headless reliability.
+
+## Phase 2 Main-Menu Entry and Comprehensive Guide Checks
+
+Verify Home → Play opens a Tutorial / Basic Game choice window without starting execution; closing/cancelling starts neither, and selecting either starts exactly one corresponding run even after repeated activation. Cover keyboard focus entry/containment/return and touch/mouse activation. The direct main-menu How to Play entry must work independently of Play or any Session, with navigable comprehensive rules, valid examples, scoring/tiebreak explanations, and current controls. Human checks include finding these topics without developer coaching; a short summary or link to a repository file is insufficient. In-game/tutorial reference access continues to preserve run state and pause/focus behavior. These M7/M8 checks supersede the Phase 1 direct Start Game entry expectation only when the new flow is delivered.
+
+## Authored Tutorial Script Acceptance
+
+Use [tutorial-script.md](tutorial-script.md) as concrete M7 fixture/content input. Reproduce all five full deals, guided prefixes and listed alternative routes; verify real Engine results after five Rounds, no winner requirement, and unrestricted legal actions in Round 5. The deliberate scripted-to-Baseline handoff must occur only at its authored checkpoint, never as illegal-script fallback. Check the difference between required and optional Pass using Engine legal Moves, both finisher-continuation branches, and direct player use of all eight combination categories. Authoring evidence is not runtime/controller/UI or human-acceptance evidence.

@@ -1,12 +1,12 @@
 # Pusoy Dos --- Game Orchestrator Design
 
-## Game Orchestrator / Runner Document (v1.6)
+## Game Orchestrator / Runner Document (v1.7)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 15, 2026
-**Parent document:** `requirements.md` v1.14  
-**Shared model:** `domain-model.md` v1.3  
-**Engine design:** `engine.md` v1.7  
+**Last Modified:** September 29, 2026
+**Parent document:** `requirements.md` v1.17  
+**Shared model:** `domain-model.md` v1.4  
+**Engine design:** `engine.md` v1.8  
 **Module:** Game Orchestrator  
 **Language:** TypeScript
 
@@ -1548,3 +1548,11 @@ This document is synchronized to the committed Phase 1 plan and `requirements.md
 - Baseline AI has no controlled randomness; separate AI RNG state is unnecessary unless a future approved AI introduces it.
 
 No canonical gameplay rule was changed by this cleanup. Any future feature that changes these boundaries must be planned and synchronized explicitly rather than inferred from older deferred text.
+
+# Phase 2 Tutorial and Presentation Coordination
+
+Tutorial scenarios use production GameRunner and PlayerController request/submission boundaries. Scripted controllers propose intended Moves on their own authoritative Turns from their permitted request data; they never force a state transition. Tutorial objective checks and guidance remain outside the generic runner. Existing normal Basic startup, Baseline selection, Session continuation, and headless execution remain compatible.
+
+Tutorial retry must distinguish Engine rejection from a legal but lesson-inappropriate attempt rejected before submission. Neither consumes an accepted gameplay transition. A scripted illegal response is a scenario defect, not an invitation to auto-pass or retry forever. Route existing structured results/diagnostics and bound execution in deterministic tests. Any required API change is reviewed at M6-T01 before implementation.
+
+Pause, leave, restart, scenario replacement, completion, and unsupported-layout recovery must preserve serialization and invalidate obsolete requests/callbacks. No old response may commit into a replacement run. Tutorial explanation checkpoints are application-owned presentation gates, not new Round/Session states. Multiple pause reasons must compose; closing Rules or recovering supported size cannot clear an unrelated gate. The production rules for Rounds 1–4 continuation and terminal Session results remain unchanged. See tutorial.md and ui-ux.md §19.

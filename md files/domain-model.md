@@ -1,10 +1,10 @@
 # Pusoy Dos --- Shared Domain Model
 
-## Domain Model Document (v1.3)
+## Domain Model Document (v1.4)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 8, 2026
-**Parent document:** `requirements.md` v1.14\
+**Last Modified:** September 29, 2026
+**Parent document:** `requirements.md` v1.17\
 **Scope:** Shared, implementation-independent game vocabulary and data
 contracts\
 **Language:** TypeScript
@@ -670,3 +670,7 @@ reveals a clear cross-module need.
 
 This keeps the domain model stable, understandable, and independent
 while preserving strong subsystem boundaries.
+
+# 20. Phase 2 Ownership Clarification
+
+Phase 2 reuses the existing Card, Move, PlayerId, Combination, and Basic game vocabulary. A tutorial is application-guided Basic gameplay, not a new GameMode. Scenario definitions, authored steps, objective identifiers, run progress, and guidance state belong to the tutorial subsystem described in tutorial.md, not shared domain. Public Engine state/events and controller request contracts retain their existing owners. This planning update adds no shared type or runtime contract.

@@ -1,11 +1,11 @@
 # Pusoy Dos --- Game Engine Design
 
-## Game Engine Document (v1.7)
+## Game Engine Document (v1.8)
 
 **Status:** Draft for implementation\
-**Last Modified:** September 9, 2026
-**Parent document:** `requirements.md` v1.14\
-**Shared model:** `domain-model.md` v1.3\
+**Last Modified:** September 29, 2026
+**Parent document:** `requirements.md` v1.17\
+**Shared model:** `domain-model.md` v1.4\
 **Module:** Game Engine\
 **Language:** TypeScript
 
@@ -1481,3 +1481,11 @@ The **Event & Logging System** owns:
 
 Keeping shared domain concepts separate from engine-owned state prevents
 both duplication and accidental leakage of engine internals.
+
+# Phase 2 Tutorial Integration Contract
+
+Phase 2 preserves authoritative legality, classification/comparison, opening, Pass/Trick/finishing semantics, Basic scoring, five-Round Sessions, events, and invariants. The Engine does not own lessons, hints, objective progression, or React state.
+
+M6-T01 must select and document the smallest valid deterministic scenario setup path. Current production startup accepts injected RNG; it does not advertise arbitrary snapshot restoration. Prefer existing production setup and legal replay where sufficient. If authored controlled deals require a new Engine-owned setup boundary, document validation, consumers, compatibility, and obtain approval for the substantial public change before implementing M6-T02. Do not add arbitrary internal-state mutation, incomplete decks, impossible opening ownership, or a general persistence/snapshot API.
+
+Every accepted tutorial Move uses production submitMove through the runner. Objectives may restrict tutorial intent before submission, but may not change legal-Move truth. Rejected Moves do not mutate authoritative state or emit accepted-transition events. Script/configuration defects must fail diagnostically; they cannot be repaired by substituting a Move or editing state. Tutorial-safe presentation follows existing views; no opponent-hand reveal exception is approved. See tutorial.md for scenario ownership and execution requirements.

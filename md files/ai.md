@@ -1,13 +1,13 @@
 # Pusoy Dos --- AI System Design
 
-## AI System Document (v1.6)
+## AI System Document (v1.7)
 
 **Status:** Draft for implementation  
-**Last Modified:** September 18, 2026  
-**Parent document:** `requirements.md` v1.16  
-**Shared model:** `domain-model.md` v1.3  
-**Engine design:** `engine.md` v1.7  
-**Orchestrator design:** `orchestrator.md` v1.6  
+**Last Modified:** September 29, 2026  
+**Parent document:** `requirements.md` v1.17  
+**Shared model:** `domain-model.md` v1.4  
+**Engine design:** `engine.md` v1.8  
+**Orchestrator design:** `orchestrator.md` v1.7  
 **M2 milestone:** `m2-baseline-ai-headless-task-breakdown.md` v1.1  
 **Module:** AI System  
 **Language:** TypeScript
@@ -308,3 +308,7 @@ Research references retained for design provenance include:
 - "Dynamic Greedy Algorithm for Big Two Card Game's AI" as historical heuristic evidence.
 
 Do not import external game rules from these sources.
+
+# Phase 2 Baseline Preservation
+
+Normal Basic gameplay continues to use the production deterministic Baseline bot and the existing information boundary. Phase 2 introduces no difficulty, personality, strategy retuning, or advanced search. Tutorial-scripted controllers belong to tutorial.md and express authored intentions through PlayerController; they are not a new AI level and may not change Baseline behavior. Scripted actors receive their permitted request view and Engine legal candidates, not other players' private hands. Authored scenario data must not be passed wholesale into production AI inputs or player-facing projections.

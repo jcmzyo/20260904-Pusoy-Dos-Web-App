@@ -352,8 +352,9 @@
   cursor: pointer;
 }
 
+/* 0.22 keeps the #f7f4e9 label at 4.5:1 or better over the lightest backdrop stop, #215b47 (ui-ux.md §19.6.5). */
 .sideButton:hover {
-  background: rgba(234, 216, 167, 0.28);
+  background: rgba(234, 216, 167, 0.22);
 }
 
 /* Leave Game is the one destructive button here, so it is red (the person's own follow-up request); the
@@ -472,4 +473,288 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #ead8a7;
+}
+
+/* ---------------------------------------------------------------------------------------------------------
+ * Supported portrait composition (M5-T03; ui-ux.md §19.6.3, revised October 2, 2026). Authored in real CSS
+ * px - PlayArea renders unscaled here - so the 14px text and 44x44px control minimums hold literally. Top to
+ * bottom: title/Round row; the table (opponents West, North, East across the top, the current hand to beat,
+ * the human's own panel at the bottom); then the controls - Event Log/Discard Pile/Leave Game, the hand,
+ * Sort Rank/Sort Suit, and Pass | Play - in DOM order, which is also portrait's Tab order (§19.6.4). The table takes spare height first, up to 5/8 of the
+ * viewport; anything beyond that goes to the controls.
+ *
+ * Two height tiers per class (`PORTRAIT_*_TALL_MIN_HEIGHT_PX`, layoutThresholds.ts; App.tsx adds
+ * `.portraitTall`): in the tall tier opponents show their face-down fan and the human's panel stacks like the
+ * others; below it there is no fan and the human's panel is a one-row strip, so everything still fits down
+ * to the 360x560 minimum.
+ *
+ * Held and center card width `W` (5:7) depends only on the viewport (and, for its cap, the pointer type):
+ * at most 14.5vw (at most 16vw keeps 13 cards with a 24px exposed strip each inside the hand's 4px side
+ * gutters from the 360px minimum up: W + 12 x 24 <= 100vw - 8px), and at most what the height leaves once
+ * everything else is laid out (`--portrait-fixed`: the layout's natural height apart from the two card rows,
+ * each 7/5 W tall), clamped to 56px and `--portrait-card-max` (88px; 72px in a fine-pointer browser window). The exposed strip
+ * spreads the remaining width over the 12 overlapped cards, up to 3/4 of a card.
+ * --------------------------------------------------------------------------------------------------------- */
+.portrait {
+  --edge-inset: 8px;
+  --portrait-card-max: 88px;
+}
+
+@media (pointer: fine) {
+  .portrait {
+    --portrait-card-max: 72px;
+  }
+}
+
+.portraitPhone {
+  --portrait-fixed: 409px;
+}
+
+.portraitTablet {
+  --portrait-fixed: 439px;
+}
+
+.portraitPhone.portraitTall {
+  --portrait-fixed: 505px;
+}
+
+.portraitTablet.portraitTall {
+  --portrait-fixed: 533px;
+}
+
+.portrait .playContent {
+  --card-width: clamp(56px, min(14.5vw, (100vh - var(--portrait-fixed)) * 5 / 14, var(--portrait-card-max)), 96px);
+  --hand-card-exposed: min(var(--card-width) * 0.75, (100vw - 8px - var(--card-width)) / 12);
+  --hand-row-padding: 0px;
+  --card-index-min-font-size: 14px;
+  --sort-button-padding: 6px 12px;
+  /* Sort Rank/Sort Suit look 32px tall but keep their 44px target: 6px transparent bands above and below. */
+  --sort-button-border-color: transparent;
+  --sort-button-border-width: 6px 0;
+  --sort-button-radius: 6px / 12px;
+  --sort-button-ring: inset 0 0 0 1px #ead8a7;
+  --sort-controls-display: grid;
+}
+
+@supports (height: 1dvh) {
+  .portrait .playContent {
+    --card-width: clamp(56px, min(14.5vw, (100dvh - var(--portrait-fixed)) * 5 / 14, var(--portrait-card-max)), 96px);
+  }
+}
+
+.portrait .header {
+  min-height: 28px;
+  padding: 4px var(--edge-inset) 0;
+}
+
+/* The table grows into spare height first, up to 5/8 of the viewport: its flex weight dwarfs the controls
+ * section's, so the controls take a negligible share until the table reaches its cap, then all of the rest
+ * (weights summing to less than 1 would leave that rest unused). The extra table height goes to the center. */
+.portrait .table {
+  flex: 1000 0 auto;
+  max-height: 62.5vh;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "west north east"
+    "center center center"
+    "south south south";
+  gap: 4px;
+  margin: 4px 4px 0;
+  padding: 4px 4px 0;
+  border-radius: 20px;
+  --seat-card-gap: 6px;
+}
+
+@supports (height: 1dvh) {
+  .portrait .table {
+    max-height: 62.5dvh;
+  }
+}
+
+.portrait .seat {
+  min-width: 0;
+  gap: var(--seat-card-gap);
+}
+
+.portrait .seatWest,
+.portrait .seatEast {
+  flex-direction: column;
+}
+
+.portrait .seatSouth {
+  justify-self: stretch;
+  /* Room for the panel's Turn/placement glow, so it fades out before the table border (the table's own
+   * bottom padding gives way to this, below). */
+  padding: 2px 8px 8px;
+}
+
+/* In the tall tier the human's panel is a stacked panel like the opponents', centered under the table. */
+.portraitTall .seatSouth {
+  justify-self: center;
+  width: min(100%, 200px);
+}
+
+/* Portrait holds every bot fan upright above its panel, overlapped like North's in landscape. */
+.portrait .seatWest .botHand,
+.portrait .seatEast .botHand {
+  flex-direction: row;
+  min-width: 184px;
+  min-height: 56px;
+}
+
+.portrait .seatWest .botHand > *:not(:first-child),
+.portrait .seatEast .botHand > *:not(:first-child) {
+  margin-top: 0;
+  margin-left: -28px;
+}
+
+.portrait .center {
+  width: 100%;
+  min-width: 0;
+}
+
+/* At least the tallest state (a meta line over a row of five cards), as in landscape. */
+.portrait .currentHand {
+  width: 100%;
+  height: auto;
+  min-height: calc(var(--card-width) * 7 / 5 + 22px);
+}
+
+.portrait .handInfo {
+  gap: 4px;
+  max-width: 100%;
+}
+
+/* One line: a long name shortens with an ellipsis while "played <type>" stays whole. */
+.portrait .handMeta {
+  display: flex;
+  max-width: 100%;
+  line-height: 17px;
+  white-space: pre;
+}
+
+.portrait .handPlayer {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portrait .handCards {
+  gap: 4px;
+}
+
+.portrait .bottomBar {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 4px;
+  min-height: 0;
+  margin: 0;
+  /* 12px between the table and the first controls row. */
+  padding: 12px 4px 8px;
+}
+
+/* Reclaim spacing for the keyboard hint at 360×560 while keeping the card/control sizes and the
+ * 12px table-to-utility gap. */
+.portrait .bottomBar:has([role="option"]:focus-visible) {
+  gap: 0;
+  padding-bottom: 0;
+}
+
+/* Three equal-width buttons, centered as a group, so Check Discard Pile sits exactly under the middle of Sort
+ * Rank/Sort Suit and the hand. Each is at most 130px wide; a label that does not fit wraps onto a second line
+ * within the 44px height. */
+.portrait .bottomLeft {
+  display: grid;
+  grid-template-columns: repeat(3, min(130px, (100% - 16px) / 3));
+  justify-content: center;
+  align-self: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.portrait .sideButton {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+}
+
+/* Phone portrait opponents are compact panels filling their column (PlayerPanel `variant="compact"`), with
+ * the face-down fan above in the tall tier: 13 backs overlapped to fit the column's width. */
+.portraitPhone .seatWest,
+.portraitPhone .seatNorth,
+.portraitPhone .seatEast {
+  justify-self: stretch;
+}
+
+.portraitPhone .seat > .botHand {
+  align-self: stretch;
+  min-width: 0;
+  min-height: 56px;
+}
+
+.portraitPhone .seat > .botHand > *:not(:first-child),
+.portraitPhone .seatWest .botHand > *:not(:first-child),
+.portraitPhone .seatEast .botHand > *:not(:first-child) {
+  margin-top: 0;
+  margin-left: calc((100% - 40px * 13) / 12);
+}
+
+/* Without a fan (the short tier), a revealed 4th-place hand is laid just below its panel, over the table
+ * (App.tsx `Seat`; its final portrait presentation is M5-T06's). */
+.portrait:not(.portraitTall) .seatWest,
+.portrait:not(.portraitTall) .seatNorth,
+.portrait:not(.portraitTall) .seatEast {
+  position: relative;
+}
+
+.portrait:not(.portraitTall) .seat > .revealedHand {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  z-index: 2;
+  align-self: auto;
+  min-width: 0;
+  min-height: 0;
+  transform: translateX(-50%);
+}
+
+.portrait .seat > .revealedHand {
+  width: max-content;
+  min-width: 0;
+  align-self: center;
+  z-index: 2;
+  --card-index-min-font-size: 14px;
+}
+
+.portrait .seat:has(> .revealedHand) {
+  width: 100%;
+}
+
+.portrait .seatWest > .revealedHand,
+.portrait:not(.portraitTall) .seatWest > .revealedHand {
+  align-self: flex-start;
+  left: 0;
+  transform: none;
+}
+
+.portrait .seatEast > .revealedHand,
+.portrait:not(.portraitTall) .seatEast > .revealedHand {
+  align-self: flex-end;
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.portrait .seat > .revealedHand > *:not(:first-child) {
+  margin-left: -16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tableDimmed {
+    transition: none;
+  }
 }
