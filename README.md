@@ -1,5 +1,7 @@
 # Pusoy Dos — Offline Web Game
 
+**Try the game here: https://jc-pusoy-dos.netlify.app/**
+
 Web-based implementation of Pusoy Dos (Filipino "Big Two"). See `requirements.md`,
 `domain-model.md`, and `engine.md` for the authoritative product/rules/architecture
 documentation. This README covers only local setup for the current milestone.
